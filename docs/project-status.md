@@ -51,10 +51,15 @@ Rama `feature/order-cancellations-refunds-incidents`, commit `1347648`, PR https
 - Participantes autorizados informan y consultan incidencias; negocio/admin las resuelve. Incidencias y reembolsos quedan en historial/versionado del pedido y notifican después de persistir.
 - Migraciones `OrderCancellationRefundsIncidents` y `OrderCancellationAuditConstraints`, script `docs/sql/OrderCancellationRefundsIncidents.sql`; no aplicadas. La alteración de `CancellationReason` solo afecta a una columna nullable que esta misma pila acaba de añadir, y el dominio limita el texto a 500 caracteres.
 
+## PR #12 abierto: métricas del piloto
+
+- Rama `feature/pilot-metrics`, commit `c8df529`, PR https://github.com/EmanuelC1601/poraqui-backend/pull/12, basada en PR #11. Añade `GET /api/admin/metrics/pilot`, con permiso exclusivo de admin, filtro UTC de hasta 366 días y datos agregados sin información personal. Resume pedidos por estado, valor total, entregas, cancelaciones, incidencias abiertas, reembolsos pendientes y tiempo medio de entrega.
+- No requiere migración. El endpoint se prueba en SQLite; queda pendiente revisar el SQL generado y el comportamiento en SQL Server cuando exista una conexión remota accesible para la aplicación.
+
 ## Verificaciones actuales
 
 - Build: `dotnet build Poraqui.sln`, 0 advertencias y 0 errores.
-- Pruebas: `dotnet test Poraqui.sln`, 18/18 con SQLite en memoria y archivos temporales. El recorrido verifica horarios, opciones, permisos entre negocios, importes, cancelación/refund manual, incidencias, snapshots, SignalR y entrega persistida.
+- Pruebas: `dotnet test Poraqui.sln`, 19/19: 18 de recorrido API con SQLite en memoria/archivos temporales y una prueba de traducción SQL Server que no abre conexión. El recorrido verifica horarios, opciones, permisos entre negocios, importes, cancelación/refund manual, incidencias, métricas, snapshots, SignalR y entrega persistida.
 - Scripts `ExternalCourierOffers`, `OfflineDeliveryCommandSync`, `CatalogProductOptions`, `BusinessOpeningHours` y `OrderCancellationRefundsIncidents` están disponibles para revisión; la última migración agrega `OrderCancellationAuditConstraints`. No hay cambios pendientes del modelo.
 - `BusinessOpeningHours` y cancelaciones/incidencias se generaron desde el modelo; los scripts no eliminan tablas ni filas. El segundo script estrecha `CancellationReason`, una columna nueva y todavía sin datos; falta validarlo en SQL Server.
 - Portal MonsterASP, solo lectura: `dbo` aparece sin tablas. Esto informa el esquema actual; no verifica conexión EF ni restricciones/carreras SQL Server.
@@ -67,8 +72,9 @@ Rama `feature/order-cancellations-refunds-incidents`, commit `1347648`, PR https
 - PR #9: `feature/catalog-options` en commit `084acb3`, publicado en https://github.com/EmanuelC1601/poraqui-backend/pull/9.
 - OTP e idempotencia general de operaciones que aún no la tienen.
 - PR #10: `feature/business-hours`, commit `d25e64f`, publicado en https://github.com/EmanuelC1601/poraqui-backend/pull/10. Requiere validación SQL Server antes de integrar.
-- El incremento de cancelaciones/incidencias/reembolsos está en PR #11; falta verificar migraciones en SQL Server antes de integrar.
-- Métricas del piloto, instrucciones finales de despliegue en MonsterASP.NET y recorrido SQL Server reproducible.
+- PR #11 implementa cancelaciones/incidencias/reembolsos; falta verificar migraciones en SQL Server antes de integrar.
+- PR #12 agrega métricas del piloto; falta verificar SQL Server.
+- Instrucciones finales de despliegue en MonsterASP.NET y recorrido SQL Server reproducible.
 
 ## Bloqueado por configuración privada
 

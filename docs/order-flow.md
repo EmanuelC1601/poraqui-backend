@@ -41,10 +41,11 @@ El `UserSecretsId` ya está configurado. Las migraciones revisables incluyen `In
 12. Si la confirmación se capturó sin internet, el courier sincroniza con `POST /api/orders/{orderId}/sync/delivery-confirmation` usando `commandId`, código y `clientCapturedAtUtc`. El backend valida el estado/código actuales antes de aceptar. Repetir exactamente el mismo comando devuelve la respuesta persistida y no duplica historial; reutilizar el ID con otro payload da 409.
 13. Cliente cancela antes de enviar comprobante con `POST /api/orders/{orderId}/cancel`; negocio/admin cancela antes de asignar courier con la ruta equivalente bajo el negocio. Si se había enviado comprobante o aprobado el pago, se crea seguimiento manual de reembolso. El cliente consulta el estado en `GET /api/orders/{orderId}`; el negocio registra el resultado manual en `.../refund-review`.
 14. Cliente, negocio o courier asignado informa una incidencia con `POST /api/orders/{orderId}/incidents`. Participantes autorizados consultan incidencias y el negocio/admin registra resolución con `POST .../incidents/{incidentId}/resolve`.
+15. Admin consulta métricas agregadas del piloto con `GET /api/admin/metrics/pilot?fromUtc=<ISO-8601>&toUtc=<ISO-8601>`; el intervalo es UTC (inicio incluido, fin excluido) y acepta hasta 366 días. Sin parámetros devuelve los últimos 30 días.
 
 ## Verificaciones actuales
 
-La suite de API usa SQLite en memoria y carpeta temporal para comprobantes. Cubre opciones obligatorias/no disponibles, permisos, importes y snapshots, comprobante, revisión manual, configuración y snapshot de transferencia, oferta/cancelación/ausencia de repartidores/rechazo/aceptación externa, cancelación de pedido con reembolso manual, incidencias, códigos, pago al recoger, sincronización idempotente, entrega y evento SignalR. SQLite no sustituye la prueba de migraciones, índices y aceptación simultánea en SQL Server.
+La suite suma 19 pruebas: 18 de API con SQLite en memoria/carpeta temporal (opciones obligatorias/no disponibles, permisos, importes y snapshots, comprobante, revisión manual, configuración y snapshot de transferencia, oferta/cancelación/ausencia de repartidores/rechazo/aceptación externa, cancelación con reembolso manual, incidencias, métricas, códigos, pago al recoger, sincronización idempotente, entrega y evento SignalR) y una de traducción de las consultas de métricas con el proveedor SQL Server sin conexión. SQLite y la generación de SQL no sustituyen la prueba de migraciones, restricciones y aceptación simultánea contra SQL Server real.
 
 ## Límites
 
