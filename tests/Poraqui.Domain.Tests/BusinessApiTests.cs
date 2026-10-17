@@ -375,13 +375,16 @@ public sealed class BusinessApiTests
             Assert.Equal("AwaitingBusinessDecision", snapshot.Snapshot.Status);
             Assert.Equal("business", snapshot.Audience);
         }
+        Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Post,
+            $"api/businesses/{businessId}/orders/{orderId}/payment-review", merchantToken,
+            JsonContent.Create(new { approved = true, note = "Transferencia localizada" }))).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(client, HttpMethod.Post,
             $"api/businesses/{businessId}/orders/{orderId}/payment-review", merchantToken,
-            JsonContent.Create(new { approved = true, note = "Reintento" }))).StatusCode);
+            JsonContent.Create(new { approved = true, note = "Nota distinta" }))).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Post,
             $"api/businesses/{businessId}/orders/{orderId}/decision", merchantToken,
             JsonContent.Create(new { accept = true, reason = "" }))).StatusCode);
-        Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(client, HttpMethod.Post,
+        Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Post,
             $"api/businesses/{businessId}/orders/{orderId}/decision", merchantToken,
             JsonContent.Create(new { accept = true, reason = "" }))).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Post,

@@ -233,7 +233,7 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IO
     {
         var order = await RequiredOrder(orderId, cancellationToken);
         await EnsureBusinessAccess(order.BusinessId, actorId, isAdmin, cancellationToken);
-        order.ReviewTransfer(actorId, approved, note);
+        if (!order.ReviewTransfer(actorId, approved, note)) return;
         await repository.SaveChangesAsync(cancellationToken);
         await PublishChange(order, cancellationToken);
     }
@@ -243,8 +243,10 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IO
     {
         var order = await RequiredOrder(orderId, cancellationToken);
         await EnsureBusinessAccess(order.BusinessId, actorId, false, cancellationToken);
-        if (accept) order.AcceptByBusiness(actorId);
-        else order.RejectByBusiness(actorId, reason ?? string.Empty);
+        var changed = accept
+            ? order.AcceptByBusiness(actorId)
+            : order.RejectByBusiness(actorId, reason ?? string.Empty);
+        if (!changed) return;
         await repository.SaveChangesAsync(cancellationToken);
         await PublishChange(order, cancellationToken);
     }
@@ -253,8 +255,8 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IO
     {
         var order = await RequiredOrder(orderId, cancellationToken);
         await EnsureBusinessAccess(order.BusinessId, actorId, false, cancellationToken);
-        if (ready) order.MarkReadyForPickup(actorId);
-        else order.BeginPreparation(actorId);
+        var changed = ready ? order.MarkReadyForPickup(actorId) : order.BeginPreparation(actorId);
+        if (!changed) return;
         await repository.SaveChangesAsync(cancellationToken);
         await PublishChange(order, cancellationToken);
     }
@@ -285,12 +287,15 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IO
     {
         var order = await RequiredOrder(orderId, cancellationToken);
         EnsureCourier(order, courierId);
-        order.BeginDelivery(courierId, channel);
+        var changed = order.BeginDelivery(courierId, channel);
         var phone = await repository.GetCustomerPhoneAsync(order.CustomerUserId, cancellationToken);
         if (string.IsNullOrWhiteSpace(phone))
             throw new InvalidOperationException("Customer has no phone number available for delivery contact.");
-        await repository.SaveChangesAsync(cancellationToken);
-        await PublishChange(order, cancellationToken);
+        if (changed)
+        {
+            await repository.SaveChangesAsync(cancellationToken);
+            await PublishChange(order, cancellationToken);
+        }
         return new CustomerContact(phone, NormalizePhone(phone), channel.ToLowerInvariant());
     }
 

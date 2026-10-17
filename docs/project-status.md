@@ -62,7 +62,7 @@ Rama `feature/order-cancellations-refunds-incidents`, commit `1347648`, PR https
 - Pruebas: `dotnet test Poraqui.sln`, 19/19: 18 de recorrido API con SQLite en memoria/archivos temporales y una prueba de traducción SQL Server que no abre conexión. El recorrido verifica horarios, opciones, permisos entre negocios, importes, cancelación/refund manual, incidencias, métricas, snapshots, SignalR y entrega persistida.
 - Scripts `ExternalCourierOffers`, `OfflineDeliveryCommandSync`, `CatalogProductOptions`, `BusinessOpeningHours` y `OrderCancellationRefundsIncidents` están disponibles para revisión; la última migración agrega `OrderCancellationAuditConstraints`. No hay cambios pendientes del modelo.
 - `BusinessOpeningHours` y cancelaciones/incidencias se generaron desde el modelo; los scripts no eliminan tablas ni filas. El segundo script estrecha `CancellationReason`, una columna nueva y todavía sin datos; falta validarlo en SQL Server.
-- Portal MonsterASP, solo lectura: `dbo` aparece sin tablas. Esto informa el esquema actual; no verifica conexión EF ni restricciones/carreras SQL Server.
+- Panel MonsterASP: el test de acceso remoto reportó `Connected in 201 ms` y el panel muestra `dbo` sin tablas. Esto confirma conectividad del propio panel y estado visible del esquema; no verifica conexión EF desde la API ni restricciones/carreras SQL Server.
 
 ## Incremento local: reintentos de recogida y entrega
 
@@ -76,13 +76,19 @@ Rama `feature/phone-verification`, PR #14: https://github.com/EmanuelC1601/poraq
 
 Pruebas: 2 nuevas pruebas verifican formularios/URLs de Twilio y aprobación/código inválido/404 usando HttpMessageHandler falso; el recorrido API usa fake solo en prueba para verificar que código inválido no confirma el teléfono, el correcto sí lo confirma y la sexta solicitud en la ventana recibe 429. Build limpio y 21/21 pasan; API con SQLite aislado. No se probaron credenciales reales ni envío SMS real. No cambia el modelo ni requiere migración.
 
+## Rama actual: reintentos idempotentes de comandos de flujo
+
+Rama `feature/workflow-idempotency`, apilada sobre la rama del PR #14. Una repetición con el mismo actor y datos de revisión, decisión de negocio, inicio de preparación, “listo”, inicio de recorrido, o rechazo de oferta no agrega historial ni vuelve a publicar SignalR; una repetición con valores distintos sigue en conflicto. Los comandos devuelven éxito sobre el contrato actual y no alteran el esquema. Pruebas agregadas cubren la versión/historial estable y el rechazo repetido.
+
+Verificado en la rama: `dotnet build Poraqui.sln --no-restore` (0 advertencias/errores), `dotnet test Poraqui.sln` (24/24; base API SQLite temporal, dominio sin BD) y `git diff --check`. No valida concurrencia sobre SQL Server.
+
 ## Pendiente
 
 - Verificar migraciones, restricciones y aceptación simultánea en SQL Server antes de integrar PR #6/#7.
 - Prueba de aceptación simultánea de ofertas y ejecución/revisión de migraciones en SQL Server.
 - Probar reconexión SignalR en cliente real; la suscripción ya devuelve instantánea persistida al reconectar.
 - PR #9: `feature/catalog-options` en commit `084acb3`, publicado en https://github.com/EmanuelC1601/poraqui-backend/pull/9.
-- Validar SMS OTP contra cuenta real tras configurar `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid` y `TwilioVerify:ApiKeySecret` en secretos locales; idempotencia para operaciones mutables restantes. Recogida y entrega ahora toleran reintentos con el mismo courier y código, sin cambios repetidos.
+- Validar SMS OTP contra cuenta real tras configurar `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid` y `TwilioVerify:ApiKeySecret` en secretos locales; idempotencia durable con clave para creación de pedidos, subida/reintento de comprobantes, asignación de courier con código, reporte de incidencias y aceptación de ofertas. Recogida y entrega ahora toleran reintentos con el mismo courier y código, sin cambios repetidos.
 - PR #10: `feature/business-hours`, commit `d25e64f`, publicado en https://github.com/EmanuelC1601/poraqui-backend/pull/10. Requiere validación SQL Server antes de integrar.
 - PR #11 implementa cancelaciones/incidencias/reembolsos; falta verificar migraciones en SQL Server antes de integrar.
 - PR #12 agrega métricas del piloto; está integrado en la rama de PR #11, pero aún no en `main`; falta validar sobre SQL Server.
@@ -91,7 +97,7 @@ Pruebas: 2 nuevas pruebas verifican formularios/URLs de Twilio y aprobación/có
 
 ## Bloqueado por configuración privada
 
-No existe `ConnectionStrings:DefaultConnection` en User Secrets/entorno de la API. Configúrala con `dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<cadena privada>" --project src/Poraqui.Api`. No compartas el valor ni uses secretos del chat. Sin la clave no se verifica conexión EF, no se puede comprobar esquema vivo con la aplicación ni aplicar migraciones. Ninguna migración se ha aplicado.
+No existe `ConnectionStrings:DefaultConnection` en User Secrets/entorno de la API. Configúrala con `dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<cadena privada>" --project src/Poraqui.Api`. No compartas el valor ni uses secretos del chat. Sin la clave no se verifica conexión EF desde la API ni se aplican migraciones, aunque el panel sí haya probado su propia conectividad. Ninguna migración se ha aplicado.
 
 ## Fuera de alcance
 
