@@ -1,12 +1,12 @@
 # Handoff de desarrollo
 
-## Incremento .NET 10 LTS (`feature/net10-lts`)
+## Incremento .NET 10 LTS (`feature/net10-lts`, PR #17)
 
 La rama actual parte de `feature/phone-verification` (`24e1a3a`) e instala .NET 10 / EF Core 10. El cambio actualiza todos los proyectos a `net10.0`, alinea paquetes Microsoft y la herramienta `dotnet-ef` en `10.0.13`, y fija `Microsoft.Data.SqlClient` 7.1.1 con `System.Security.Cryptography.Pkcs` 10.0.13 para resolver alertas de una dependencia transitiva. `README.md` y `docs/architecture.md` documentan el runtime y publicación en MonsterASP.NET.
 
-Verificación local: build correcto (0 advertencias/errores), suite 24 aprobadas/1 omitida (la prueba optativa de concurrencia requiere `ConnectionStrings__SqlServerTest`) y `migrations has-pending-model-changes` indica que el modelo coincide con las migraciones. La suite usa SQLite aislado; no hubo conexión con SQL Server, no se aplicaron migraciones y no se ejecutó prueba de concurrencia SQL Server. No hay migración nueva en este cambio. PR #17 (`https://github.com/EmanuelC1601/poraqui-backend/pull/17`) está abierto contra `feature/phone-verification`, encabezado por `b686ddd`; también contiene un seguimiento documental.
+PR #17 (`https://github.com/EmanuelC1601/poraqui-backend/pull/17`) se integró en `feature/phone-verification` mediante `0f31ed4`. Build correcto (0 advertencias/errores), suite 24 aprobadas/1 omitida (la prueba optativa de concurrencia requiere `ConnectionStrings__SqlServerTest`) y `migrations has-pending-model-changes` indica que el modelo coincide con las migraciones. La suite usa SQLite aislado. EF conectó a la BD de desarrollo, detectó las ocho migraciones pendientes y las aplicó explícitamente; la lista posterior confirma todas aplicadas. El script SQL generado no contiene `DROP`, `DELETE FROM` ni `TRUNCATE`; el panel mostraba cero tablas antes de la operación. No se ejecutó prueba de concurrencia SQL Server ni se publicó configuración privada.
 
-Para seguir: integrar PR #17 en `feature/phone-verification` y actualizar la rama local. La cadena funcional sigue apilada sobre ramas previas y fuera de `main`. Después, configurar `ConnectionStrings:DefaultConnection` en User Secrets/entorno privado y ejecutar primero la validación SQL Server y scripts revisados. Nunca apuntar la prueba automatizada a la BD compartida.
+La configuración local se guarda en User Secrets como `ConnectionStrings:DefaultConnection`; el test de concurrencia requiere una base aislada separada `ConnectionStrings__SqlServerTest` con nombre exacto `PoraquiIntegrationTests`. No configures esa prueba contra la BD compartida. La cadena funcional sigue fuera de `main`; al integrar sus PR, coordina el código con este esquema ya aplicado.
 
 ## Base, ramas y responsabilidad
 

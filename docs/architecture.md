@@ -7,7 +7,7 @@ La solución usa .NET 10 LTS y Clean Architecture. `main` es la rama predetermin
 - **Poraqui.Infrastructure**: EF Core, SQL Server, Identity y adaptadores; depende de Application y Domain.
 - **Poraqui.Api**: composición HTTP y configuración; depende de Application e Infrastructure.
 
-La dependencia de ejecución apunta hacia el dominio. La API registra persistencia e Identity solo cuando existe `ConnectionStrings:DefaultConnection`, para permitir compilar y arrancar sin credenciales. Configura el secreto en variables de entorno (`ConnectionStrings__DefaultConnection`) o en secretos de usuario; no guardes credenciales en el repositorio. La conexión privada no estaba disponible en la copia de Codex al 17 de octubre de 2026; se requiere `ConnectionStrings:DefaultConnection` para comprobarla.
+La dependencia de ejecución apunta hacia el dominio. La API registra persistencia e Identity solo cuando existe `ConnectionStrings:DefaultConnection`, para permitir compilar y arrancar sin credenciales. Configura el secreto en variables de entorno (`ConnectionStrings__DefaultConnection`) o en secretos de usuario; no guardes credenciales en el repositorio. La conexión se guardó en User Secrets local y EF verificó SQL Server el 17 de octubre de 2026; no se versionó ningún secreto.
 
 El contexto EF compartido es `AppDbContext` en Infrastructure. El responsable del backend genera y revisa migraciones, y las aplica a la BD de desarrollo tras verificar que son aditivas y preservan los datos. No usar `EnsureDeleted`, reinicios ni migraciones destructivas en esa BD. La API no ejecuta migraciones automáticamente al iniciar.
 
