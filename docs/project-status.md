@@ -51,9 +51,9 @@ Rama `feature/order-cancellations-refunds-incidents`, commit `1347648`, PR https
 - Participantes autorizados informan y consultan incidencias; negocio/admin las resuelve. Incidencias y reembolsos quedan en historial/versionado del pedido y notifican después de persistir.
 - Migraciones `OrderCancellationRefundsIncidents` y `OrderCancellationAuditConstraints`, script `docs/sql/OrderCancellationRefundsIncidents.sql`; no aplicadas. La alteración de `CancellationReason` solo afecta a una columna nullable que esta misma pila acaba de añadir, y el dominio limita el texto a 500 caracteres.
 
-## En desarrollo: métricas del piloto
+## PR #12 abierto: métricas del piloto
 
-- `feature/pilot-metrics` añade `GET /api/admin/metrics/pilot`, con permiso exclusivo de admin, filtro UTC de hasta 366 días y datos agregados sin información personal. Resume pedidos por estado, valor total, entregas, cancelaciones, incidencias abiertas, reembolsos pendientes y tiempo medio de entrega.
+- Rama `feature/pilot-metrics`, commit `c8df529`, PR https://github.com/EmanuelC1601/poraqui-backend/pull/12, basada en PR #11. Añade `GET /api/admin/metrics/pilot`, con permiso exclusivo de admin, filtro UTC de hasta 366 días y datos agregados sin información personal. Resume pedidos por estado, valor total, entregas, cancelaciones, incidencias abiertas, reembolsos pendientes y tiempo medio de entrega.
 - No requiere migración. El endpoint se prueba en SQLite; queda pendiente revisar el SQL generado y el comportamiento en SQL Server cuando exista una conexión remota accesible para la aplicación.
 
 ## Verificaciones actuales
@@ -73,7 +73,7 @@ Rama `feature/order-cancellations-refunds-incidents`, commit `1347648`, PR https
 - OTP e idempotencia general de operaciones que aún no la tienen.
 - PR #10: `feature/business-hours`, commit `d25e64f`, publicado en https://github.com/EmanuelC1601/poraqui-backend/pull/10. Requiere validación SQL Server antes de integrar.
 - PR #11 implementa cancelaciones/incidencias/reembolsos; falta verificar migraciones en SQL Server antes de integrar.
-- Las métricas del piloto están en desarrollo en `feature/pilot-metrics`; falta publicar el PR tras la revisión final.
+- PR #12 agrega métricas del piloto; falta verificar SQL Server.
 - Instrucciones finales de despliegue en MonsterASP.NET y recorrido SQL Server reproducible.
 
 ## Bloqueado por configuración privada
