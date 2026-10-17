@@ -20,6 +20,8 @@ if (!string.IsNullOrWhiteSpace(connectionString))
         .AddEntityFrameworkStores<AppDbContext>();
     builder.Services.AddScoped<IBusinessRepository, BusinessRepository>();
     builder.Services.AddScoped<BusinessService>();
+    builder.Services.AddScoped<ICatalogOrderRepository, CatalogOrderRepository>();
+    builder.Services.AddScoped<CatalogOrderService>();
 }
 builder.Services.AddPoraquiAuthorization();
 
