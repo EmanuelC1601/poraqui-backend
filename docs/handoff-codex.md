@@ -6,9 +6,11 @@ Hay un único responsable. `main` es la base de integración. Crear ramas `featu
 
 ## Estado de esta entrega
 
-PR #1 ya estaba integrado en `main`; se revisó su contenido de arquitectura inicial, mapeos de comercio/pedidos y pruebas de dominio. El repositorio conservó cambios posteriores y PR #22–#28 integrados hasta `7216c23`.
+PR #1 ya estaba integrado en `main`; se revisó su contenido de arquitectura inicial, mapeos de comercio/pedidos y pruebas de dominio. El repositorio conservó cambios posteriores y PR #22–#29 integrados hasta `36a71fc`.
 
 En `feature/order-creation-idempotency` se agregó `commandId` a creación de pedido, huella del payload, replay de la respuesta con el mismo pedido/código, 409 si el ID se reutiliza con otra petición, persistencia protegida del código con ASP.NET Data Protection y migración SQL/EF revisable. Data Protection usa nombre de aplicación estable `Poraqui`; si se configura `DataProtection:KeysPath`, persiste llaves en esa ruta privada compartida. En hosting multiinstancia debe ser persistente/compartida.
+
+PR #29 integró idempotencia de creación de pedido. La rama activa `feature/transfer-evidence-idempotency` requiere `commandId` multipart y guarda hash del contenido con la revisión; replay no duplica archivo ni historial y contenido/orden distinto responde 409. Migración `TransferEvidenceCommandIdempotency` es aditiva y requiere revisión antes de aplicar. La rama pasó build sin advertencias, 21/21 pruebas SQLite y OpenAPI local HTTP 200.
 
 ## Verificación ejecutada
 
@@ -18,12 +20,12 @@ En `feature/order-creation-idempotency` se agregó `commandId` a creación de pe
 - `dotnet ef migrations has-pending-model-changes`: no hay cambios sin migración.
 - `git diff --check`: limpio.
 
-No se aplicó migración ni se modificó SQL Server. No se repitió un ensayo de OpenAPI en este incremento. La idempotencia de creación tiene prueba de replay/conflicto en la ruta de API. Falta probar carrera SQL Server aislada.
+PR #29 quedó integrado. Su migración no se aplicó por este cambio; no se modificó SQL Server. OpenAPI local respondió HTTP 200 y se actualizó el snapshot. La prueba de API cubre replay/conflicto de creación. Falta probar carrera SQL Server aislada.
 
 ## Próximos incrementos
 
-1. Terminar/revisar PR de idempotencia de creación de pedidos y regenerar `docs/openapi.json`.
-2. Idempotencia de carga de comprobante y asignación de courier.
+1. Verificar e integrar idempotencia de comprobantes; regenerar `docs/openapi.json`.
+2. Implementar idempotencia de asignación de courier.
 3. Reconciliar todos los IDs de migración del servidor con una cadena revisable antes de aplicar ninguna.
 4. Configurar `ConnectionStrings:SqlServerTest` hacia BD aislada, probar migraciones, restricciones y aceptación simultánea.
 5. OTP real, métricas, reconexión del cliente y despliegue MonsterASP.NET.

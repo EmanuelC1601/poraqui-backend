@@ -13,8 +13,8 @@ Estado: `main` es la base única de integración. Este documento describe lo imp
 
 ## Pedido, pago y entrega
 
-- Cliente crea con `POST /api/orders`. En la rama `feature/order-creation-idempotency`, requiere `commandId` GUID estable por intento lógico. Repetir ID con mismo payload devuelve mismo pedido y código; payload distinto con el mismo ID da 409. Requiere migración aditiva `OrderCreationCommandIdempotency`, aún no integrada/aplicada.
-- Cliente sube comprobante privado a `POST /api/orders/{id}/transfer-evidence`; negocio revisa pago manualmente, acepta/rechaza, inicia preparación y marca listo.
+- Cliente crea con `POST /api/orders`. Requiere `commandId` GUID estable por intento lógico. Repetir ID con mismo payload devuelve mismo pedido y código; payload distinto con el mismo ID da 409. La migración aditiva `OrderCreationCommandIdempotency` está integrada en PR #29; no se ejecutó en SQL Server.
+- Cliente sube comprobante privado a `POST /api/orders/{id}/transfer-evidence` como multipart `commandId` + `file`. La rama `feature/transfer-evidence-idempotency` añade replay con el mismo ID/hash, 409 si el contenido/orden difiere, y una migración aditiva aún no integrada. Negocio revisa pago manualmente, acepta/rechaza, inicia preparación y marca listo.
 - Reparto propio: admin habilita rol y negocio asigna con monto pagadero al recoger. `POST /api/orders/{id}/pickup` valida el código y registra pago negocio→repartidor por separado del pago cliente→negocio.
 - Reparto externo: admin habilita perfil; courier marca disponibilidad/zona; negocio publica oferta con origen, destino, condiciones y remuneración; courier acepta/rechaza. La asignación acepta solo un ganador y cancela/vence ofertas según flujo persistido.
 - Repartidor inicia recorrido eligiendo `whatsapp` o `call`; teléfono solo se revela al asignado. Confirma entrega con código del cliente. Estados e historial consultables por participantes autorizados.

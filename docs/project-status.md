@@ -6,17 +6,18 @@ Actualizado: 2026-10-17. `main` es la base de integración y tiene un único res
 
 | Estado | Capacidad | Evidencia |
 |---|---|---|
-| Integrado | Clean Architecture, Identity, roles y autorización por relación con negocio/pedido; comercios, catálogo y opciones, zonas y tarifas; horario; precios y snapshots calculados en servidor | `main` en `7216c23`, PR #1 y #22–#28; `BusinessApiTests` |
+| Integrado | Clean Architecture, Identity, roles y autorización por relación con negocio/pedido; comercios, catálogo y opciones, zonas y tarifas; horario; precios y snapshots calculados en servidor | `main` en `36a71fc`, PR #1 y #22–#29; `BusinessApiTests` |
 | Integrado | Comprobante privado, revisión manual de transferencia, decisión del negocio, preparación, reparto propio/externo, ofertas, recogida con pago del negocio, contacto autorizado, códigos e historial | contratos y recorrido `docs/order-flow.md`; pruebas SQLite API |
 | Integrado | Confirmación offline validada por servidor, SignalR con destinatarios autorizados y snapshot al suscribirse, cancelaciones, incidencias, reembolsos manuales y reintentos idempotentes de transiciones e incidencias | PR #22–#28; pruebas SQLite API |
-| En rama | Idempotencia de `POST /api/orders`, persistencia protegida del código de entrega para repetir la respuesta; migración revisable | `feature/order-creation-idempotency`, cherry-pick `bc73e9a` adaptado sobre `7216c23`; build y 21/21 pruebas SQLite pasan |
-| Pendiente | Idempotencia de carga de comprobante y asignación; OTP con proveedor real; métricas piloto; pruebas SQL Server aisladas de migraciones/índices/concurrencia; reconexión real en cliente; despliegue MonsterASP.NET | Sin integrar. `ConnectionStrings:SqlServerTest` no está configurada |
+| Integrado | Idempotencia de `POST /api/orders`, respuesta estable con replay y conflicto 409 por payload distinto | PR #29, merge `36a71fc`; migración aditiva ya integrada, no aplicada por este cambio |
+| En rama | Idempotencia de comprobantes por `commandId` y hash del archivo; reintento devuelve replay sin crear nueva revisión ni archivo | `feature/transfer-evidence-idempotency`, commit de origen `60c0bbc` adaptado sobre `36a71fc`; pruebas pendientes |
+| Pendiente | Idempotencia de asignación de courier; OTP con proveedor real; métricas piloto; pruebas SQL Server aisladas de migraciones/índices/concurrencia; reconexión real en cliente; despliegue MonsterASP.NET | Sin integrar. `ConnectionStrings:SqlServerTest` no está configurada |
 | Bloqueado por configuración | Aplicar de forma segura toda la cadena de migraciones a SQL Server compartido y correr pruebas de concurrencia sobre SQL Server aislado | Historial compartido contiene migraciones registradas de incrementos que aún no están todos reconciliados en `main`; revisar cadena antes de aplicar. No se ejecutaron migraciones |
 | Fuera de alcance | GPS, distancias estimadas, transferencias bancarias automáticas y frontend | Se usan zonas/tarifas configuradas y revisión manual |
 
 ## Verificaciones de la rama activa
 
-`dotnet restore Poraqui.sln`, `dotnet build Poraqui.sln --no-restore` (0 advertencias, 0 errores), `dotnet test Poraqui.sln --no-build` (21/21; SQLite en memoria y archivos temporales) y `dotnet ef migrations has-pending-model-changes` (sin cambios sin migración). `git diff --check` limpio. La migración de idempotencia crea tabla, FK e índices de forma aditiva; todavía no se ha aplicado.
+La última rama integrada (PR #29) pasó restore, build (0 advertencias/errores), 21/21 pruebas SQLite, OpenAPI local y `dotnet ef migrations has-pending-model-changes`. La rama activa de comprobantes también pasó restore, build (0 advertencias/errores) y 21/21 pruebas SQLite; OpenAPI local responde HTTP 200 y documenta el multipart `commandId`. Su migración es aditiva y no se aplicó.
 
 ## SQL Server privado
 
