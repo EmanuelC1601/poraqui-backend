@@ -1,6 +1,6 @@
 # Contratos API
 
-Estado: `main` es la base única de integración. Este documento describe lo implementado y las adiciones de la rama activa; revisar `docs/project-status.md` para evidencia y pendientes. OpenAPI en Development: `/openapi/v1.json`.
+Estado: `main` es la base única de integración. Este documento describe los contratos implementados; revisar `docs/project-status.md` para evidencia y pendientes. OpenAPI en Development: `/openapi/v1.json`.
 
 ## Identidad, permisos y comercio
 
@@ -20,7 +20,7 @@ Estado: `main` es la base única de integración. Este documento describe lo imp
 - Repartidor inicia recorrido eligiendo `whatsapp` o `call`; teléfono solo se revela al asignado. Confirma entrega con código del cliente. Estados e historial consultables por participantes autorizados.
 - Acciones de transición reintentables no duplican historial ni pagos. Reportes de incidentes aceptan `commandId`; reembolso es seguimiento manual, sin movimiento bancario de la API.
 - Sync offline de entrega requiere `commandId`, código y hora de captura; el servidor vuelve a comprobar autorización, estado y código antes de aceptar.
-- La rama activa añade `GET /api/admin/metrics/pilot?fromUtc={utc}&toUtc={utc}`, restringido a `PlatformAdmin`. El rango predeterminado son los últimos 30 días y el máximo es 366 días; devuelve cantidad, valor bruto de pedidos, entregados/cancelados, tiempo medio de entrega, incidencias abiertas, reembolsos por revisar y conteos por estado. Importes agregan pedidos creados dentro del intervalo.
+- `GET /api/admin/metrics/pilot?fromUtc={utc}&toUtc={utc}`, restringido a `PlatformAdmin`. El rango predeterminado son los últimos 30 días y el máximo es 366 días; devuelve cantidad, valor bruto de pedidos, entregados/cancelados, tiempo medio de entrega, incidencias abiertas, reembolsos por revisar y conteos por estado. Importes agregan pedidos creados dentro del intervalo.
 
 ## SignalR
 
