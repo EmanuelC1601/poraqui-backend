@@ -11,6 +11,7 @@ public interface IExternalCourierRepository
     Task<IReadOnlyList<Guid>> GetAvailableCouriersAsync(Guid zoneId, CancellationToken cancellationToken);
     Task<IReadOnlySet<Guid>> GetCouriersWithActiveOffersAsync(Guid orderId, DateTimeOffset now, CancellationToken cancellationToken);
     Task<CourierAvailability?> GetAvailabilityAsync(Guid courierId, CancellationToken cancellationToken);
+    Task<bool> IsActiveZoneAsync(Guid zoneId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ExternalDeliveryOffer>> GetOffersAsync(Guid courierId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ExternalDeliveryOffer>> GetOffersForOrderAsync(Guid orderId, CancellationToken cancellationToken);
     Task<ExternalDeliveryOffer?> GetOfferAsync(Guid offerId, CancellationToken cancellationToken);
@@ -30,6 +31,8 @@ public sealed class ExternalCourierService(IExternalCourierRepository repository
     {
         var profile = await repository.GetAvailabilityAsync(courierId, ct);
         if (profile is null) throw new InvalidOperationException("External courier profile is not provisioned.");
+        if (available && (zoneId is null || !await repository.IsActiveZoneAsync(zoneId.Value, ct)))
+            throw new ArgumentException("An active delivery zone is required while available.", nameof(zoneId));
         profile.SetAvailable(available, zoneId);
         await repository.SaveChangesAsync(ct);
     }

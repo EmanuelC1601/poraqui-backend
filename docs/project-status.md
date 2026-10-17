@@ -26,6 +26,8 @@ Actualizado: 2026-10-17. `main` es la base de integración y tiene un único res
 
 Última verificación de código (PR #41, ahora integrada): `dotnet test Poraqui.sln` aprobó 29 pruebas y omitió 2 carreras SQL por falta de `ConnectionStrings__SqlServerTest`; `dotnet build Poraqui.sln --no-restore` terminó con cero advertencias y errores; `git diff --check` pasó. Las carreras todavía no se han ejecutado contra SQL Server.
 
+En curso en `feature/external-courier-active-zone`: la disponibilidad de courier externo ahora verifica que la zona exista y esté activa antes de persistir; prueba API SQLite añadida para zona inexistente. Aún no está integrada. Ejecutar verificaciones de esta rama antes de publicar el PR.
+
 ## SQL Server privado
 
 `ConnectionStrings:DefaultConnection` existe en User Secrets. El 2026-10-17, `dotnet ef migrations list` conectó en modo de consulta y devolvió las 12 migraciones de desarrollo aplicadas. No se ejecutó ninguna migración sobre esa BD. Se creó una segunda base MSSQL gratuita en el panel como destino aislado de pruebas; está habilitada, aún sin esquema ni datos. El proveedor indica que su acceso Local solo funciona desde sitios alojados; el acceso Remote de esta nueva base continúa deshabilitado. Para ejecutar pruebas desde el equipo, falta aprobar/habilitar ese acceso, obtener la cadena Remote y guardarla localmente como `ConnectionStrings__SqlServerTest`. El guard de pruebas rechaza cualquier test catalog que tenga el mismo nombre que el catálogo configurado en `DefaultConnection`. La API nunca migra al iniciar. Antes de una futura aplicación en la BD compartida, revisa el SQL generado y concilia el historial; no usar pruebas concurrentes ni limpieza en esa BD.

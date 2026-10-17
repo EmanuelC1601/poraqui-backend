@@ -527,6 +527,8 @@ public sealed class BusinessApiTests
             JsonContent.Create(new { isExternalCourier = true }))).StatusCode);
         var courierToken = await LoginAsync(client, "courier@example.test");
         var courierTwoToken = await LoginAsync(client, "courier-two@example.test");
+        Assert.Equal(HttpStatusCode.BadRequest, (await SendAsync(client, HttpMethod.Put, "api/courier/external/availability", courierToken,
+            JsonContent.Create(new { isAvailable = true, zoneId = Guid.NewGuid() }))).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put, "api/courier/external/availability", courierToken,
             JsonContent.Create(new { isAvailable = true, zoneId }))).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put, "api/courier/external/availability", courierTwoToken,
