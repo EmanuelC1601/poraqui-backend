@@ -15,14 +15,15 @@ Actualizado: 2026-10-17. `main` es la base de integración y tiene un único res
 | Integrado | Pruebas guardadas de concurrencia SQL Server para aceptación simultánea de oferta externa y asignación interna; conflicto concurrente de oferta responde 409 | PR #32, merge `22cec11`; ambos casos requieren la conexión aislada indicada abajo |
 | Integrado | `GET /api/admin/metrics/pilot`, limitado a PlatformAdmin; agrega pedidos por intervalo UTC, importe bruto, estados, tiempo medio, incidencias abiertas y reembolsos por revisar | PR #33, merge `bddc081`; prueba de permiso/rango/valores y traducción de consultas comprobada con proveedor SQL Server sin abrir conexión |
 | Integrado; verificación externa pendiente | OTP vía Twilio Verify, E.164, confirmación Identity y límite de 5 intentos/10 min/IP | PR #36, merge `0f4dd51`; proveedor cubierto con handler HTTP simulado. Envío real requiere secretos y no se ha comprobado |
-| Integrado | Consulta del snapshot persistido al reconectar SignalR | Prueba con `Microsoft.AspNetCore.SignalR.Client`: nueva conexión vuelve a suscribirse y recibe estado/versión actuales |
-| Pendiente | Ejecutar carreras SQL de concurrencia; publicar/verificar en MonsterASP.NET | No verificado en SQL Server o no desplegado; guía de hosting en `docs/deployment-monsterasp.md` |
+| Integrado | Consulta del snapshot persistido al reconectar SignalR | PR #38, merge `a0c3b0f`; prueba con `Microsoft.AspNetCore.SignalR.Client` comprueba nueva conexión, resuscripción y estado/versión actuales |
+| Integrado | Guía de publicación MonsterASP.NET | PR #39, merge `e9d77e4`; documentación preparada, sitio aún no publicado |
+| Pendiente | Ejecutar carreras SQL de concurrencia; publicar/verificar en MonsterASP.NET | No verificado en SQL Server ni desplegado; guía de hosting en `docs/deployment-monsterasp.md` |
 | Bloqueado por configuración | Ejecutar carreras reales en SQL Server | Falta crear/configurar `ConnectionStrings__SqlServerTest` apuntando a una base aislada `PoraquiIntegrationTests`; las pruebas se omiten mientras tanto |
 | Fuera de alcance | GPS, distancias estimadas, transferencias bancarias automáticas y frontend | Se usan zonas/tarifas configuradas y revisión manual |
 
 ## Verificaciones de la rama activa
 
-PR #29–#36 integrados y rama activa SignalR: restore/build, pruebas SQLite y OpenAPI. PR #36 tuvo 26 casos, 24 correctos y 2 omitidos; la rama SignalR añade cliente oficial y comprobación de snapshot tras nueva conexión. Las carreras todavía no se han ejecutado contra SQL Server.
+`main` está al día con `origin/main` en `e9d77e4`. Última verificación de código (PR #38): restore/build sin advertencias ni errores; 24 pruebas aprobadas y 2 omitidas por falta de la conexión SQL aislada. Incluyó cliente SignalR que comprueba snapshot tras nueva conexión. PR #39 fue solo documentación y pasó `git diff --check`. Las carreras todavía no se han ejecutado contra SQL Server.
 
 ## SQL Server privado
 
