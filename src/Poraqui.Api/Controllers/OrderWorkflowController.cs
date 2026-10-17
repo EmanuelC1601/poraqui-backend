@@ -179,29 +179,49 @@ public sealed class OrderWorkflowController(OrderWorkflowService workflow, UserM
     [HttpPost("orders/{orderId:guid}/transfer-evidence")]
     [RequestSizeLimit(9 * 1024 * 1024)]
     [Consumes("multipart/form-data")]
-    public async Task<IActionResult> SubmitTransferEvidence(Guid orderId, [FromForm] IFormFile file, CancellationToken cancellationToken)
+    public async Task<IActionResult> SubmitTransferEvidence(Guid orderId, [FromForm] Guid commandId,
+        [FromForm] IFormFile file, CancellationToken cancellationToken)
     {
         if (!TryGetActor(out var actorId, out _)) return Unauthorized();
+        if (commandId == Guid.Empty) return BadRequest(new { error = "A command ID is required." });
         if (file is null) return BadRequest(new { error = "Evidence file is required." });
+        if (file.Length > 8 * 1024 * 1024) return BadRequest(new { error = "Evidence file exceeds the 8 MB limit." });
+        string? reference = null;
         try
         {
             var order = await workflow.GetForCustomerAsync(orderId, actorId, cancellationToken);
             if (order is null) return NotFound();
-            string reference;
-            using (var upload = file.OpenReadStream())
+            byte[] bytes;
+            await using (var upload = file.OpenReadStream())
+            using (var buffer = new MemoryStream())
+            {
+                await upload.CopyToAsync(buffer, cancellationToken);
+                bytes = buffer.ToArray();
+            }
+            var contentHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes));
+            if (await workflow.HasTransferEvidenceReplayAsync(orderId, actorId, commandId, contentHash, cancellationToken))
+                return Accepted(new { replayed = true });
+            using (var upload = new MemoryStream(bytes, writable: false))
                 reference = await evidenceStorage.SaveAsync(upload, file.FileName, file.ContentType, cancellationToken);
             try
             {
-                await workflow.SubmitTransferEvidenceAsync(orderId, actorId, reference, cancellationToken);
+                var submitted = await workflow.SubmitTransferEvidenceAsync(orderId, actorId, commandId, contentHash, reference, cancellationToken);
+                if (!submitted)
+                {
+                    await evidenceStorage.DeleteAsync(reference, CancellationToken.None);
+                    reference = null;
+                    return Accepted(new { replayed = true });
+                }
             }
             catch
             {
-                await evidenceStorage.DeleteAsync(reference, CancellationToken.None);
+                if (reference is not null) await evidenceStorage.DeleteAsync(reference, CancellationToken.None);
                 throw;
             }
-            return Accepted();
+            return Accepted(new { replayed = false });
         }
         catch (OrderResourceForbiddenException) { return Forbid(); }
+        catch (TransferEvidenceCommandConflictException) { return Conflict(new { error = "The command ID was already used with different transfer evidence." }); }
         catch (KeyNotFoundException) { return NotFound(); }
         catch (InvalidOperationException exception) { return Conflict(new { error = exception.Message }); }
         catch (ArgumentException exception) { return BadRequest(new { error = exception.Message }); }

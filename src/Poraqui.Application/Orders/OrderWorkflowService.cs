@@ -13,8 +13,10 @@ public interface IOrderWorkflowRepository
     Task<string?> GetCustomerPhoneAsync(Guid customerUserId, CancellationToken cancellationToken);
     Task<OfflineDeliverySyncRecord?> GetOfflineDeliveryCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken);
     Task<OrderIncident?> GetIncidentCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken);
+    Task<TransferReview?> GetTransferEvidenceCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken);
     Task CancelOpenExternalOffersForOrderAsync(Guid orderId, CancellationToken cancellationToken);
     void AddOfflineDeliveryCommand(OfflineDeliverySyncRecord command);
+    Task<bool> SaveTransferEvidenceCommandAsync(Order order, CancellationToken cancellationToken);
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }
 
@@ -46,14 +48,48 @@ public sealed record OrderRealtimeSubscription(OrderRealtimeSnapshot Snapshot, s
 
 public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IOrderChangePublisher publisher)
 {
-    public async Task SubmitTransferEvidenceAsync(Guid orderId, Guid customerId, string privateEvidenceReference,
-        CancellationToken cancellationToken)
+    public async Task<bool> HasTransferEvidenceReplayAsync(Guid orderId, Guid customerId, Guid commandId,
+        string contentHash, CancellationToken cancellationToken)
     {
+        if (commandId == Guid.Empty) throw new ArgumentException("A command ID is required.", nameof(commandId));
         var order = await RequiredOrder(orderId, cancellationToken);
         if (order.CustomerUserId != customerId) throw new OrderResourceForbiddenException();
-        order.SubmitTransferEvidence(privateEvidenceReference, customerId);
-        await repository.SaveChangesAsync(cancellationToken);
+        var existing = await repository.GetTransferEvidenceCommandAsync(customerId, commandId, cancellationToken);
+        if (existing is null) return false;
+        EnsureMatchingTransferEvidence(existing, orderId, contentHash);
+        return true;
+    }
+
+    public async Task<bool> SubmitTransferEvidenceAsync(Guid orderId, Guid customerId, Guid commandId,
+        string contentHash, string privateEvidenceReference, CancellationToken cancellationToken)
+    {
+        if (commandId == Guid.Empty) throw new ArgumentException("A command ID is required.", nameof(commandId));
+        var order = await RequiredOrder(orderId, cancellationToken);
+        if (order.CustomerUserId != customerId) throw new OrderResourceForbiddenException();
+        var existing = await repository.GetTransferEvidenceCommandAsync(customerId, commandId, cancellationToken);
+        if (existing is not null)
+        {
+            EnsureMatchingTransferEvidence(existing, orderId, contentHash);
+            return false;
+        }
+        order.SubmitTransferEvidence(privateEvidenceReference, customerId, commandId, contentHash);
+        var saved = await repository.SaveTransferEvidenceCommandAsync(order, cancellationToken);
+        if (!saved)
+        {
+            existing = await repository.GetTransferEvidenceCommandAsync(customerId, commandId, cancellationToken)
+                ?? throw new InvalidOperationException("The transfer evidence command could not be recovered after a concurrent retry.");
+            EnsureMatchingTransferEvidence(existing, orderId, contentHash);
+            return false;
+        }
         await PublishChange(order, cancellationToken);
+        return true;
+    }
+
+    private static void EnsureMatchingTransferEvidence(TransferReview existing, Guid orderId, string contentHash)
+    {
+        if (existing.OrderId != orderId ||
+            !string.Equals(existing.ContentHash, contentHash, StringComparison.Ordinal))
+            throw new TransferEvidenceCommandConflictException();
     }
 
     public async Task<IReadOnlyList<OrderWorkflowView>> GetBusinessOrdersAsync(Guid businessId, Guid ownerId, bool isAdmin,
@@ -387,3 +423,4 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IO
 public sealed class OrderResourceForbiddenException : Exception { }
 public sealed class OfflineDeliveryCommandConflictException : Exception { }
 public sealed class IncidentCommandConflictException : Exception { }
+public sealed class TransferEvidenceCommandConflictException : Exception { }

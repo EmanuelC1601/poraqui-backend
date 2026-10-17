@@ -41,6 +41,10 @@ public sealed class OrderWorkflowRepository(AppDbContext db) : IOrderWorkflowRep
         db.Set<OrderIncident>().SingleOrDefaultAsync(incident => incident.ReporterUserId == actorUserId &&
             incident.CommandId == commandId, cancellationToken);
 
+    public Task<TransferReview?> GetTransferEvidenceCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken) =>
+        db.Set<TransferReview>().SingleOrDefaultAsync(review => review.SubmittedByUserId == actorUserId &&
+            review.CommandId == commandId, cancellationToken);
+
     public async Task CancelOpenExternalOffersForOrderAsync(Guid orderId, CancellationToken cancellationToken)
     {
         var offers = await db.ExternalDeliveryOffers.Where(offer => offer.OrderId == orderId &&
@@ -49,6 +53,25 @@ public sealed class OrderWorkflowRepository(AppDbContext db) : IOrderWorkflowRep
     }
 
     public void AddOfflineDeliveryCommand(OfflineDeliverySyncRecord command) => db.OfflineDeliverySyncRecords.Add(command);
+
+    public async Task<bool> SaveTransferEvidenceCommandAsync(Order order, CancellationToken cancellationToken)
+    {
+        var commandIds = order.TransferReviews.Where(review => review.CommandId.HasValue)
+            .Select(review => review.CommandId!.Value).ToArray();
+        try
+        {
+            await SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateException)
+        {
+            db.ChangeTracker.Clear();
+            if (commandIds.Length > 0 && await db.Set<TransferReview>().AnyAsync(review => review.SubmittedByUserId == order.CustomerUserId &&
+                    review.CommandId.HasValue && commandIds.Contains(review.CommandId.Value), cancellationToken))
+                return false;
+            throw;
+        }
+    }
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken)
     {
