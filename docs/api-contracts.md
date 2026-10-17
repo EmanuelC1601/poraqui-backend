@@ -2,11 +2,11 @@
 
 ## Estado del contrato
 
-`main` contiene PR #1–#5 y es la base de integración. La rama `feature/phone-verification` incorpora la pila funcional PR #6–#17 y sigue fuera de `main`; la implementación y sus contratos están disponibles para integración progresiva. El incremento actual `feature/command-idempotency-increment` parte de esa rama. En esta pila, Development expone 61 rutas OpenAPI en `/openapi/v1.json`. La API no migra al arrancar.
+`main` integra PR #1–#6 y es la base de integración. PR #7–#13 están integrados en ramas apiladas. `feature/phone-verification` incorpora PR #14 y los PR #15–#18 integrados en esa rama; sigue fuera de `main`. PR #19–#21 están en ramas posteriores. En esta pila, Development expone 61 rutas OpenAPI en `/openapi/v1.json`. La API no migra al arrancar.
 
 La BD de desarrollo SQL Server recibió nueve migraciones, incluida `IncidentCommandIdempotency`. EF las aplicó explícitamente y confirmó que no quedan pendientes ni cambios de modelo. La prueba funcional API usa SQLite; la prueba real de aceptación concurrente requiere una BD aislada `PoraquiIntegrationTests` y sigue pendiente.
 
-## Integrado en `main` (PR #1–#5)
+## Contratos base integrados en `main` (PR #1–#6)
 
 ### Identidad, permisos y negocio
 
@@ -20,27 +20,21 @@ La BD de desarrollo SQL Server recibió nueve migraciones, incluida `IncidentCom
 ### Catálogo, tarifa y pedido
 
 - `GET/POST /api/businesses/{id}/products`; `PUT /api/products/{productId}`.
-- El negocio agrega grupos de opciones con `POST /api/products/{productId}/option-groups` (`name`, `minSelections`, `maxSelections`, `options[{name,priceDelta}]`); cambia disponibilidad con `PUT /api/option-groups/{id}/availability` y `PUT /api/product-options/{id}/availability`. Requiere propietario del producto o administrador.
-- `GET /api/businesses/{id}/products` incluye solo grupos y opciones disponibles con límites y diferencias de precio. Al crear pedido, `items[]` puede incluir `optionIds[]`. El servidor comprueba opciones disponibles y límites de cada grupo, calcula `precio base + diferencias` y guarda snapshots de nombres/precios seleccionados en cada línea. El cliente no envía importes.
 - `GET /api/delivery-zones/active`; admins administran zonas con `POST/PUT /api/delivery-zones`.
 - Negocio/admin administra tarifas por zona con `GET/POST /api/businesses/{id}/delivery-rates` y `PUT /api/businesses/{id}/delivery-rates/{zoneId}`.
-- Negocio/admin configura la semana y zona horaria con `PUT /api/businesses/{id}/opening-hours` (`timeZoneId`, siete `days` con `day`, `isClosed`, `opensAt`, `closesAt`). Consulta pública `GET /api/businesses/{id}/opening-hours` devuelve horario y `isAcceptingOrders`. Los pedidos se rechazan fuera del horario local configurado. Hasta configurar el horario, el negocio conserva la disponibilidad previa.
 - `GET/PUT /api/businesses/{businessId}/transfer-details`: propietario/admin configura destinatario, institución, referencia e instrucciones.
 - `POST /api/orders`: cliente envía negocio, zona, dirección, producto IDs y cantidades. El servidor obtiene precios y tarifa activos; no acepta importes del cliente. El pedido guarda snapshot de instrucciones de transferencia que solo ve el cliente del pedido.
 
 ### Pago manual y reparto propio
 
-- `POST /api/account/phone/verification` inicia un SMS OTP para un número E.164. `POST /api/account/phone/verification/confirm` recibe el mismo número y código; solo si Twilio Verify responde `approved`, Identity guarda el teléfono como confirmado. Código inválido/vencido devuelve 400; proveedor sin configurar o indisponible devuelve 503. Ambos endpoints comparten límite de cinco solicitudes por IP cada diez minutos; excederlo devuelve 429. No se guardan códigos OTP en la BD.
-- Configuración privada requerida: `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid` y `TwilioVerify:ApiKeySecret`. El adaptador usa HTTPS y el recurso Verify de Twilio; no existe un modo simulado en producción.
 - Cliente sube comprobante privado con `POST /api/orders/{id}/transfer-evidence` (`multipart/form-data`, `file`, PDF/JPEG/PNG, máximo 8 MB). Solo negocio propietario/admin puede descargarlo.
 - Negocio/admin revisa pago con `POST /api/businesses/{businessId}/orders/{orderId}/payment-review`; aprobación deja `AwaitingBusinessDecision`.
 - `POST .../decision`, `POST .../preparation` y `POST .../ready` gestionan decisión e inicio explícito de preparación.
 - Admin asigna rol de courier propio con `PUT /api/admin/users/{id}/delivery-person`; negocio asigna con `POST .../assign-courier` y fija el importe que paga al recoger.
 - Courier propio consulta asignaciones con `GET /api/courier/orders` y `GET /api/courier/orders/{orderId}`.
-- `POST /api/orders/{id}/pickup` valida código y registra por separado que el courier recibió el pago del negocio. Repetirlo con el mismo courier y código después de una recogida ya guardada responde correctamente sin volver a modificar historial ni publicar evento; código incorrecto sigue en conflicto.
+- `POST /api/orders/{id}/pickup` valida código y registra por separado que el courier recibió el pago del negocio.
 - `POST /api/orders/{id}/delivery/start` permite `whatsapp` o `call`; solo el courier asignado recibe teléfono.
-- `POST /api/orders/{id}/delivery/confirm` exige código de recepción del cliente. Un reintento con el mismo courier y código tras una entrega ya guardada es idempotente; no se agrega otra transición ni evento.
-- Repetir una revisión de pago con el mismo revisor, decisión y nota; la misma decisión de negocio (y, al rechazar, la misma razón); el inicio de preparación o “listo” con el mismo actor; el inicio de recorrido con el mismo courier/canal; o el rechazo de una oferta ya rechazada por ese courier devuelve éxito sin duplicar historial, versión ni notificaciones. Si cambian los datos de una revisión ya aplicada, se conserva el conflicto.
+- `POST /api/orders/{id}/delivery/confirm` exige código de recepción del cliente.
 - Cliente consulta `GET /api/orders/{id}`; negocio consulta `GET /api/businesses/{businessId}/orders` y `GET .../orders/{orderId}`. Incluyen estado e historial.
 
 Cada transición de pedido incrementa `Order.Version`; la persistencia detecta escrituras obsoletas. Los códigos son de seis dígitos y se guardan hasheados; el código de recepción se entrega al cliente al crear el pedido y el código de recogida se entrega una vez al asignar.
@@ -96,6 +90,20 @@ Cada transición de pedido incrementa `Order.Version`; la persistencia detecta e
 - `GET /api/admin/metrics/pilot?fromUtc={ISO-8601}&toUtc={ISO-8601}` devuelve conteo de pedidos por estado, suma de totales de todos los pedidos creados en el periodo (incluye cancelados/rechazados), entregas, cancelaciones, incidencias abiertas, reembolsos que esperan revisión y tiempo medio hasta entrega. Solo admin de plataforma puede consultarlo.
 - El periodo es UTC, inclusivo al inicio y exclusivo al final, máximo 366 días. Sin parámetros usa los últimos 30 días. La respuesta es agregada y no incluye identificadores, direcciones, teléfonos ni datos de pago.
 - Consulta de solo lectura; no requiere migración ni cambia el esquema. PR #12 está integrado en `feature/order-cancellations-refunds-incidents` (`d04882a`), aún no en `main`. La prueba de ruta/permisos/agregados usa SQLite aislado; una prueba adicional confirma la traducción de las consultas con el proveedor EF Core SQL Server sin abrir conexión. Aún falta ejecutar contra SQL Server real.
+
+## PR #13 integrado en `feature/order-cancellations-refunds-incidents`: reintentos de reparto
+
+`POST /api/orders/{id}/pickup` y `/delivery/confirm` aceptan repetir la misma transición con el courier asignado y el código correcto después de una respuesta perdida. No vuelven a incrementar versión, duplicar historial ni publicar otro evento. El código erróneo sigue en conflicto.
+
+## PR #14: verificación telefónica SMS, abierto en `feature/phone-verification`
+
+- `POST /api/account/phone/verification` inicia Twilio Verify SMS para teléfono E.164. `POST /api/account/phone/verification/confirm` recibe el mismo número y código; Identity confirma el teléfono solo con estado `approved`.
+- Código inválido/caducado devuelve 400; configuración o proveedor indisponible, 503. Ambos endpoints comparten límite de cinco solicitudes por IP cada diez minutos; excederlo devuelve 429. OTP no se guarda en la BD.
+- Configuración privada: `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid`, `TwilioVerify:ApiKeySecret`. El test reemplaza al proveedor; falta configurar Twilio y comprobar envío real.
+
+## PR #15 y PR #18 integrados en la pila de PR #14
+
+Los reintentos de revisión de pago, decisión del negocio, preparación, “listo”, inicio de recorrido y rechazo de oferta son idempotentes cuando actor y payload coinciden; payload distinto conserva conflicto. PR #18 añade `commandId` durable al reporte `POST /api/orders/{id}/incidents`: mismo actor, orden y payload reproduce la incidencia; clave usada con otros datos da 409. La migración `IncidentCommandIdempotency` añade columna nullable e índice único filtrado, ya aplicada según historial EF.
 
 ## Validación, antecedentes y pendientes
 

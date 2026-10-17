@@ -62,6 +62,7 @@ public sealed class OrderWorkflowController(OrderWorkflowService workflow, UserM
         catch (IncidentCommandConflictException) { return Conflict(new { error = "Command ID was already used for a different order or incident payload." }); }
         catch (ArgumentException exception) { return BadRequest(new { error = exception.Message }); }
         catch (DbUpdateConcurrencyException) { return Conflict(new { error = "Order changed; reload its current state." }); }
+        catch (DbUpdateException) { return Conflict(new { error = "Incident command conflicted with a concurrent write; retry the same command ID." }); }
     }
 
     [Authorize(Policy = ApplicationPolicies.DeliveryOperations)]
