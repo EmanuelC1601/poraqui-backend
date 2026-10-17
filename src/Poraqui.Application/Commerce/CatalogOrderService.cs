@@ -31,7 +31,7 @@ public sealed record CreatedOrderView(Guid Id, string OrderNumber, Guid Business
 public sealed record CreatedOrderLineView(Guid ProductId, string ProductName, decimal UnitPrice, int Quantity, decimal LineTotal);
 public sealed record TransferInstructionsView(string RecipientName, string Institution, string AccountReference, string? Instructions);
 
-public sealed class CatalogOrderService(ICatalogOrderRepository repository)
+public sealed class CatalogOrderService(ICatalogOrderRepository repository, Poraqui.Application.Orders.IOrderChangePublisher publisher)
 {
     public async Task<IReadOnlyList<ProductView>> GetProductsAsync(Guid businessId, CancellationToken cancellationToken)
     {
@@ -176,6 +176,9 @@ public sealed class CatalogOrderService(ICatalogOrderRepository repository)
         order.SetDeliveryCodeHash(OrderAccessCode.Hash(deliveryCode));
         await repository.AddOrderAsync(order, cancellationToken);
         await repository.SaveChangesAsync(cancellationToken);
+        var created = order.StatusHistory.Single();
+        await publisher.PublishAsync(new Poraqui.Application.Orders.OrderChangeNotice(order.Id, order.BusinessId,
+            order.CustomerUserId, order.CourierUserId, order.Status.ToString(), order.Version, created.ChangedAtUtc), cancellationToken);
         return ToView(order, deliveryCode);
     }
 

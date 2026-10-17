@@ -33,8 +33,10 @@ public sealed record OrderWorkflowView(Guid Id, string OrderNumber, Guid Custome
 public sealed record CourierAssignment(string PickupCode, decimal PaymentAmount, OrderWorkflowView Order);
 public sealed record CustomerContact(string? PhoneNumber, string WhatsAppDialString, string Channel);
 public sealed record OfflineDeliverySyncResult(Guid CommandId, Guid OrderId, string Status, DateTimeOffset AcceptedAtUtc, bool Replayed);
+public sealed record OrderRealtimeSnapshot(Guid OrderId, string Status, long Version, DateTimeOffset ChangedAtUtc);
+public sealed record OrderRealtimeSubscription(OrderRealtimeSnapshot Snapshot, string Audience);
 
-public sealed class OrderWorkflowService(IOrderWorkflowRepository repository)
+public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IOrderChangePublisher publisher)
 {
     public async Task SubmitTransferEvidenceAsync(Guid orderId, Guid customerId, string privateEvidenceReference,
         CancellationToken cancellationToken)
@@ -43,6 +45,7 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository)
         if (order.CustomerUserId != customerId) throw new OrderResourceForbiddenException();
         order.SubmitTransferEvidence(privateEvidenceReference, customerId);
         await repository.SaveChangesAsync(cancellationToken);
+        await PublishChange(order, cancellationToken);
     }
 
     public async Task<IReadOnlyList<OrderWorkflowView>> GetBusinessOrdersAsync(Guid businessId, Guid ownerId, bool isAdmin,
@@ -87,6 +90,18 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository)
         return ToView(order, address);
     }
 
+    public async Task<OrderRealtimeSubscription> GetRealtimeSnapshotAsync(Guid orderId, Guid actorId, bool isAdmin,
+        CancellationToken cancellationToken)
+    {
+        var order = await RequiredOrder(orderId, cancellationToken);
+        var audience = isAdmin ? "admin" : order.CustomerUserId == actorId ? "customer" :
+            order.CourierUserId == actorId ? "courier" :
+            await repository.BusinessBelongsToAsync(order.BusinessId, actorId, cancellationToken) ? "business" : null;
+        if (audience is null) throw new OrderResourceForbiddenException();
+        return new OrderRealtimeSubscription(new OrderRealtimeSnapshot(order.Id, order.Status.ToString(), order.Version,
+            order.StatusHistory.OrderByDescending(entry => entry.ChangedAtUtc).First().ChangedAtUtc), audience);
+    }
+
     public async Task<IReadOnlyList<OrderWorkflowView>> GetOrdersForCourierAsync(Guid courierId, CancellationToken cancellationToken)
     {
         var orders = await repository.GetOrdersForCourierAsync(courierId, cancellationToken);
@@ -115,6 +130,7 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository)
         await EnsureBusinessAccess(order.BusinessId, actorId, isAdmin, cancellationToken);
         order.ReviewTransfer(actorId, approved, note);
         await repository.SaveChangesAsync(cancellationToken);
+        await PublishChange(order, cancellationToken);
     }
 
     public async Task DecideBusinessAsync(Guid orderId, Guid actorId, bool accept, string? reason,
@@ -125,6 +141,7 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository)
         if (accept) order.AcceptByBusiness(actorId);
         else order.RejectByBusiness(actorId, reason ?? string.Empty);
         await repository.SaveChangesAsync(cancellationToken);
+        await PublishChange(order, cancellationToken);
     }
 
     public async Task ChangePreparationAsync(Guid orderId, Guid actorId, bool ready, CancellationToken cancellationToken)
@@ -134,6 +151,7 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository)
         if (ready) order.MarkReadyForPickup(actorId);
         else order.BeginPreparation(actorId);
         await repository.SaveChangesAsync(cancellationToken);
+        await PublishChange(order, cancellationToken);
     }
 
     public async Task<CourierAssignment> AssignCourierAsync(Guid orderId, Guid businessUserId, Guid courierId,
@@ -144,6 +162,7 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository)
         var pickupCode = OrderAccessCode.Generate();
         order.AssignCourier(businessUserId, courierId, OrderAccessCode.Hash(pickupCode), courierPaymentAmount);
         await repository.SaveChangesAsync(cancellationToken);
+        await PublishChange(order, cancellationToken);
         var address = await repository.GetBusinessAddressAsync(order.BusinessId, cancellationToken) ?? string.Empty;
         return new CourierAssignment(pickupCode, order.CourierPaymentAmount!.Value, ToView(order, address));
     }
@@ -154,6 +173,7 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository)
         EnsureCourier(order, courierId);
         order.MarkPickedUp(courierId, OrderAccessCode.Hash(pickupCode));
         await repository.SaveChangesAsync(cancellationToken);
+        await PublishChange(order, cancellationToken);
     }
 
     public async Task<CustomerContact> BeginDeliveryAsync(Guid orderId, Guid courierId, string channel, CancellationToken cancellationToken)
@@ -165,6 +185,7 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository)
         if (string.IsNullOrWhiteSpace(phone))
             throw new InvalidOperationException("Customer has no phone number available for delivery contact.");
         await repository.SaveChangesAsync(cancellationToken);
+        await PublishChange(order, cancellationToken);
         return new CustomerContact(phone, NormalizePhone(phone), channel.ToLowerInvariant());
     }
 
@@ -174,6 +195,7 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository)
         EnsureCourier(order, courierId);
         order.MarkDelivered(courierId, OrderAccessCode.Hash(deliveryCode));
         await repository.SaveChangesAsync(cancellationToken);
+        await PublishChange(order, cancellationToken);
     }
 
     public async Task<OfflineDeliverySyncResult> SyncDeliveryConfirmationAsync(Guid orderId, Guid courierId, Guid commandId,
@@ -198,6 +220,7 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository)
         repository.AddOfflineDeliveryCommand(new OfflineDeliverySyncRecord(commandId, courierId, orderId, payloadHash,
             clientCapturedAtUtc, acceptedAt));
         await repository.SaveChangesAsync(cancellationToken);
+        await PublishChange(order, cancellationToken);
         return new OfflineDeliverySyncResult(commandId, orderId, OrderStatus.Delivered.ToString(), acceptedAt, false);
     }
 
@@ -216,6 +239,13 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository)
     }
 
     private static string NormalizePhone(string? phone) => new((phone ?? string.Empty).Where(char.IsDigit).ToArray());
+
+    private Task PublishChange(Order order, CancellationToken cancellationToken)
+    {
+        var change = order.StatusHistory.OrderByDescending(entry => entry.ChangedAtUtc).First();
+        return publisher.PublishAsync(new OrderChangeNotice(order.Id, order.BusinessId, order.CustomerUserId,
+            order.CourierUserId, order.Status.ToString(), order.Version, change.ChangedAtUtc), cancellationToken);
+    }
 
     private static OrderWorkflowView ToView(Order order, string businessAddress) => new(order.Id, order.OrderNumber, order.CustomerUserId,
         order.BusinessId, businessAddress, order.ZoneId, order.CourierUserId, order.DeliveryAddress, order.Items.Sum(item => item.LineTotal),
