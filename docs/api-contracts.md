@@ -1,6 +1,6 @@
 # Contratos API y entre módulos
 
-Este documento describe contratos implementados. `main` integra PR #1–#6; PR #7–#12 ya están integrados entre ramas apiladas y esperan que la pila llegue a `main`. PR #10 se integró en `feature/catalog-options`; PR #11, con PR #12 de métricas, se integró en `feature/business-hours`.
+Este documento describe contratos implementados. `main` integra PR #1–#6; PR #7–#12 ya están integrados entre ramas apiladas y esperan que la pila llegue a `main`. PR #10 se integró en `feature/catalog-options`; PR #11, con PR #12 de métricas, se integró en `feature/business-hours`. PR #13 añade reintentos seguros y está abierto en `feature/delivery-command-retries`.
 
 ## Identidad y comercio — `main`
 

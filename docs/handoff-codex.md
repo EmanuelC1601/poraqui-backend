@@ -10,7 +10,7 @@ Este repositorio tiene un único responsable para todos los módulos: identidad/
 - PR #7–#9 fueron integrados en sus ramas apiladas.
 - PR #10 se integró en `feature/catalog-options` con merge commit `fc68274` y ya está cerrado como merged.
 - PR #11 (cancelaciones/incidencias/reembolsos), que contiene PR #12 (métricas), se integró en `feature/business-hours` con `efa53d9`; aún no está en `main`.
-- PR #13–#14 y PR #18–#21 se mantienen en ramas apiladas y todavía no están en `main`.
+- PR #13 (`feature/delivery-command-retries`) está abierto, sincronizado con la base de PR #11 y pasa 19/19 pruebas SQLite; #14 y #18–#21 siguen en ramas apiladas fuera de `main`.
 
 ## SQL Server y migraciones
 
@@ -20,13 +20,13 @@ La clave privada `ConnectionStrings:DefaultConnection` está configurada en User
 
 ## Build y pruebas
 
-Sobre la rama de PR #11, incluyendo métricas #12: `dotnet build Poraqui.sln --no-restore` pasa con 0 advertencias/errores; `dotnet test Poraqui.sln --no-build --no-restore` pasa 19/19 con SQLite aislada. Una prueba comprueba traducción de la consulta SQL Server sin conectarse a SQL Server. Este host tiene SDK/runtime .NET 10 mientras la solución apunta a net9; para ejecutar test host usar `$env:DOTNET_ROLL_FORWARD='Major'`. No confundir SQLite/traducción con verificación de restricciones o concurrencia SQL Server.
+Sobre `feature/delivery-command-retries`, con PR #11/#12 como base: `dotnet build Poraqui.sln --no-restore` pasa con 0 advertencias/errores; `dotnet test Poraqui.sln --no-build --no-restore` pasa 19/19 con SQLite aislada. Se prueba reintento de recogida/entrega con código correcto y no duplicación de versión/historial, además de permisos, importes, transiciones, métricas y recorrido. Una prueba comprueba traducción SQL Server sin conectarse a SQL Server. Este host tiene SDK/runtime .NET 10 mientras la solución apunta a net9; para ejecutar test host usar `$env:DOTNET_ROLL_FORWARD='Major'`. No confundir SQLite/traducción con verificación de restricciones o concurrencia SQL Server.
 
 El recorrido funcional, endpoints y límites están en `docs/order-flow.md`. Contratos vigentes y ledger verificable están en `docs/api-contracts.md` y `docs/project-status.md`. Para OpenAPI en Development, ejecutar `dotnet run --project src/Poraqui.Api` y consultar `/openapi/v1.json`.
 
 ## Próximos pasos
 
-1. Completar revisión e integración de PR #13, que hace seguro repetir recogida/entrega con el mismo código sin duplicar versión, historial o evento.
+1. Integrar PR #13 después de finalizar la verificación de su diff y checks.
 2. Revisar PR #14 y #18–#21 en orden, con foco en permisos cruzados, transiciones, códigos, concurrencia e idempotencia.
 3. Preparar una BD aislada SQL Server para migraciones/restricciones y pruebas concurrentes; nunca hacer pruebas destructivas sobre la BD compartida.
 4. Completar despliegue MonsterASP.NET, almacenamiento privado persistente y recorrido publicado; validar reconexión SignalR con cliente.

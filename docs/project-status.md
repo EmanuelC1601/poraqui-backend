@@ -1,6 +1,6 @@
 # Estado verificable del proyecto
 
-Actualizado: 2026-10-17. `main` integra PR #1–#6. PR #7–#12 se han integrado en ramas de trabajo apiladas, todavía fuera de `main`. PR #10 se integró en `feature/catalog-options` (`fc68274`) y PR #11, que incluye PR #12, en `feature/business-hours` (`efa53d9`). PR #13–#14 y PR #18–#21 siguen en sus pilas de ramas, fuera de `main`. El equipo trabaja con un único responsable; OpenCode ya no participa.
+Actualizado: 2026-10-17. `main` integra PR #1–#6. PR #7–#12 se han integrado en ramas de trabajo apiladas, todavía fuera de `main`. PR #10 se integró en `feature/catalog-options` (`fc68274`) y PR #11, que incluye PR #12, en `feature/business-hours` (`efa53d9`). PR #13 (reintentos de reparto) está abierto desde `feature/delivery-command-retries`; PR #14 y #18–#21 siguen en sus pilas, fuera de `main`. El equipo trabaja con un único responsable; OpenCode ya no participa.
 
 ## Implementado
 
@@ -15,7 +15,7 @@ Actualizado: 2026-10-17. `main` integra PR #1–#6. PR #7–#12 se han integrado
 |---|---|
 | Integrar PR #7–#12 hasta `main` | Pendiente; #7–#12 están integrados en ramas apiladas, fuera de `main`. |
 | OTP de teléfono | PR #14 en pila; proveedor/configuración real pendientes. |
-| Reintentos/idempotencia durable para comandos y altas | PR #13 añade repetición segura de recogida/entrega. OTP/idempotencia durable y asignación siguen en PR #14 y #18–#21; verificar e integrar en orden. |
+| Reintentos/idempotencia durable para comandos y altas | PR #13 añade repetición segura de recogida/entrega y espera integración. OTP/idempotencia durable y asignación siguen en PR #14 y #18–#21; verificar e integrar en orden. |
 | Revisión SQL Server de restricciones y aceptación/asignación concurrente | Bloqueada para pruebas automatizadas aisladas por falta de `ConnectionStrings:SqlServerTest`. La conexión privada `DefaultConnection` sí permite consultar historial. |
 | Prueba de reconexión SignalR con cliente real | Pendiente; el hub devuelve snapshot persistido al suscribirse. |
 | Despliegue MonsterASP.NET, almacenamiento privado persistente y recorrido publicado | Pendiente. |
@@ -23,11 +23,13 @@ Actualizado: 2026-10-17. `main` integra PR #1–#6. PR #7–#12 se han integrado
 
 ## Verificación de este incremento
 
-- La pila que contiene PR #11–#13 está en revisión; PR #13 es `feature/delivery-command-retries`.
-- `dotnet build Poraqui.sln --no-restore`: correcto, 0 advertencias y 0 errores; requiere `DOTNET_ROLL_FORWARD=Major` en este host que tiene runtime .NET 10 para ejecutar tests net9.
-- `dotnet test Poraqui.sln --no-build --no-restore`: 19/19 con SQLite aislada (incluye una prueba que inspecciona traducción SQL Server, sin conexión SQL).
-- `git diff --check`: pendiente tras esta actualización documental.
+- Rama probada: `feature/delivery-command-retries`, base sincronizada con `feature/order-cancellations-refunds-incidents`.
+- `dotnet build Poraqui.sln --no-restore`: correcto, 0 advertencias y 0 errores; tests net9 requieren `DOTNET_ROLL_FORWARD=Major` en este host con runtime .NET 10.
+- `dotnet test Poraqui.sln --no-build --no-restore`: 19/19 con SQLite aislada (incluye una prueba de traducción SQL Server, sin conexión SQL). PR #13 añade repetición de recogida/entrega sin nuevo historial ni versión.
+- `git diff --check`: limpio antes de este cambio documental.
 - EF Core contra la configuración privada `ConnectionStrings:DefaultConnection` lista las migraciones hasta `OrderCancellationAuditConstraints` y `has-pending-model-changes` confirma que el modelo coincide. Esto confirma conectividad e historial, no ejecuta una prueba de bloqueo/concurrencia. No se aplicó una migración en esta sesión.
 - `ConnectionStrings:SqlServerTest` no está configurada; no ejecutar pruebas con borrado/limpieza en la BD compartida.
+
+PR #13 no agrega migraciones.
 
 Para configurar una copia local, establece `ConnectionStrings:DefaultConnection` con User Secrets del proyecto `src/Poraqui.Api`. Para pruebas SQL aisladas, configura además `ConnectionStrings:SqlServerTest` apuntando a una base separada. Nunca incluyas los valores en Git o logs.
