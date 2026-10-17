@@ -1,32 +1,39 @@
 # Estado verificable del proyecto
 
-Actualizado: 2026-10-17. El PR #1 está bajo revisión. Esta lista distingue reglas de dominio existentes de flujos funcionales expuestos y probados.
+Actualizado: 2026-10-17. La rama de trabajo es `feature/functional-order-flow`, basada en `main` (`e346995`). El PR #1 está integrado. Esta página diferencia código existente, pruebas ejecutadas y trabajo pendiente.
 
 ## Implementado y verificado
 
-- Solución .NET 9 compilable con Domain, Application, Infrastructure y Api.
-- EF Core SQL Server, Identity base y configuración condicional de `AppDbContext`; no se aplican migraciones al iniciar.
-- Entidades/reglas iniciales de negocio, producto, zona, tarifa, pedido, líneas y revisión manual de transferencia.
-- Cálculo de importes usando valores proporcionados al dominio; todavía no hay un caso de uso que cargue catálogo y tarifa del servidor.
-- Mapeos EF de los modelos de comercio y pedidos.
-- 8 pruebas unitarias/regresión con SQLite en memoria aislado. La consulta en el portal SQL confirmó conexión del proveedor y 0 tablas de usuario antes de migrar.
+- Arquitectura .NET 9 compilable con proyectos Domain, Application, Infrastructure y Api; EF Core SQL Server e Identity con GUID.
+- Modelos y mapeos iniciales EF para negocio, producto, zona, tarifa, pedido, líneas y revisión de transferencia.
+- Identity API para registro/login cuando existe configuración privada de conexión; roles iniciales y policies.
+- Primer administrador instalable con `Bootstrap:AdminKey` privado y transacción.
+- Alta y configuración de negocio, listado público activo y activación administrativa.
+- Autorización por rol y recurso para leer/configurar negocio; prueba integrada cubre denegación entre propietarios.
+- Suite de pruebas compila solución y pasa 10/10 en SQLite en memoria. Incluye API Identity/negocio y pruebas de dominio/persistencia.
+- API no migra automáticamente al iniciar. Sin migraciones generadas o aplicadas.
 
 ## Pendiente
 
-- Login/registro operativo, asignación de roles y permisos por propietario/recurso.
-- Casos de uso, validación/autorización, endpoints HTTP y OpenAPI para todo el negocio.
-- Opciones de producto, horarios, disponibilidad por negocio, zonas/tarifas administrables y cálculo autoritativo desde base de datos.
-- Transferencia: datos de cobro, comprobante privado, revisión autorizada, idempotencia y confirmación de pedido.
-- Recorrido interno: aceptación/rechazo del negocio, preparación explícita, repartidores propios, pago al recoger, código de recogida, viaje, contacto consentido, código/confirmación de entrega, estado e historial.
-- Reparto externo: disponibilidad, oferta visible con origen/destino/condiciones/remuneración, aceptación atómica, rechazo, expiración, cancelación y ausencia de repartidores.
-- SignalR con destinatarios autorizados y eventos después de persistir; sincronización, operaciones idempotentes y validación antes de aceptar entregas offline.
-- Incidencias, reembolsos manuales, métricas del piloto y despliegue MonsterASP.NET.
-- Migración inicial revisable y validación de restricciones/concurrencia con SQL Server desde la aplicación.
+- Revisión de migración inicial y restricciones sobre SQL Server; conectividad EF desde aplicación.
+- Catálogo con opciones y disponibilidad, zonas/tarifas administrables y precio calculado en servidor.
+- Creación de pedido, aceptación/rechazo del negocio, pagos manuales, evidencia privada y confirmación de revisión.
+- Preparación explícita, reparto propio, asignación, pago al repartidor al recoger, códigos y recorrido/entrega.
+- Reparto externo: disponibilidad, ofertas, aceptación/rechazo concurrentes, cancelación, vencimiento y ausencia de repartidores.
+- SignalR autorizado, estado tras reconexión, idempotencia, sincronización offline validada, incidencias/reembolsos, métricas y despliegue MonsterASP.NET.
+- OpenAPI validado y guía reproducible del flujo completo.
 
 ## Bloqueado
 
-- Conexión desde la aplicación y migraciones EF bloqueadas hasta que esté configurado el secreto `ConnectionStrings:DefaultConnection` en User Secrets de `src/Poraqui.Api` o la variable `ConnectionStrings__DefaultConnection`. El portal web permite consultas, pero no sustituye la cadena privada de la aplicación.
+- Configuración privada `ConnectionStrings:DefaultConnection` ausente en la copia local. La variable equivalente es `ConnectionStrings__DefaultConnection`. El portal MonsterASP respondió a una consulta de solo lectura y reportó cero tablas de usuario, pero eso no verifica conexión EF. Sin secreto local no se ejecutan pruebas SQL Server ni se generan/aplican migraciones.
+- No se usan credenciales copiadas del chat y no se realizaron cambios de esquema ni de datos compartidos.
 
-## No incluido por alcance
+## Fuera de alcance
 
-- GPS/distancias automáticas, transferencias bancarias automáticas y frontend.
+GPS/distancias automáticas, transferencias bancarias automáticas y frontend.
+
+## Integración vigente
+
+- `main`: base de integración, contiene merge de PR #1 (`e346995`).
+- `feature/functional-order-flow`: incremento de identidad/negocio en curso; aún sin commit ni PR.
+- Ver el handoff en `docs/handoff-codex.md` y contratos vigentes/provisionales en `docs/api-contracts.md`.

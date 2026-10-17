@@ -1,0 +1,52 @@
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Poraqui.Infrastructure.Persistence;
+
+namespace Poraqui.Domain.Tests;
+
+public sealed class ApiTestHost : WebApplicationFactory<Program>
+{
+    private readonly SqliteConnection _connection = new("Data Source=:memory:");
+    private readonly string? _previousConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection");
+    private readonly string? _previousBootstrapKey = Environment.GetEnvironmentVariable("Bootstrap__AdminKey");
+
+    public ApiTestHost()
+    {
+        _connection.Open();
+        Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", "Server=localhost;Database=unit;Integrated Security=true");
+        Environment.SetEnvironmentVariable("Bootstrap__AdminKey", "integration-test-bootstrap-key-with-sufficient-length");
+    }
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.UseEnvironment("Testing");
+        builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<DbContextOptions<AppDbContext>>();
+            services.RemoveAll<AppDbContext>();
+            services.AddDbContext<AppDbContext>(options => options.UseSqlite(_connection));
+        });
+    }
+
+    public async Task InitializeDatabaseAsync()
+    {
+        using var scope = Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.EnsureCreatedAsync();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if (disposing)
+        {
+            _connection.Dispose();
+            Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", _previousConnectionString);
+            Environment.SetEnvironmentVariable("Bootstrap__AdminKey", _previousBootstrapKey);
+        }
+    }
+}
