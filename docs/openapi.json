@@ -6,7 +6,7 @@
   },
   "servers": [
     {
-      "url": "http://localhost:5153/"
+      "url": "http://127.0.0.1:5189/"
     }
   ],
   "paths": {
@@ -2852,11 +2852,16 @@
       },
       "ReportIncidentRequest": {
         "required": [
+          "commandId",
           "category",
           "description"
         ],
         "type": "object",
         "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "category": {
             "type": "string"
           },
