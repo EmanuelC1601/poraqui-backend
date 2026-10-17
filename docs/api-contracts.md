@@ -20,6 +20,7 @@ Estado: `main` es la base única de integración. Este documento describe lo imp
 - Repartidor inicia recorrido eligiendo `whatsapp` o `call`; teléfono solo se revela al asignado. Confirma entrega con código del cliente. Estados e historial consultables por participantes autorizados.
 - Acciones de transición reintentables no duplican historial ni pagos. Reportes de incidentes aceptan `commandId`; reembolso es seguimiento manual, sin movimiento bancario de la API.
 - Sync offline de entrega requiere `commandId`, código y hora de captura; el servidor vuelve a comprobar autorización, estado y código antes de aceptar.
+- La rama activa añade `GET /api/admin/metrics/pilot?fromUtc={utc}&toUtc={utc}`, restringido a `PlatformAdmin`. El rango predeterminado son los últimos 30 días y el máximo es 366 días; devuelve cantidad, valor bruto de pedidos, entregados/cancelados, tiempo medio de entrega, incidencias abiertas, reembolsos por revisar y conteos por estado. Importes agregan pedidos creados dentro del intervalo.
 
 ## SignalR
 
@@ -27,4 +28,4 @@ Hub autenticado `/hubs/orders`; `SubscribeOrder(orderId)` valida cliente, negoci
 
 ## Operación y límites
 
-No se ejecuta migración al iniciar la API. Migraciones y scripts revisables están bajo `src/Poraqui.Infrastructure/Persistence/Migrations` y `docs/sql`. `ConnectionStrings:SqlServerTest` debe apuntar a una base aislada para verificar SQL Server. Sin GPS ni distancia inferida; no hay llamadas automáticas de WhatsApp, OTP productivo, métricas piloto ni pagos bancarios automáticos.
+No se ejecuta migración al iniciar la API. Migraciones y scripts revisables están bajo `src/Poraqui.Infrastructure/Persistence/Migrations` y `docs/sql`. `ConnectionStrings:SqlServerTest` debe apuntar a una base aislada para verificar SQL Server. Sin GPS ni distancia inferida; no hay llamadas automáticas de WhatsApp, OTP productivo ni pagos bancarios automáticos.
