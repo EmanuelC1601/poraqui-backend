@@ -2,9 +2,9 @@
 
 ## Estado del contrato
 
-`main` contiene PR #1–#5 y es la base de integración. La rama `feature/phone-verification` incorpora la pila funcional PR #6–#17 y sigue fuera de `main`; la implementación y sus contratos están disponibles para integración progresiva. El incremento actual `feature/command-idempotency-increment` parte de esa rama. En esta pila, Development expone 61 rutas OpenAPI en `/openapi/v1.json`. La API no migra al arrancar.
+`main` contiene PR #1–#5 y es la base de integración. La rama `feature/phone-verification` incorpora la pila funcional PR #6–#17. PR #18 agrega idempotencia durable a incidencias; la rama local `feature/order-create-idempotency` continúa sobre PR #18 e implementa idempotencia de creación de pedidos. Ambos cambios siguen fuera de `main`. En Development la API expone `/openapi/v1.json`. La API no migra al arrancar.
 
-La BD de desarrollo SQL Server recibió nueve migraciones, incluida `IncidentCommandIdempotency`. EF las aplicó explícitamente y confirmó que no quedan pendientes ni cambios de modelo. La prueba funcional API usa SQLite; la prueba real de aceptación concurrente requiere una BD aislada `PoraquiIntegrationTests` y sigue pendiente.
+La BD de desarrollo SQL Server recibió diez migraciones, incluida `IncidentCommandIdempotency` y `OrderCreationCommandIdempotency`. EF las aplicó explícitamente y confirmó que no quedan pendientes ni cambios de modelo. Las pruebas funcionales API usan SQLite; la prueba real de aceptación concurrente requiere una BD aislada `PoraquiIntegrationTests` y sigue pendiente.
 
 ## Integrado en `main` (PR #1–#5)
 
@@ -26,7 +26,7 @@ La BD de desarrollo SQL Server recibió nueve migraciones, incluida `IncidentCom
 - Negocio/admin administra tarifas por zona con `GET/POST /api/businesses/{id}/delivery-rates` y `PUT /api/businesses/{id}/delivery-rates/{zoneId}`.
 - Negocio/admin configura la semana y zona horaria con `PUT /api/businesses/{id}/opening-hours` (`timeZoneId`, siete `days` con `day`, `isClosed`, `opensAt`, `closesAt`). Consulta pública `GET /api/businesses/{id}/opening-hours` devuelve horario y `isAcceptingOrders`. Los pedidos se rechazan fuera del horario local configurado. Hasta configurar el horario, el negocio conserva la disponibilidad previa.
 - `GET/PUT /api/businesses/{businessId}/transfer-details`: propietario/admin configura destinatario, institución, referencia e instrucciones.
-- `POST /api/orders`: cliente envía negocio, zona, dirección, producto IDs y cantidades. El servidor obtiene precios y tarifa activos; no acepta importes del cliente. El pedido guarda snapshot de instrucciones de transferencia que solo ve el cliente del pedido.
+- `POST /api/orders`: cliente envía `commandId`, negocio, zona, dirección, producto IDs, cantidades y opciones. El servidor obtiene precios y tarifa activos; no acepta importes del cliente. El pedido guarda snapshot de instrucciones de transferencia que solo ve el cliente del pedido. Repetir el mismo actor, comando y solicitud devuelve el pedido y código originales; una clave con otro contenido responde 409. El código se almacena protegido mediante ASP.NET Data Protection.
 
 ### Pago manual y reparto propio
 
@@ -54,7 +54,7 @@ Cada transición de pedido incrementa `Order.Version`; la persistencia detecta e
 - Courier rechaza o acepta con `POST /api/courier/external/offers/{offerId}/reject` y `/accept`. Aceptar guarda oferta y asignación del pedido en una transacción y devuelve una vez el código de recogida. Al recoger se conserva el registro existente de pago del negocio.
 - Negocio cancela ofertas abiertas con `POST /api/businesses/{businessId}/orders/{orderId}/external-offers/cancel`. Al listar o aceptar, las ofertas vencidas se marcan como expiradas.
 - `ExternalDeliveryOffer.Version`, `Order.Version` y un índice único filtrado por pedido aceptado protegen frente a respuestas concurrentes. Falta ejecutar la carrera en SQL Server.
-- Migración `ExternalCourierOffers` y script SQL revisables en `src/Poraqui.Infrastructure/Persistence/Migrations/` y `docs/sql/20261017191548_ExternalCourierOffers.sql`; aplicada en la BD de desarrollo como parte de las ocho migraciones pendientes verificadas por EF.
+- Migración `ExternalCourierOffers` y script SQL revisables en `src/Poraqui.Infrastructure/Persistence/Migrations/` y `docs/sql/20261017191548_ExternalCourierOffers.sql`; aplicada en la BD de desarrollo como parte del esquema ya verificado por EF.
 
 ## Implementado en la pila; pendiente integrar a `main`: sincronización de entrega (`feature/offline-delivery-sync`, basada en PR #6)
 

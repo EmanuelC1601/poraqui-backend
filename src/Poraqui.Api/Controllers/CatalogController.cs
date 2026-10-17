@@ -187,10 +187,11 @@ public sealed class CatalogController(CatalogOrderService catalog, UserManager<A
         if (!Guid.TryParse(users.GetUserId(User), out var customerId)) return Unauthorized();
         try
         {
-            var order = await catalog.CreateOrderAsync(customerId, request.BusinessId, request.ZoneId,
+            var order = await catalog.CreateOrderAsync(customerId, request.BusinessId, request.ZoneId, request.CommandId,
                 request.DeliveryAddress, request.Items, cancellationToken);
             return Created($"/api/orders/{order.Id}", order);
         }
+        catch (OrderCreationCommandConflictException) { return Conflict(new { error = "The command ID was already used with a different order request." }); }
         catch (ArgumentException exception) { return BadRequest(new { error = exception.Message }); }
     }
 
@@ -208,4 +209,4 @@ public sealed record UpdateZoneRequest(string Name, bool IsActive);
 public sealed record RateRequest(Guid ZoneId, decimal Fee);
 public sealed record UpdateRateRequest(decimal Fee, bool IsActive);
 public sealed record ConfigureOpeningHoursRequest(string TimeZoneId, IReadOnlyCollection<OpeningHoursRequest> Days);
-public sealed record CreateOrderRequest(Guid BusinessId, Guid ZoneId, string DeliveryAddress, IReadOnlyCollection<OrderItemRequest> Items);
+public sealed record CreateOrderRequest(Guid CommandId, Guid BusinessId, Guid ZoneId, string DeliveryAddress, IReadOnlyCollection<OrderItemRequest> Items);

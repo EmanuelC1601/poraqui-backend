@@ -19,7 +19,7 @@ El `UserSecretsId` ya está configurado. Las migraciones revisables incluyen `In
 2. Registra una cuenta de negocio, inicia sesión, crea negocio con `POST /api/businesses`, actívalo como admin con `PUT /api/businesses/{id}/active` y configura transferencia con `PUT /api/businesses/{id}/transfer-details`.
 3. El admin crea una zona con `POST /api/delivery-zones`. El negocio registra productos con `POST /api/businesses/{id}/products`, configura grupos de variantes con `POST /api/products/{productId}/option-groups` y tarifa con `POST /api/businesses/{id}/delivery-rates`. El negocio puede cambiar la disponibilidad de grupos/opciones con sus rutas `.../availability`.
    Antes de aceptar pedidos con horario, el propietario configura su zona y semana en `PUT /api/businesses/{id}/opening-hours`; la consulta pública `GET` muestra horario y disponibilidad actual.
-4. Cliente registra teléfono con `PUT /api/account/phone` y crea pedido con `POST /api/orders`:
+4. Cliente registra teléfono con `PUT /api/account/phone` y crea pedido con `POST /api/orders`, incluyendo un `commandId` GUID estable para reintentos:
 
    ```json
    {

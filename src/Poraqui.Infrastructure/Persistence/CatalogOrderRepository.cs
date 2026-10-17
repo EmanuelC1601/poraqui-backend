@@ -7,6 +7,12 @@ namespace Poraqui.Infrastructure.Persistence;
 
 public sealed class CatalogOrderRepository(AppDbContext db) : ICatalogOrderRepository
 {
+    public Task<OrderCreationCommand?> GetOrderCreationCommandAsync(Guid customerId, Guid commandId, CancellationToken cancellationToken) =>
+        db.Set<OrderCreationCommand>().SingleOrDefaultAsync(command => command.CustomerUserId == customerId && command.CommandId == commandId, cancellationToken);
+
+    public Task<Order?> GetOrderForCreationReplayAsync(Guid orderId, CancellationToken cancellationToken) =>
+        db.Orders.Include(order => order.Items).ThenInclude(item => item.Options)
+            .SingleOrDefaultAsync(order => order.Id == orderId, cancellationToken);
     public Task<Business?> GetBusinessAsync(Guid businessId, CancellationToken cancellationToken) =>
         db.Businesses.Include(item => item.OpeningHours).SingleOrDefaultAsync(item => item.Id == businessId, cancellationToken);
 
@@ -50,5 +56,23 @@ public sealed class CatalogOrderRepository(AppDbContext db) : ICatalogOrderRepos
     public async Task AddZoneAsync(DeliveryZone zone, CancellationToken cancellationToken) => await db.DeliveryZones.AddAsync(zone, cancellationToken);
     public async Task AddRateAsync(DeliveryRate rate, CancellationToken cancellationToken) => await db.DeliveryRates.AddAsync(rate, cancellationToken);
     public async Task AddOrderAsync(Order order, CancellationToken cancellationToken) => await db.Orders.AddAsync(order, cancellationToken);
+    public async Task<bool> SaveOrderCreationAsync(Order order, OrderCreationCommand command, CancellationToken cancellationToken)
+    {
+        await db.Orders.AddAsync(order, cancellationToken);
+        await db.Set<OrderCreationCommand>().AddAsync(command, cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateException)
+        {
+            db.ChangeTracker.Clear();
+            if (await db.Set<OrderCreationCommand>().AnyAsync(existing =>
+                    existing.CustomerUserId == command.CustomerUserId && existing.CommandId == command.CommandId, cancellationToken))
+                return false;
+            throw;
+        }
+    }
     public async Task SaveChangesAsync(CancellationToken cancellationToken) => await db.SaveChangesAsync(cancellationToken);
 }

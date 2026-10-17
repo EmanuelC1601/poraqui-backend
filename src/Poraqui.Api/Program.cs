@@ -10,6 +10,7 @@ using Poraqui.Application.Commerce;
 using Poraqui.Application.Orders;
 using Poraqui.Infrastructure.Storage;
 using Poraqui.Api.Realtime;
+using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,6 +32,13 @@ builder.Services.AddRateLimiter(options =>
 });
 builder.Services.AddScoped<IOrderChangePublisher, SignalROrderChangePublisher>();
 builder.Services.AddHttpClient<IPhoneVerificationProvider, TwilioVerifyPhoneVerificationProvider>();
+var dataProtection = builder.Services.AddDataProtection().SetApplicationName("Poraqui");
+var dataProtectionKeysPath = builder.Configuration["DataProtection:KeysPath"];
+if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
+{
+    Directory.CreateDirectory(dataProtectionKeysPath);
+    dataProtection.PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
+}
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 var identityConfigured = !string.IsNullOrWhiteSpace(connectionString);
 if (!string.IsNullOrWhiteSpace(connectionString))
@@ -44,6 +52,7 @@ if (!string.IsNullOrWhiteSpace(connectionString))
     builder.Services.AddScoped<BusinessService>();
     builder.Services.AddScoped<ICatalogOrderRepository, CatalogOrderRepository>();
     builder.Services.AddScoped<CatalogOrderService>();
+    builder.Services.AddScoped<IOrderCommandSecretProtector, DataProtectionOrderCommandSecretProtector>();
     builder.Services.AddScoped<IOrderWorkflowRepository, OrderWorkflowRepository>();
     builder.Services.AddScoped<OrderWorkflowService>();
     builder.Services.AddScoped<IExternalCourierRepository, ExternalCourierRepository>();
