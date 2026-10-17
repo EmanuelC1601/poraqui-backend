@@ -14,14 +14,17 @@ Actualizado: 2026-10-17. `main` es la base de integración y tiene un único res
 | Integrado | Idempotencia de asignación de courier propio y persistencia protegida del código de recogida | PR #31, merge `cf3da9f`; prueba API de replay y conflictos |
 | Integrado | Pruebas guardadas de concurrencia SQL Server para aceptación simultánea de oferta externa y asignación interna; conflicto concurrente de oferta responde 409 | PR #32, merge `22cec11`; ambos casos requieren la conexión aislada indicada abajo |
 | Integrado | `GET /api/admin/metrics/pilot`, limitado a PlatformAdmin; agrega pedidos por intervalo UTC, importe bruto, estados, tiempo medio, incidencias abiertas y reembolsos por revisar | PR #33, merge `bddc081`; prueba de permiso/rango/valores y traducción de consultas comprobada con proveedor SQL Server sin abrir conexión |
-| Pendiente | OTP con proveedor real; ejecutar carreras SQL de concurrencia; prueba de reconexión SignalR con cliente real; despliegue MonsterASP.NET | No integrado o no verificado en SQL Server |
+| Implementado, verificación externa pendiente | OTP vía Twilio Verify, E.164, confirmación Identity y límite de 5 intentos/10 min/IP | Proveedor integrado y cubierto con handler HTTP simulado; envío real requiere secretos y no se ha comprobado |
+| Pendiente | Ejecutar carreras SQL de concurrencia; prueba de reconexión SignalR con cliente real; despliegue MonsterASP.NET | No verificado en SQL Server o no configurado |
 | Bloqueado por configuración | Ejecutar carreras reales en SQL Server | Falta `ConnectionStrings__SqlServerTest` apuntando a la base aislada `PoraquiIntegrationTests`; las pruebas se omiten mientras tanto |
 | Fuera de alcance | GPS, distancias estimadas, transferencias bancarias automáticas y frontend | Se usan zonas/tarifas configuradas y revisión manual |
 
 ## Verificaciones de la rama activa
 
-PR #29–#33: restore/build (0 advertencias/errores), 22 pruebas SQLite correctas, OpenAPI local y sin cambios pendientes del modelo. La suite tiene 24 casos, 22 correctos y 2 omitidos por no estar configurada la conexión SQL Server aislada; `PilotMetricsSqlServerQueryTests` comprueba la generación de SQL sin conexión de red. Las carreras todavía no se han ejecutado contra SQL Server.
+PR #29–#35 integrados y rama activa OTP: restore/build, pruebas SQLite y OpenAPI. Suite OTP: 26 casos, 24 correctos y 2 omitidos por no estar configurada la conexión SQL Server aislada; incluye integración de inicio/código inválido/confirmación/límite y pruebas de protocolo simuladas. `PilotMetricsSqlServerQueryTests` comprueba la generación de SQL sin conexión de red. Las carreras todavía no se han ejecutado contra SQL Server.
 
 ## SQL Server privado
 
 `ConnectionStrings:DefaultConnection` existe en User Secrets. El 2026-10-17, `dotnet ef migrations list` conectó en modo de consulta y devolvió las 12 migraciones de `main`, sin entradas pendientes. Ninguna migración se ejecutó durante esta revisión. `ConnectionStrings:SqlServerTest` falta; configura esa clave privada exclusivamente para una BD aislada cuyo catálogo sea `PoraquiIntegrationTests`. La API nunca migra al iniciar. Antes de una futura aplicación en la BD compartida, revisa el SQL generado y concilia el historial; no usar pruebas concurrentes ni limpieza en esa BD.
+
+El proveedor Twilio Verify requiere `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid` y `TwilioVerify:ApiKeySecret` en configuración privada. No están configurados para esta ejecución y no se envió SMS real.

@@ -161,8 +161,32 @@ public sealed class BusinessApiTests
 
         await RegisterAsync(client, "customer@example.test");
         var customerToken = await LoginAsync(client, "customer@example.test");
-        Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put, "api/account/phone", customerToken,
-            JsonContent.Create(new { phoneNumber = "+52 55 1234 5678" }))).StatusCode);
+        const string customerPhone = "+525512345678";
+        using (var startVerification = await SendAsync(client, HttpMethod.Post, "api/account/phone/verification", customerToken,
+                   JsonContent.Create(new { phoneNumber = customerPhone })))
+            Assert.Equal(HttpStatusCode.Accepted, startVerification.StatusCode);
+        using (var invalidCode = await SendAsync(client, HttpMethod.Post, "api/account/phone/verification/confirm", customerToken,
+                   JsonContent.Create(new { phoneNumber = customerPhone, code = "000000" })))
+            Assert.Equal(HttpStatusCode.BadRequest, invalidCode.StatusCode);
+        using (var confirmedPhone = await SendAsync(client, HttpMethod.Post, "api/account/phone/verification/confirm", customerToken,
+                   JsonContent.Create(new { phoneNumber = customerPhone, code = "123456" })))
+            Assert.Equal(HttpStatusCode.NoContent, confirmedPhone.StatusCode);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var customer = await users.FindByEmailAsync("customer@example.test");
+            Assert.Equal(customerPhone, customer!.PhoneNumber);
+            Assert.True(customer.PhoneNumberConfirmed);
+        }
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            using var allowedAttempt = await SendAsync(client, HttpMethod.Post, "api/account/phone/verification", customerToken,
+                JsonContent.Create(new { phoneNumber = customerPhone }));
+            Assert.Equal(HttpStatusCode.Accepted, allowedAttempt.StatusCode);
+        }
+        using (var rateLimitedAttempt = await SendAsync(client, HttpMethod.Post, "api/account/phone/verification", customerToken,
+                   JsonContent.Create(new { phoneNumber = customerPhone })))
+            Assert.Equal(HttpStatusCode.TooManyRequests, rateLimitedAttempt.StatusCode);
         var requestJson = $$"""{"commandId":"{{Guid.NewGuid()}}","businessId":"{{businessId}}","zoneId":"{{zoneId}}","deliveryAddress":"Calle de prueba","items":[{"productId":"{{productId}}","quantity":2,"unitPrice":0.01}]}""";
         Assert.Equal(HttpStatusCode.BadRequest, (await SendAsync(client, HttpMethod.Post, "api/orders", customerToken,
             new StringContent(requestJson, Encoding.UTF8, "application/json"))).StatusCode);
