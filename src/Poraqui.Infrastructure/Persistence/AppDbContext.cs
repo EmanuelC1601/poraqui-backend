@@ -62,7 +62,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         {
             entity.ToTable("Orders");
             entity.HasKey(x => x.Id);
-            entity.Property(x => x.OrderNumber).HasMaxLength(20).IsRequired();
+            entity.Property(x => x.OrderNumber).HasMaxLength(40).IsRequired();
             entity.HasIndex(x => x.OrderNumber).IsUnique();
             entity.Property(x => x.DeliveryAddress).HasMaxLength(500).IsRequired();
             entity.Property(x => x.DeliveryFee).HasPrecision(18, 2);

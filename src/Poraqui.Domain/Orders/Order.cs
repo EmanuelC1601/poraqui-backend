@@ -18,7 +18,7 @@ public sealed class Order
         if (lines.Length == 0) throw new ArgumentException("At least one item is required.", nameof(items));
 
         Id = Guid.NewGuid();
-        OrderNumber = $"PQ-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid():N}"[..20].ToUpperInvariant();
+        OrderNumber = $"PQ-{Guid.NewGuid():N}".ToUpperInvariant();
         CustomerUserId = customerUserId;
         BusinessId = businessId;
         ZoneId = zoneId;

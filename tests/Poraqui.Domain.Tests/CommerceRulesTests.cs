@@ -35,6 +35,9 @@ public sealed class CommerceRulesTests
         Assert.Equal(20m, order.Items.Single().LineTotal);
         Assert.Equal(25.5m, order.Total);
         Assert.Equal(OrderStatus.PendingPayment, order.Status);
+        Assert.StartsWith("PQ-", order.OrderNumber);
+        Assert.InRange(order.OrderNumber.Length, 35, 40);
+        Assert.NotEqual(order.OrderNumber, CreateOrder().OrderNumber);
     }
 
     [Fact]
