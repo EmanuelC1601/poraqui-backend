@@ -12,10 +12,10 @@ Una persona mantiene todos los módulos: identidad y permisos, comercio, pedidos
 
 ## Ramas y base de datos
 
-`main` es la base de integración. Trabajar en incrementos pequeños `feature/*`, con PR revisado, `dotnet build Poraqui.sln`, `dotnet test Poraqui.sln` y los chequeos SQL Server pertinentes antes de integrar. Actualizar `docs/project-status.md`, `docs/handoff-codex.md` y `docs/api-contracts.md` por incremento. PR #1–#4 están integrados; el ledger detalla verificaciones y pendientes.
+`main` es la base de integración. Un solo responsable trabaja en incrementos pequeños `feature/*`, con PR revisado, `dotnet build Poraqui.sln`, `dotnet test Poraqui.sln` y los chequeos SQL Server pertinentes antes de integrar. Actualiza `docs/project-status.md`, `docs/handoff-codex.md` y `docs/api-contracts.md` por incremento. PR #1–#5 están integrados; `feature/external-courier-offers` continúa desde el commit de PR #5.
 
 Las pruebas que creen o limpien datos usan bases aisladas. La BD de desarrollo puede recibir solo registros identificables de prueba. No borrar ni recrear datos ni reiniciar la BD compartida. No incluir credenciales en Git; usar User Secrets localmente y la configuración privada del hosting en despliegue. La API no aplica migraciones al arrancar.
 
 ## Antecedentes
 
-El plan inicial contempló dos agentes, con el módulo de reparto en OpenCode. El equipo cambió a un responsable único antes de integrar el PR #1. Los contratos preliminares de reparto se conservan como referencia, pero no hay implementación que dependa de otra persona.
+El plan inicial contempló dos agentes y asignó reparto a OpenCode. El equipo cambió a un responsable único antes de integrar PR #1. Los contratos y esa asignación se conservan como antecedentes; no hay dependencia operativa de otra persona.

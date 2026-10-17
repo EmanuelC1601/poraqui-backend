@@ -15,6 +15,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<DeliveryZone> DeliveryZones => Set<DeliveryZone>();
     public DbSet<DeliveryRate> DeliveryRates => Set<DeliveryRate>();
     public DbSet<Order> Orders => Set<Order>();
+    public DbSet<CourierAvailability> CourierAvailabilities => Set<CourierAvailability>();
+    public DbSet<ExternalDeliveryOffer> ExternalDeliveryOffers => Set<ExternalDeliveryOffer>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -123,6 +125,31 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(x => x.Reason).HasMaxLength(500).IsRequired();
             entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorUserId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex("OrderId", nameof(OrderStatusChange.ChangedAtUtc));
+        });
+
+        builder.Entity<CourierAvailability>(entity =>
+        {
+            entity.ToTable("CourierAvailabilities");
+            entity.HasKey(x => x.CourierUserId);
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CourierUserId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<DeliveryZone>().WithMany().HasForeignKey(x => x.ZoneId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<ExternalDeliveryOffer>(entity =>
+        {
+            entity.ToTable("ExternalDeliveryOffers");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.PickupAddress).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.DestinationAddress).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.Remuneration).HasPrecision(18, 2);
+            entity.Property(x => x.Conditions).HasMaxLength(1000);
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            entity.Property(x => x.Version).IsConcurrencyToken();
+            entity.HasOne<Order>().WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CourierUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<DeliveryZone>().WithMany().HasForeignKey(x => x.ZoneId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => new { x.CourierUserId, x.Status, x.ExpiresAtUtc });
+            entity.HasIndex(x => x.OrderId).IsUnique().HasFilter("[Status] = 'Accepted'");
         });
     }
 }
