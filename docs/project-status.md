@@ -66,7 +66,7 @@ Rama `feature/order-cancellations-refunds-incidents`, commit `1347648`, PR https
 
 ## Incremento local: reintentos de recogida y entrega
 
-La rama local `feature/otp-phone-verification` parte de `d04882a` (PR #12 ya integrado en la rama de PR #11, aún no en `main`). `POST /api/orders/{id}/pickup` y `POST /api/orders/{id}/delivery/confirm` aceptan el reintento con el mismo courier asignado y el código correcto después de una confirmación persistida. Reintentos no aumentan `Order.Version`, no duplican historial ni emiten otra notificación. Un código incorrecto se rechaza. Es una extensión del comportamiento en el servidor; no altera el esquema.
+Rama `feature/delivery-command-retries`, commit `0b9f2a5`, PR #13: https://github.com/EmanuelC1601/poraqui-backend/pull/13. Parte de `d04882a` (PR #12 ya integrado en la rama de PR #11, aún no en `main`). `POST /api/orders/{id}/pickup` y `POST /api/orders/{id}/delivery/confirm` aceptan el reintento con el mismo courier asignado y el código correcto después de una confirmación persistida. Reintentos no aumentan `Order.Version`, no duplican historial ni emiten otra notificación. Un código incorrecto se rechaza. Es una extensión del comportamiento en el servidor; no altera el esquema.
 
 Verificado en este incremento: `dotnet build Poraqui.sln` (0 advertencias, 0 errores) y `dotnet test Poraqui.sln --no-build` (19/19; 18 recorridos API usan SQLite temporal/en memoria y 1 comprueba traducción del proveedor SQL Server sin conectarse). La prueba de dominio comprueba los dos reintentos y códigos erróneos. No se probó contra la BD compartida.
 
@@ -80,7 +80,7 @@ Verificado en este incremento: `dotnet build Poraqui.sln` (0 advertencias, 0 err
 - PR #10: `feature/business-hours`, commit `d25e64f`, publicado en https://github.com/EmanuelC1601/poraqui-backend/pull/10. Requiere validación SQL Server antes de integrar.
 - PR #11 implementa cancelaciones/incidencias/reembolsos; falta verificar migraciones en SQL Server antes de integrar.
 - PR #12 agrega métricas del piloto; está integrado en la rama de PR #11, pero aún no en `main`; falta validar sobre SQL Server.
-- Incremento local de idempotencia de recogida/entrega pendiente de commit/PR.
+- PR #13 hace idempotentes reintentos de recogida/entrega; está abierto para revisión/integración en la rama anterior. No necesita migración.
 - Instrucciones finales de despliegue en MonsterASP.NET y recorrido SQL Server reproducible.
 
 ## Bloqueado por configuración privada
