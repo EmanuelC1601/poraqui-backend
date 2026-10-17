@@ -26,14 +26,14 @@ Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167`. PR #6 (`fea
 
 ## Verificaciones actuales
 
-- Build: `dotnet build Poraqui.sln`, 0 advertencias/errores antes de los últimos cambios de sync; se repetirá build completo antes de abrir PR #7.
-- Test dirigido: recorrido de pago y reparto con SQLite en memoria pasó 1/1 después de implementar sync. Se repetirá la suite completa antes del PR.
+- Build: `dotnet build Poraqui.sln`, 0 advertencias y 0 errores después de implementar sync.
+- Pruebas: `dotnet test Poraqui.sln`, 14/14; SQLite en memoria y archivos temporales. Incluye recorrido de pago/reparto, autorización del courier asignado, código inválido, reintento sin duplicar historial y colisión de clave idempotente.
 - Migraciones `ExternalCourierOffers` y `OfflineDeliveryCommandSync` tienen scripts revisables. `has-pending-model-changes` se verificó después de crear migración de sync y no indicó cambios del modelo.
 - Portal MonsterASP, solo lectura: `dbo` aparece sin tablas. Esto informa el esquema actual; no verifica conexión EF ni restricciones/carreras SQL Server.
 
 ## Pendiente
 
-- Suite completa del incremento actual y build limpio previo al PR #7.
+- Verificar migraciones, restricciones y aceptación simultánea en SQL Server antes de integrar PR #6/#7.
 - Prueba de aceptación simultánea de ofertas y ejecución/revisión de migraciones en SQL Server.
 - SignalR tras persistencia, destinatarios autorizados y lectura de estado al reconectar.
 - Idempotencia para creación de pedidos, pagos y demás operaciones que aún no la tienen.
