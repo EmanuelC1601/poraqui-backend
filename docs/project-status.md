@@ -24,9 +24,11 @@ Actualizado: 2026-10-17. `main` es la base de integración y tiene un único res
 
 ## Verificaciones de la rama activa
 
-Última verificación de código (PR #41, ahora integrada): `dotnet test Poraqui.sln` aprobó 29 pruebas y omitió 2 carreras SQL por falta de `ConnectionStrings__SqlServerTest`; `dotnet build Poraqui.sln --no-restore` terminó con cero advertencias y errores; `git diff --check` pasó. Las carreras todavía no se han ejecutado contra SQL Server.
+Última verificación (rama `feature/external-offer-expiration-worker`): `dotnet test Poraqui.sln` aprobó 30 pruebas y omitió 2 carreras SQL porque falta `ConnectionStrings__SqlServerTest`; `dotnet build Poraqui.sln --no-restore` terminó con cero advertencias y errores; `git diff --check` pasó. Las carreras todavía no se han ejecutado contra SQL Server.
 
-En curso en `feature/external-courier-active-zone`: la disponibilidad de courier externo ahora verifica que la zona exista y esté activa antes de persistir; prueba API SQLite añadida para zona inexistente. Aún no está integrada. Ejecutar verificaciones de esta rama antes de publicar el PR.
+PR #43 (`6063058`) valida que courier externo active disponibilidad solo en zona existente y activa; prueba API SQLite cubre zona inexistente.
+
+En curso en `feature/external-offer-expiration-worker`: un proceso hospedado barre ofertas vencidas cada minuto y persiste el estado `Expired`. Una prueba SQLite comprueba que solo las ofertas debidas se actualicen. La rama no está integrada todavía; ejecutar build y pruebas antes del PR.
 
 ## SQL Server privado
 

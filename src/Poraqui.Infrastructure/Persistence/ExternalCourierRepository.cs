@@ -38,6 +38,24 @@ public sealed class ExternalCourierRepository(AppDbContext db) : IExternalCourie
         db.ExternalDeliveryOffers.SingleOrDefaultAsync(x => x.Id == offerId, cancellationToken);
     public Task<bool> HasAcceptedOfferAsync(Guid orderId, CancellationToken cancellationToken) =>
         db.ExternalDeliveryOffers.AnyAsync(x => x.OrderId == orderId && x.Status == ExternalDeliveryOfferStatus.Accepted, cancellationToken);
+    public async Task<int> ExpireDueOffersAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        ExternalDeliveryOffer[] dueOffers;
+        if (db.Database.IsSqlServer())
+        {
+            dueOffers = await db.ExternalDeliveryOffers.Where(x => x.Status == ExternalDeliveryOfferStatus.Offered &&
+                x.ExpiresAtUtc <= now).ToArrayAsync(cancellationToken);
+        }
+        else
+        {
+            var openOffers = await db.ExternalDeliveryOffers.Where(x => x.Status == ExternalDeliveryOfferStatus.Offered)
+                .ToListAsync(cancellationToken);
+            dueOffers = openOffers.Where(x => x.ExpiresAtUtc <= now).ToArray();
+        }
+        foreach (var offer in dueOffers) offer.Expire(now);
+        if (dueOffers.Length > 0) await db.SaveChangesAsync(cancellationToken);
+        return dueOffers.Length;
+    }
     public void AddOffer(ExternalDeliveryOffer offer) => db.ExternalDeliveryOffers.Add(offer);
     public async Task SaveChangesAsync(CancellationToken cancellationToken)
     {
