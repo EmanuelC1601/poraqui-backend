@@ -2,9 +2,15 @@
 
 ## Estado actual: idempotencia de incidencias
 
-La rama `feature/command-idempotency-increment` agrega `commandId` durable a `POST /api/orders/{id}/incidents`. Un reintento con el mismo actor, pedido y contenido devuelve la incidencia persistida; una clave reutilizada con contenido distinto responde 409. La notificación no se vuelve a publicar en el reintento. La migración `20261017210748_IncidentCommandIdempotency` ya se generó, se revisó y se aplicó explícitamente a la BD compartida; agrega una columna nullable y un índice único filtrado, sin borrar filas o columnas. EF lista nueve migraciones aplicadas y no encuentra cambios pendientes del modelo.
+La rama `feature/command-idempotency-increment` agrega `commandId` durable a `POST /api/orders/{id}/incidents`. Un reintento con el mismo actor, pedido y contenido devuelve la incidencia persistida; una clave reutilizada con contenido distinto responde 409. La notificación no se vuelve a publicar en el reintento. La migración `20261017210748_IncidentCommandIdempotency` ya se generó, se revisó y se aplicó explícitamente a la BD compartida; agrega una columna nullable y un índice único filtrado, sin borrar filas o columnas. EF lista diez migraciones aplicadas y no encuentra cambios pendientes del modelo.
 
 Verificación local: build .NET 10 limpio, suite completa 24 aprobadas y 1 prueba optativa omitida porque no está configurada una BD SQL Server aislada (`ConnectionStrings__SqlServerTest`). Las pruebas funcionales corren sobre SQLite aislado; no se ha verificado aún aceptación concurrente en SQL Server. El cambio está publicado como commit `52bf5b6` en `feature/command-idempotency-increment`, PR #18, apilado sobre `feature/phone-verification` (PR #14). El desarrollo y la integración tienen un único responsable; no hay dependencias operativas con OpenCode.
+
+## Incremento en curso: creación idempotente de pedidos
+
+La rama local `feature/order-create-idempotency`, basada en PR #18, requiere `commandId` para `POST /api/orders`. Por cliente y clave mantiene hash de la solicitud, pedido relacionado y código de recepción protegido con ASP.NET Data Protection. Un reintento igual devuelve el mismo pedido y código; reusar la clave con otro contenido responde 409. La clave y el pedido se guardan juntos y la clave primaria compuesta protege solicitudes simultáneas. La migración `20261017211445_OrderCreationCommandIdempotency` crea una tabla nueva; SQL revisado en `docs/sql/20261017211445_OrderCreationCommandIdempotency.sql` y aplicado explícitamente a desarrollo. La API no migra al arrancar.
+
+En despliegue, configura `DataProtection:KeysPath` (variable `DataProtection__KeysPath`) para una carpeta persistente, privada y compartida por las instancias que atiendan la misma aplicación. Las claves no se guardan en Git. Build y suite tras el cambio: 0 warnings/errores, 24 aprobadas y 1 omitida por falta de `ConnectionStrings__SqlServerTest`; las pruebas funcionales usan SQLite. Publicado como commit `bc73e9a` en `feature/order-create-idempotency`, PR #19, apilado sobre PR #18. OpenAPI local confirma que `commandId` es requerido y la API inicia sin ejecutar migraciones.
 
 ## Incremento .NET 10 LTS (`feature/net10-lts`, PR #17)
 
