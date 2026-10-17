@@ -6,7 +6,7 @@
   },
   "servers": [
     {
-      "url": "http://127.0.0.1:5191/"
+      "url": "http://127.0.0.1:5187/"
     }
   ],
   "paths": {
@@ -2354,6 +2354,53 @@
           }
         }
       }
+    },
+    "/api/admin/metrics/pilot": {
+      "get": {
+        "tags": [
+          "PilotMetrics"
+        ],
+        "parameters": [
+          {
+            "name": "fromUtc",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "toUtc",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PilotMetricsResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PilotMetricsResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PilotMetricsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2800,6 +2847,82 @@
           }
         }
       },
+      "PilotMetricsResponse": {
+        "required": [
+          "fromUtc",
+          "toUtc",
+          "orderCount",
+          "grossOrderValue",
+          "deliveredCount",
+          "cancelledCount",
+          "averageMinutesToDelivery",
+          "openIncidentCount",
+          "refundReviewCount",
+          "ordersByStatus"
+        ],
+        "type": "object",
+        "properties": {
+          "fromUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "toUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "orderCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "grossOrderValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "deliveredCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cancelledCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "averageMinutesToDelivery": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "openIncidentCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "refundReviewCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "ordersByStatus": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PilotOrderStatusCount"
+            }
+          }
+        }
+      },
+      "PilotOrderStatusCount": {
+        "required": [
+          "status",
+          "count"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "ProductRequest": {
         "required": [
           "name",
@@ -3201,6 +3324,9 @@
     },
     {
       "name": "OrderWorkflow"
+    },
+    {
+      "name": "PilotMetrics"
     }
   ]
 }

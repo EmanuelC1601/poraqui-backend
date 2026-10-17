@@ -636,6 +636,26 @@ public sealed class BusinessApiTests
         Assert.True(customerOrder.RootElement.GetProperty("courierPaymentAmount").ValueKind == JsonValueKind.Null);
         Assert.Equal("CLABE-TEST-001", customerOrder.RootElement.GetProperty("transferInstructions").GetProperty("accountReference").GetString());
         Assert.Equal(12, customerOrder.RootElement.GetProperty("history").GetArrayLength());
+
+        var metricsFrom = Uri.EscapeDataString(DateTimeOffset.UtcNow.AddHours(-1).ToString("O"));
+        var metricsTo = Uri.EscapeDataString(DateTimeOffset.UtcNow.AddHours(1).ToString("O"));
+        Assert.Equal(HttpStatusCode.Forbidden, (await SendAsync(client, HttpMethod.Get,
+            $"api/admin/metrics/pilot?fromUtc={metricsFrom}&toUtc={metricsTo}", merchantToken)).StatusCode);
+        using (var metricsResponse = await SendAsync(client, HttpMethod.Get,
+                   $"api/admin/metrics/pilot?fromUtc={metricsFrom}&toUtc={metricsTo}", adminToken))
+        {
+            Assert.Equal(HttpStatusCode.OK, metricsResponse.StatusCode);
+            using var metrics = JsonDocument.Parse(await metricsResponse.Content.ReadAsStringAsync());
+            Assert.Equal(3, metrics.RootElement.GetProperty("orderCount").GetInt32());
+            Assert.Equal(246.00m, metrics.RootElement.GetProperty("grossOrderValue").GetDecimal());
+            Assert.Equal(1, metrics.RootElement.GetProperty("deliveredCount").GetInt32());
+            Assert.Equal(1, metrics.RootElement.GetProperty("cancelledCount").GetInt32());
+            Assert.Contains(metrics.RootElement.GetProperty("ordersByStatus").EnumerateArray(),
+                item => item.GetProperty("status").GetString() == "Delivered" && item.GetProperty("count").GetInt32() == 1);
+        }
+        using var invalidMetricsRange = await SendAsync(client, HttpMethod.Get,
+            $"api/admin/metrics/pilot?fromUtc={metricsFrom}&toUtc={Uri.EscapeDataString(DateTimeOffset.UtcNow.AddDays(400).ToString("O"))}", adminToken);
+        Assert.Equal(HttpStatusCode.BadRequest, invalidMetricsRange.StatusCode);
     }
 
     private static async Task RegisterAsync(HttpClient client, string email)

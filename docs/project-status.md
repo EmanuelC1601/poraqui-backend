@@ -12,14 +12,15 @@ Actualizado: 2026-10-17. `main` es la base de integración y tiene un único res
 | Integrado | Idempotencia de `POST /api/orders`, respuesta estable con replay y conflicto 409 por payload distinto | PR #29, merge `36a71fc`; migración aditiva ya integrada, no aplicada por este cambio |
 | Integrado | Idempotencia de comprobantes por `commandId` y hash del archivo | PR #30, merge `2a15ea2`; reintentos idénticos devuelven replay y no duplican revisión/archivo |
 | Integrado | Idempotencia de asignación de courier propio y persistencia protegida del código de recogida | PR #31, merge `cf3da9f`; prueba API de replay y conflictos |
-| En rama | Pruebas de concurrencia SQL Server para aceptación simultánea de oferta externa y asignación interna; DbUpdateException de oferta concurrente se traduce a 409 | `feature/sqlserver-concurrency-tests-main`, commits `5a130e6` y `ab4d874`; requiere base aislada `PoraquiIntegrationTests` |
-| Pendiente | OTP con proveedor real; métricas piloto integradas; aplicar migraciones en SQL Server compartido tras reconciliar historial; ejecutar pruebas SQL de concurrencia; prueba de reconexión de SignalR con cliente real; despliegue MonsterASP.NET | No integrado o no verificado en SQL Server |
+| Integrado | Pruebas guardadas de concurrencia SQL Server para aceptación simultánea de oferta externa y asignación interna; conflicto concurrente de oferta responde 409 | PR #32, merge `22cec11`; ambos casos requieren la conexión aislada indicada abajo |
+| En rama | `GET /api/admin/metrics/pilot`, limitado a PlatformAdmin; agrega pedidos por intervalo UTC, importe bruto, estados, tiempo medio, incidencias abiertas y reembolsos por revisar | `feature/pilot-metrics-main`; 22 pruebas correctas en SQLite; traducción de consultas comprobada con proveedor SQL Server sin abrir conexión |
+| Pendiente | OTP con proveedor real; aplicar migraciones en SQL Server compartido tras reconciliar historial; ejecutar carreras SQL de concurrencia; prueba de reconexión SignalR con cliente real; despliegue MonsterASP.NET | No integrado o no verificado en SQL Server |
 | Bloqueado por configuración | Ejecutar carreras y verificar índices/restricciones/migraciones con SQL Server | Falta `ConnectionStrings__SqlServerTest` apuntando a la base aislada `PoraquiIntegrationTests`; no se ejecutaron migraciones |
 | Fuera de alcance | GPS, distancias estimadas, transferencias bancarias automáticas y frontend | Se usan zonas/tarifas configuradas y revisión manual |
 
 ## Verificaciones de la rama activa
 
-PR #29–#31: restore/build (0 advertencias/errores), 21 pruebas SQLite correctas, OpenAPI local y sin cambios pendientes del modelo. En la rama activa se ejecutaron 23 casos: 21 correctos y 2 omitidos por no estar configurada la conexión SQL Server aislada. Los casos de concurrencia todavía no se han ejecutado contra SQL Server.
+PR #29–#32: restore/build (0 advertencias/errores), 21 pruebas SQLite correctas, OpenAPI local y sin cambios pendientes del modelo. Rama de métricas: 24 casos, 22 correctos y 2 omitidos por no estar configurada la conexión SQL Server aislada; `PilotMetricsSqlServerQueryTests` comprueba la generación de SQL sin conexión de red. Las carreras todavía no se han ejecutado contra SQL Server.
 
 ## SQL Server privado
 

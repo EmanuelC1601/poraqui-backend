@@ -6,7 +6,7 @@ El backend tiene un único responsable. `main` es la base de integración; cada 
 
 ## Cambios integrados
 
-- PR #1 y PR #22–#31 están integrados en `main` (actualmente `cf3da9f`). El recorrido cubre identidad y autorización por rol/recurso, configuración comercial y catálogo, pedidos con precios de servidor, comprobante privado y revisión manual, preparación, reparto propio/externo, ofertas, códigos, contacto autorizado, historial, incidencias, reembolsos manuales, sincronización offline, SignalR e idempotencia.
+- PR #1 y PR #22–#32 están integrados en `main` (actualmente `22cec11`). El recorrido cubre identidad y autorización por rol/recurso, configuración comercial y catálogo, pedidos con precios de servidor, comprobante privado y revisión manual, preparación, reparto propio/externo, ofertas, códigos, contacto autorizado, historial, incidencias, reembolsos manuales, sincronización offline, SignalR e idempotencia. PR #32 agrega pruebas de concurrencia SQL Server; los casos están añadidos pero no se han ejecutado aún contra SQL Server.
 - PR #29 incorpora idempotencia de creación de pedido.
 - PR #30 incorpora idempotencia de subida del comprobante.
 - PR #31 incorpora idempotencia de asignación de courier propio.
@@ -14,9 +14,9 @@ El backend tiene un único responsable. `main` es la base de integración; cada 
 
 ## Rama activa
 
-`feature/sqlserver-concurrency-tests-main` agrega pruebas de carreras SQL Server con dos contextos independientes para aceptación de oferta externa y asignación de courier propio. Ambas se omiten si `ConnectionStrings__SqlServerTest` falta o no apunta exactamente a la base aislada `PoraquiIntegrationTests`. La rama también normaliza a HTTP 409 el conflicto de guardado concurrente al aceptar una oferta externa.
+`feature/pilot-metrics-main` añade `GET /api/admin/metrics/pilot`, restringido a PlatformAdmin, con rango UTC de hasta 366 días, conteos, suma bruta, tiempo medio de entrega, incidencias abiertas y reembolsos en revisión. Tiene prueba de API para permisos/rango/valores y prueba de traducción SQL Server sin conexión.
 
-La suite ejecutada tuvo 23 casos: 21 correctos y 2 omitidos porque no está configurada la conexión aislada SQL Server. Las carreras reales aún no se han verificado en SQL Server. No se ejecutaron migraciones en esta entrega.
+La suite de esta rama ejecutó 24 casos: 22 correctos y 2 omitidos porque no está configurada la conexión aislada SQL Server. La traducción de métricas está verificada con el proveedor SQL Server sin abrir conexión; las carreras reales aún no se han verificado en SQL Server. No se ejecutaron migraciones en esta entrega.
 
 ## Configuración privada y verificaciones
 
@@ -26,6 +26,7 @@ La suite ejecutada tuvo 23 casos: 21 correctos y 2 omitidos porque no está conf
 - Tests de solución: 21 correctos, 2 omitidos en esta rama.
 - `dotnet ef migrations has-pending-model-changes`: sin cambios pendientes del modelo.
 - OpenAPI local: HTTP 200; snapshot versionado.
+- Generar OpenAPI del build de esta rama y actualizar `docs/openapi.json` antes del PR de métricas.
 - La API no aplica migraciones automáticamente. Antes de aplicar cualquier migración compartida, conciliar `__EFMigrationsHistory` y revisar todos los scripts para asegurar que preservan datos.
 
 ## Próximos pasos verificables
