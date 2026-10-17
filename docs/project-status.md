@@ -1,6 +1,6 @@
 # Estado verificable del proyecto
 
-Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167`. PR #6 (reparto externo), #7 (sincronización offline) y #8 (SignalR) están abiertos y apilados. La rama `feature/catalog-options` continúa sobre PR #8; el PR de este incremento está pendiente de publicación.
+Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167`. PR #6 (reparto externo), #7 (sincronización offline), #8 (SignalR) y #9 (opciones de catálogo) están abiertos y apilados sobre `main`. `main` es la base de integración. El desarrollo tiene un único responsable; las asignaciones previas a OpenCode se conservan como antecedente, sin dependencia operativa.
 
 ## Implementado en `main`
 
@@ -30,7 +30,7 @@ Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167`. PR #6 (repa
 - `SubscribeOrder` comprueba la relación de usuario con el pedido y devuelve una instantánea persistida con estado y versión. Los eventos `OrderChanged` salen después del guardado, solo a los grupos autorizados por pedido y sin datos personales.
 - Al reconectar, el cliente vuelve a suscribirse y recibe el estado vigente. El fallo de publicación se registra y no cambia la respuesta de una transición ya persistida.
 
-## Rama actual: opciones del catálogo
+## PR #9 abierto: opciones del catálogo
 
 - Grupos de opciones obligatorios/opcionales con límite mínimo/máximo, diferencias no negativas de precio y disponibilidad por grupo/variante.
 - El cliente elige IDs de opciones; el servidor valida pertenencia/disponibilidad y calcula cada precio unitario. Pedido e historial de consulta conservan snapshots de nombres/diferencias.
@@ -48,6 +48,7 @@ Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167`. PR #6 (repa
 - Verificar migraciones, restricciones y aceptación simultánea en SQL Server antes de integrar PR #6/#7.
 - Prueba de aceptación simultánea de ofertas y ejecución/revisión de migraciones en SQL Server.
 - Probar reconexión SignalR en cliente real; la suscripción ya devuelve instantánea persistida al reconectar.
+- PR #9: `feature/catalog-options` en commit `084acb3`, publicado en https://github.com/EmanuelC1601/poraqui-backend/pull/9.
 - Idempotencia para creación de pedidos, pagos y demás operaciones que aún no la tienen.
 - Horarios, OTP, cancelación del pedido, incidencias y seguimiento completo de reembolsos manuales.
 - Métricas del piloto, instrucciones finales de despliegue en MonsterASP.NET y recorrido SQL Server reproducible.
