@@ -10,7 +10,7 @@ Este repositorio tiene un único responsable para todos los módulos: identidad/
 - PR #7–#9 fueron integrados en sus ramas apiladas.
 - PR #10 se integró en `feature/catalog-options` con merge commit `fc68274` y ya está cerrado como merged.
 - PR #11 (cancelaciones/incidencias/reembolsos), que contiene PR #12 (métricas), se integró en `feature/business-hours` con `efa53d9`; aún no está en `main`.
-- PR #13 (`feature/delivery-command-retries`) está abierto, sincronizado con la base de PR #11 y pasa 19/19 pruebas SQLite; #14 y #18–#21 siguen en ramas apiladas fuera de `main`.
+- PR #13 (`feature/delivery-command-retries`) está integrado en `feature/order-cancellations-refunds-incidents` (`634590c`); build y 19/19 pruebas SQLite pasaron. PR #14 y #18–#21 siguen en ramas apiladas fuera de `main`.
 
 ## SQL Server y migraciones
 
@@ -26,8 +26,8 @@ El recorrido funcional, endpoints y límites están en `docs/order-flow.md`. Con
 
 ## Próximos pasos
 
-1. Integrar PR #13 después de finalizar la verificación de su diff y checks.
-2. Revisar PR #14 y #18–#21 en orden, con foco en permisos cruzados, transiciones, códigos, concurrencia e idempotencia.
+1. Revisar e integrar PR #14 sobre la base actualizada de PR #13.
+2. Revisar PR #18–#21 en orden, con foco en permisos cruzados, transiciones, códigos, concurrencia e idempotencia.
 3. Preparar una BD aislada SQL Server para migraciones/restricciones y pruebas concurrentes; nunca hacer pruebas destructivas sobre la BD compartida.
 4. Completar despliegue MonsterASP.NET, almacenamiento privado persistente y recorrido publicado; validar reconexión SignalR con cliente.
 

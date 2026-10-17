@@ -1,6 +1,6 @@
 # Contratos API y entre módulos
 
-Este documento describe contratos implementados. `main` integra PR #1–#6; PR #7–#12 ya están integrados entre ramas apiladas y esperan que la pila llegue a `main`. PR #10 se integró en `feature/catalog-options`; PR #11, con PR #12 de métricas, se integró en `feature/business-hours`. PR #13 añade reintentos seguros y está abierto en `feature/delivery-command-retries`.
+Este documento describe contratos implementados. `main` integra PR #1–#6; PR #7–#13 ya están integrados entre ramas apiladas y esperan que la pila llegue a `main`. PR #10 se integró en `feature/catalog-options`; PR #11, con PR #12 de métricas, en `feature/business-hours`; PR #13 en `feature/order-cancellations-refunds-incidents`.
 
 ## Identidad y comercio — `main`
 
@@ -53,6 +53,6 @@ Las pruebas actuales usan SQLite aislada, salvo una prueba de traducción de con
 
 ## Pendientes y límites
 
-PR #13–#14 y #18–#21 siguen en sus ramas apiladas; comprobar idempotencia/OTP e integrarlas por orden. Falta cliente real para reconexión SignalR, validación SQL aislada de restricciones y concurrencia, almacenamiento privado persistente y despliegue MonsterASP.NET. WhatsApp/llamada se completa manualmente fuera de la API. Tarifas usan zonas configuradas: no hay GPS ni cálculo de distancias. No hay transferencias bancarias automáticas ni frontend.
+PR #14 y #18–#21 siguen en sus ramas apiladas; comprobar OTP/idempotencia e integrarlos por orden. Falta cliente real para reconexión SignalR, validación SQL aislada de restricciones y concurrencia, almacenamiento privado persistente y despliegue MonsterASP.NET. WhatsApp/llamada se completa manualmente fuera de la API. Tarifas usan zonas configuradas: no hay GPS ni cálculo de distancias. No hay transferencias bancarias automáticas ni frontend.
 
 El plan original asignó módulos de reparto a OpenCode; la decisión vigente es responsable único. Se conserva el antecedente sin dependencia operativa.
