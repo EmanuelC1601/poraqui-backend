@@ -78,14 +78,20 @@ Pruebas: 2 nuevas pruebas verifican formularios/URLs de Twilio y aprobación/có
 
 ## Rama actual: reintentos idempotentes de comandos de flujo
 
-Rama `feature/workflow-idempotency`, commit `aeddd06`, PR #15: https://github.com/EmanuelC1601/poraqui-backend/pull/15, apilada sobre la rama del PR #14. Una repetición con el mismo actor y datos de revisión, decisión de negocio, inicio de preparación, “listo”, inicio de recorrido, o rechazo de oferta no agrega historial ni vuelve a publicar SignalR; una repetición con valores distintos sigue en conflicto. Los comandos devuelven éxito sobre el contrato actual y no alteran el esquema. Pruebas agregadas cubren la versión/historial estable y el rechazo repetido.
+Rama `feature/workflow-idempotency`, PR #15: https://github.com/EmanuelC1601/poraqui-backend/pull/15, fue integrada en la rama base `feature/phone-verification` mediante `700355a`; sigue fuera de `main`. Una repetición con el mismo actor y datos de revisión, decisión de negocio, inicio de preparación, “listo”, inicio de recorrido, o rechazo de oferta no agrega historial ni vuelve a publicar SignalR; una repetición con valores distintos sigue en conflicto. No alteró el esquema. Pruebas agregadas cubren la versión/historial estable y el rechazo repetido.
 
 Verificado en la rama: `dotnet build Poraqui.sln --no-restore` (0 advertencias/errores), `dotnet test Poraqui.sln` (24/24; base API SQLite temporal, dominio sin BD) y `git diff --check`. No valida concurrencia sobre SQL Server.
+
+## Rama actual: prueba optativa de concurrencia SQL Server
+
+Rama `feature/order-command-idempotency`, basada en `feature/phone-verification` tras integrar PR #15. Añade una prueba de integración que fuerza dos aceptaciones de ofertas a llegar simultáneamente a `SaveChanges`, verifica que solo una asigna al pedido y responde conflicto para la otra. Solo corre cuando `ConnectionStrings__SqlServerTest` apunta a la BD aislada `PoraquiIntegrationTests`; aplica las migraciones en esa base y limpia únicamente los registros con GUID generados por la prueba. El endpoint traduce conflictos de escritura de aceptación a HTTP 409.
+
+Verificado localmente: `dotnet build Poraqui.sln` (0 advertencias/errores), `dotnet test Poraqui.sln` (24 aprobadas, 1 omitida porque no está configurada `ConnectionStrings__SqlServerTest`), `git diff --check`. Todavía no se ha ejecutado la prueba contra SQL Server.
 
 ## Pendiente
 
 - Verificar migraciones, restricciones y aceptación simultánea en SQL Server antes de integrar PR #6/#7.
-- Prueba de aceptación simultánea de ofertas y ejecución/revisión de migraciones en SQL Server.
+- Ejecutar la prueba de aceptación simultánea y revisar/aplicar las migraciones en SQL Server.
 - Probar reconexión SignalR en cliente real; la suscripción ya devuelve instantánea persistida al reconectar.
 - PR #9: `feature/catalog-options` en commit `084acb3`, publicado en https://github.com/EmanuelC1601/poraqui-backend/pull/9.
 - Validar SMS OTP contra cuenta real tras configurar `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid` y `TwilioVerify:ApiKeySecret` en secretos locales; idempotencia durable con clave para creación de pedidos, subida/reintento de comprobantes, asignación de courier con código, reporte de incidencias y aceptación de ofertas. Recogida y entrega ahora toleran reintentos con el mismo courier y código, sin cambios repetidos.

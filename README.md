@@ -26,3 +26,14 @@ Configura los tres valores Twilio para que los endpoints de verificación telef�
 La API no aplica migraciones al iniciar. Revisa los scripts y aplica las migraciones de forma explícita después de validar el esquema de destino. En entorno Development, OpenAPI se sirve en `/openapi/v1.json`. El hub autenticado de estados de pedido está en `/hubs/orders`; consulta [contratos](docs/api-contracts.md) para suscribirse y recuperar estado tras reconectar.
 
 Consulta [arquitectura](docs/architecture.md), [contratos](docs/api-contracts.md) y [acuerdos del equipo](docs/team-work.md).
+
+## Prueba de concurrencia SQL Server
+
+La aceptación simultánea de ofertas tiene una prueba optativa que aplica las migraciones y crea/elimina únicamente filas de prueba en una base aislada llamada `PoraquiIntegrationTests`. Configura `ConnectionStrings__SqlServerTest` en la sesión local de PowerShell con la cadena privada de esa base y ejecuta:
+
+```powershell
+$env:ConnectionStrings__SqlServerTest = "<cadena privada de PoraquiIntegrationTests>"
+dotnet test tests/Poraqui.Domain.Tests --filter FullyQualifiedName~SqlServerExternalOfferConcurrencyTests
+```
+
+La prueba no se ejecuta si la variable falta, y se omite si el nombre de la base no coincide exactamente con `PoraquiIntegrationTests`. Nunca apuntes esta cadena a la base compartida de desarrollo. Las migraciones de la API tampoco se aplican al iniciar.
