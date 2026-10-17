@@ -13,6 +13,31 @@ namespace Poraqui.Api.Controllers;
 public sealed class CatalogController(CatalogOrderService catalog, UserManager<ApplicationUser> users) : ControllerBase
 {
     [AllowAnonymous]
+    [HttpGet("businesses/{businessId:guid}/opening-hours")]
+    public async Task<IActionResult> GetOpeningHours(Guid businessId, CancellationToken cancellationToken)
+    {
+        var result = await catalog.GetOpeningHoursAsync(businessId, cancellationToken);
+        return result is null ? NotFound() : Ok(result);
+    }
+
+    [Authorize(Policy = ApplicationPolicies.ManageBusiness)]
+    [HttpPut("businesses/{businessId:guid}/opening-hours")]
+    public async Task<IActionResult> ConfigureOpeningHours(Guid businessId, ConfigureOpeningHoursRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetActor(out var actorId, out var isAdmin)) return Unauthorized();
+        if (request.Days is null) return BadRequest(new { error = "A weekly schedule is required." });
+        try
+        {
+            var result = await catalog.ConfigureOpeningHoursAsync(businessId, actorId, isAdmin,
+                request.TimeZoneId, request.Days, cancellationToken);
+            return result is null ? NotFound() : Ok(result);
+        }
+        catch (BusinessAuthorizationException) { return Forbid(); }
+        catch (ArgumentException exception) { return BadRequest(new { error = exception.Message }); }
+    }
+
+    [AllowAnonymous]
     [HttpGet("businesses/{businessId:guid}/products")]
     public async Task<IActionResult> GetProducts(Guid businessId, CancellationToken cancellationToken) =>
         Ok(await catalog.GetProductsAsync(businessId, cancellationToken));
@@ -182,4 +207,5 @@ public sealed record ZoneRequest(string Name);
 public sealed record UpdateZoneRequest(string Name, bool IsActive);
 public sealed record RateRequest(Guid ZoneId, decimal Fee);
 public sealed record UpdateRateRequest(decimal Fee, bool IsActive);
+public sealed record ConfigureOpeningHoursRequest(string TimeZoneId, IReadOnlyCollection<OpeningHoursRequest> Days);
 public sealed record CreateOrderRequest(Guid BusinessId, Guid ZoneId, string DeliveryAddress, IReadOnlyCollection<OrderItemRequest> Items);

@@ -1,6 +1,6 @@
 # Estado verificable del proyecto
 
-Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167`. PR #6 (reparto externo), #7 (sincronización offline), #8 (SignalR) y #9 (opciones de catálogo) están abiertos y apilados sobre `main`. `main` es la base de integración. El desarrollo tiene un único responsable; las asignaciones previas a OpenCode se conservan como antecedente, sin dependencia operativa.
+Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167`. PR #6 (reparto externo), #7 (sincronización offline), #8 (SignalR) y #9 (opciones de catálogo) están abiertos y apilados sobre `main`. `feature/business-hours` parte de PR #9. `main` es la base de integración. El desarrollo tiene un único responsable; las asignaciones previas a OpenCode se conservan como antecedente, sin dependencia operativa.
 
 ## Implementado en `main`
 
@@ -36,11 +36,18 @@ Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167`. PR #6 (repa
 - El cliente elige IDs de opciones; el servidor valida pertenencia/disponibilidad y calcula cada precio unitario. Pedido e historial de consulta conservan snapshots de nombres/diferencias.
 - Migración `CatalogProductOptions` y `docs/sql/CatalogProductOptions.sql` crean tres tablas e índices únicos. El script de aplicación es aditivo; no se aplicó.
 
+## Rama actual: horarios del negocio
+
+- Dueño/admin configura los siete días y una zona horaria; consulta pública devuelve horario y si acepta pedidos ahora.
+- La creación valida la hora local del negocio. El comportamiento previo sigue hasta que el comercio configura su horario.
+- Migración aditiva `BusinessOpeningHours` y script `docs/sql/BusinessOpeningHours.sql`; no aplicado. Pruebas nuevas cubren horario local, cierre, rango y permisos entre negocios.
+
 ## Verificaciones actuales
 
 - Build: `dotnet build Poraqui.sln`, 0 advertencias y 0 errores.
-- Pruebas: `dotnet test Poraqui.sln`, 14/14 con SQLite en memoria y archivos temporales. El recorrido verifica opciones requeridas/no disponibles, permisos de catálogo, importes calculados, snapshots de orden, SignalR y entrega ya persistida.
-- Scripts `ExternalCourierOffers`, `OfflineDeliveryCommandSync` y `CatalogProductOptions` están disponibles para revisión. No hay cambios pendientes del modelo tras `CatalogProductOptions`.
+- Pruebas: `dotnet test Poraqui.sln`, 15/15 con SQLite en memoria y archivos temporales. El recorrido verifica horarios, opciones requeridas/no disponibles, permisos, importes, snapshots, SignalR y entrega persistida.
+- Scripts `ExternalCourierOffers`, `OfflineDeliveryCommandSync`, `CatalogProductOptions` y `BusinessOpeningHours` están disponibles para revisión. No hay cambios pendientes del modelo tras `BusinessOpeningHours`.
+- `BusinessOpeningHours` se generó desde el modelo actual; su script solo añade columnas/tabla y no altera filas existentes. Debe validarse en SQL Server antes de aplicar.
 - Portal MonsterASP, solo lectura: `dbo` aparece sin tablas. Esto informa el esquema actual; no verifica conexión EF ni restricciones/carreras SQL Server.
 
 ## Pendiente
@@ -50,7 +57,8 @@ Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167`. PR #6 (repa
 - Probar reconexión SignalR en cliente real; la suscripción ya devuelve instantánea persistida al reconectar.
 - PR #9: `feature/catalog-options` en commit `084acb3`, publicado en https://github.com/EmanuelC1601/poraqui-backend/pull/9.
 - Idempotencia para creación de pedidos, pagos y demás operaciones que aún no la tienen.
-- Horarios, OTP, cancelación del pedido, incidencias y seguimiento completo de reembolsos manuales.
+- OTP, cancelación del pedido, incidencias y seguimiento completo de reembolsos manuales.
+- El incremento `feature/business-hours` requiere verificaciones finales, publicación de PR y validación SQL Server.
 - Métricas del piloto, instrucciones finales de despliegue en MonsterASP.NET y recorrido SQL Server reproducible.
 
 ## Bloqueado por configuración privada

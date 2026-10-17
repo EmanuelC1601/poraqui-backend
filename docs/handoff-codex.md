@@ -2,7 +2,7 @@
 
 ## Base, ramas y responsabilidad
 
-`main` contiene PR #1–#5 hasta `d677167` y es la base de integración. PR #6 agrega reparto externo; PR #7 sincronización offline está apilado sobre #6; PR #8 SignalR está apilado sobre #7; PR #9 opciones de catálogo se apila sobre #8. Un solo responsable mantiene todos los módulos, contratos, `AppDbContext` y migraciones. OpenCode ya no participa; su anterior asignación de reparto se conserva como antecedente.
+`main` contiene PR #1–#5 hasta `d677167` y es la base de integración. PR #6 agrega reparto externo; PR #7 sincronización offline está apilado sobre #6; PR #8 SignalR está apilado sobre #7; PR #9 opciones de catálogo se apila sobre #8; `feature/business-hours` continúa desde PR #9. Un solo responsable mantiene todos los módulos, contratos, `AppDbContext` y migraciones. OpenCode ya no participa; su anterior asignación de reparto se conserva como antecedente.
 
 ## Incremento previo: sincronización offline (PR #7)
 
@@ -30,8 +30,12 @@ Agrega grupos de opciones obligatorios/opcionales con límites de selección, op
 
 Migración `CatalogProductOptions` crea `ProductOptionGroups`, `ProductOptions` y `OrderLineOptions`; script aditivo `docs/sql/CatalogProductOptions.sql`, generado desde `OfflineDeliveryCommandSync`. No aplicado. Verificado con `dotnet build Poraqui.sln` (0 advertencias/errores), `dotnet test Poraqui.sln` (14/14; SQLite temporal), `git diff --check` y `migrations has-pending-model-changes` (sin cambios). SQL Server no está configurado.
 
+## Incremento actual: horarios del negocio
+
+Rama `feature/business-hours`, continuada desde PR #9. Configura siete días y una zona horaria mediante `PUT /api/businesses/{businessId}/opening-hours`; consulta horario y disponibilidad con `GET /api/businesses/{businessId}/opening-hours`. Los pedidos se rechazan fuera del horario local. Los negocios sin horario conservan temporalmente el comportamiento abierto previo. Migración `BusinessOpeningHours` y script `docs/sql/BusinessOpeningHours.sql`; es aditiva y no aplicada. `dotnet build Poraqui.sln` y `dotnet test Poraqui.sln` pasan (15/15, SQLite temporal); la migración no tiene cambios pendientes del modelo. Falta publicar el PR y validar el script/tipos en SQL Server.
+
 ## Siguiente trabajo
 
-PR #9 (`feature/catalog-options`, commit `084acb3`) está publicado: https://github.com/EmanuelC1601/poraqui-backend/pull/9.
+PR #9 (`feature/catalog-options`, commit `084acb3`, último commit documental `8c7bf2a`) está publicado: https://github.com/EmanuelC1601/poraqui-backend/pull/9. Continuar con OTP, cancelación y reembolsos/incidencias, idempotencia de operaciones restantes, métricas y despliegue. Las migraciones aún dependen de configurar y verificar SQL Server.
 
 Probar reconexión de un cliente SignalR; después, idempotencia general de otras operaciones, cancelaciones de pedidos, incidencias y reembolsos; horarios de catálogo; métricas y despliegue. Ver contratos y ledger en `docs/api-contracts.md` y `docs/project-status.md`.

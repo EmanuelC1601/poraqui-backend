@@ -18,6 +18,7 @@
 - `GET /api/businesses/{id}/products` incluye solo grupos y opciones disponibles con límites y diferencias de precio. Al crear pedido, `items[]` puede incluir `optionIds[]`. El servidor comprueba opciones disponibles y límites de cada grupo, calcula `precio base + diferencias` y guarda snapshots de nombres/precios seleccionados en cada línea. El cliente no envía importes.
 - `GET /api/delivery-zones/active`; admins administran zonas con `POST/PUT /api/delivery-zones`.
 - Negocio/admin administra tarifas por zona con `GET/POST /api/businesses/{id}/delivery-rates` y `PUT /api/businesses/{id}/delivery-rates/{zoneId}`.
+- Negocio/admin configura la semana y zona horaria con `PUT /api/businesses/{id}/opening-hours` (`timeZoneId`, siete `days` con `day`, `isClosed`, `opensAt`, `closesAt`). Consulta pública `GET /api/businesses/{id}/opening-hours` devuelve horario y `isAcceptingOrders`. Los pedidos se rechazan fuera del horario local configurado. Hasta configurar el horario, el negocio conserva la disponibilidad previa.
 - `GET/PUT /api/businesses/{businessId}/transfer-details`: propietario/admin configura destinatario, institución, referencia e instrucciones.
 - `POST /api/orders`: cliente envía negocio, zona, dirección, producto IDs y cantidades. El servidor obtiene precios y tarifa activos; no acepta importes del cliente. El pedido guarda snapshot de instrucciones de transferencia que solo ve el cliente del pedido.
 
@@ -69,10 +70,16 @@ Cada transición de pedido incrementa `Order.Version`; la persistencia detecta e
 - El precio unitario de línea refleja las opciones y el pedido guarda una copia de nombre/importe para conservar el recibo si el negocio cambia el catálogo después.
 - Migración `CatalogProductOptions` y `docs/sql/CatalogProductOptions.sql` crean tres tablas e índices aditivos. No elimina datos ni está aplicada. La suite pasa en SQLite; SQL Server aún no se ha validado.
 
+## En desarrollo: horarios del negocio (`feature/business-hours`, basada en PR #9)
+
+- El propietario o admin configura los siete días y zona horaria; la API rechaza días duplicados/incompletos, zona inválida, horas ausentes y rangos invertidos. `GET /api/businesses/{id}/opening-hours` expone horario y disponibilidad actual.
+- `POST /api/orders` rechaza nuevos pedidos cuando el negocio está cerrado según su zona horaria. Los negocios sin horario configurado mantienen temporalmente su disponibilidad actual.
+- Migración `BusinessOpeningHours` añade `Businesses.TimeZoneId`, `Businesses.HasConfiguredOpeningHours` y una tabla con clave primaria `(BusinessId, Day)`. `docs/sql/BusinessOpeningHours.sql` es aditivo y no aplicado. Pruebas actuales con SQLite; falta verificar migración y tipo `time` en SQL Server.
+
 ## Validación, antecedentes y pendientes
 
 `dotnet test Poraqui.sln` ejercita un recorrido aislado SQLite con importes, permisos, transferencia, comprobante, oferta externa, cancelación, ausencia de repartidores, rechazo, aceptación, códigos, pago al recoger y entrega. SQLite no verifica por sí solo los bloqueos, índices y concurrencia de SQL Server.
 
 El contrato provisional `src/Poraqui.Application/Delivery/DeliveryOrderContracts.cs` se eliminó en PR #4 al implementar reparto propio. La asignación previa a OpenCode se conserva como antecedente; hay un solo responsable.
 
-Pendiente: horarios, OTP, cancelación de pedido, incidencias/reembolsos completos, idempotencia general para otros comandos, métricas, despliegue y verificación SQL Server incluyendo carreras simultáneas. No hay GPS, distancias inferidas ni transferencias bancarias automáticas.
+Pendiente: OTP, cancelación de pedido, incidencias/reembolsos completos, idempotencia general para otros comandos, métricas, despliegue y verificación SQL Server incluyendo carreras simultáneas. No hay GPS, distancias inferidas ni transferencias bancarias automáticas.
