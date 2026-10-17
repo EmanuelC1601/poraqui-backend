@@ -83,6 +83,12 @@ Cada transición de pedido incrementa `Order.Version`; la persistencia detecta e
 - Cliente, negocio propietario o courier asignado registra/consulta incidencias con `POST/GET /api/orders/{id}/incidents`; negocio/admin resuelve con `POST /api/businesses/{businessId}/orders/{orderId}/incidents/{incidentId}/resolve`. Cambios de pedido, incidente y reembolso incrementan versión y notifican después de persistir.
 - Migraciones `OrderCancellationRefundsIncidents` y `OrderCancellationAuditConstraints`; script `docs/sql/OrderCancellationRefundsIncidents.sql`. Añaden campos, tablas e índices; no aplicadas. Pruebas locales con SQLite; SQL Server sigue pendiente.
 
+## PR #12 en desarrollo: métricas del piloto (`feature/pilot-metrics`, basada en PR #11)
+
+- `GET /api/admin/metrics/pilot?fromUtc={ISO-8601}&toUtc={ISO-8601}` devuelve conteo de pedidos por estado, suma de totales de todos los pedidos creados en el periodo (incluye cancelados/rechazados), entregas, cancelaciones, incidencias abiertas, reembolsos que esperan revisión y tiempo medio hasta entrega. Solo admin de plataforma puede consultarlo.
+- El periodo es UTC, inclusivo al inicio y exclusivo al final, máximo 366 días. Sin parámetros usa los últimos 30 días. La respuesta es agregada y no incluye identificadores, direcciones, teléfonos ni datos de pago.
+- Consulta de solo lectura; no requiere migración ni cambia el esquema. Prueba de permisos y agregados en el recorrido API aislado con SQLite.
+
 ## Validación, antecedentes y pendientes
 
 `dotnet test Poraqui.sln` ejercita un recorrido aislado SQLite con importes, permisos, transferencia, comprobante, oferta externa, cancelación, ausencia de repartidores, rechazo, aceptación, códigos, pago al recoger y entrega. SQLite no verifica por sí solo los bloqueos, índices y concurrencia de SQL Server.

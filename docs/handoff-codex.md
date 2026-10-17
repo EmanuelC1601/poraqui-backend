@@ -42,4 +42,6 @@ Migraciones `OrderCancellationRefundsIncidents` y `OrderCancellationAuditConstra
 
 ## Siguiente trabajo
 
-Completar OTP, idempotencia de los comandos restantes, métricas y despliegue. Reconexión SignalR de cliente real y pruebas SQL Server siguen pendientes. Los PR #6–#11 están publicados pero no integrados porque sus cambios incluyen migraciones sin validar en la BD configurada. Ver contratos y ledger en `docs/api-contracts.md` y `docs/project-status.md`.
+`feature/pilot-metrics` añade `GET /api/admin/metrics/pilot`; es agregado y de solo lectura, sin migración. Build limpio (0 advertencias/errores), pruebas API 18/18 en SQLite y `migrations has-pending-model-changes` sin cambios de modelo. La consulta SQLite usa agregación aislada en memoria porque EF SQLite no ordena `DateTimeOffset`; la consulta SQL Server acota por fechas y agrega en la base. La conexión remota de MonsterASP no está en configuración privada local, por lo que no se ejecutó contra SQL Server. Antes de integrar los PR apilados hay que validar esquema/migraciones y concurrencia con la conexión privada accesible.
+
+Después completar OTP, idempotencia de comandos restantes y despliegue. Reconexión SignalR en cliente real y verificación SQL Server siguen pendientes. Ver contratos y ledger en `docs/api-contracts.md` y `docs/project-status.md`.
