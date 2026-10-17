@@ -7,7 +7,7 @@ La solución usa .NET 9 y Clean Architecture. `main` es la rama predeterminada y
 - **Poraqui.Infrastructure**: EF Core, SQL Server, Identity y adaptadores; depende de Application y Domain.
 - **Poraqui.Api**: composición HTTP y configuración; depende de Application e Infrastructure.
 
-La dependencia de ejecución apunta hacia el dominio. La API registra persistencia e Identity solo cuando existe `ConnectionStrings:DefaultConnection`, para permitir compilar y arrancar sin credenciales. Configura el secreto en variables de entorno (`ConnectionStrings__DefaultConnection`) o en secretos de usuario; no guardes credenciales en el repositorio. La conexión privada no estaba disponible en la copia de Codex al 17 de octubre de 2026; se requiere `ConnectionStrings:DefaultConnection` para comprobarla.
+La dependencia de ejecución apunta hacia el dominio. La API registra persistencia e Identity solo cuando existe `ConnectionStrings:DefaultConnection`, para permitir compilar y arrancar sin credenciales. Configura el secreto en variables de entorno (`ConnectionStrings__DefaultConnection`) o en User Secrets; no guardes credenciales en el repositorio. El 17 de octubre de 2026 esta clave estaba en User Secrets y permitió consultar en modo de lectura el historial de migraciones SQL Server.
 
 El contexto EF compartido es `AppDbContext` en Infrastructure. El responsable del backend genera y revisa migraciones, y las aplica a la BD de desarrollo tras verificar que son aditivas y preservan los datos. No usar `EnsureDeleted`, reinicios ni migraciones destructivas en esa BD. La API no ejecuta migraciones automáticamente al iniciar.
 
@@ -15,4 +15,4 @@ EF tooling se fija en `.config/dotnet-tools.json`; ejecutar `dotnet tool restore
 
 ## Publicación
 
-MonsterASP.NET debe ejecutar `src/Poraqui.Api/Poraqui.Api.csproj` con runtime .NET 9 y recibir `ConnectionStrings__DefaultConnection` desde configuración segura del hosting. La cadena para SQL Server debe tener cifrado TLS habilitado y confiar solo en el certificado configurado por el proveedor.
+MonsterASP.NET debe ejecutar `src/Poraqui.Api/Poraqui.Api.csproj` con runtime .NET 9 y recibir `ConnectionStrings__DefaultConnection` desde configuración segura del hosting. Sigue [la guía de despliegue](deployment-monsterasp.md) para runtime, variables privadas, almacenamiento y publicación. Aún no se ha publicado.

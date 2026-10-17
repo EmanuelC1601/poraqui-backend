@@ -16,8 +16,8 @@ Actualizado: 2026-10-17. `main` es la base de integración y tiene un único res
 | Integrado | `GET /api/admin/metrics/pilot`, limitado a PlatformAdmin; agrega pedidos por intervalo UTC, importe bruto, estados, tiempo medio, incidencias abiertas y reembolsos por revisar | PR #33, merge `bddc081`; prueba de permiso/rango/valores y traducción de consultas comprobada con proveedor SQL Server sin abrir conexión |
 | Integrado; verificación externa pendiente | OTP vía Twilio Verify, E.164, confirmación Identity y límite de 5 intentos/10 min/IP | PR #36, merge `0f4dd51`; proveedor cubierto con handler HTTP simulado. Envío real requiere secretos y no se ha comprobado |
 | Integrado | Consulta del snapshot persistido al reconectar SignalR | Prueba con `Microsoft.AspNetCore.SignalR.Client`: nueva conexión vuelve a suscribirse y recibe estado/versión actuales |
-| Pendiente | Ejecutar carreras SQL de concurrencia; despliegue MonsterASP.NET | No verificado en SQL Server o no configurado |
-| Bloqueado por configuración | Ejecutar carreras reales en SQL Server | Falta `ConnectionStrings__SqlServerTest` apuntando a la base aislada `PoraquiIntegrationTests`; las pruebas se omiten mientras tanto |
+| Pendiente | Ejecutar carreras SQL de concurrencia; publicar/verificar en MonsterASP.NET | No verificado en SQL Server o no desplegado; guía de hosting en `docs/deployment-monsterasp.md` |
+| Bloqueado por configuración | Ejecutar carreras reales en SQL Server | Falta crear/configurar `ConnectionStrings__SqlServerTest` apuntando a una base aislada `PoraquiIntegrationTests`; las pruebas se omiten mientras tanto |
 | Fuera de alcance | GPS, distancias estimadas, transferencias bancarias automáticas y frontend | Se usan zonas/tarifas configuradas y revisión manual |
 
 ## Verificaciones de la rama activa
