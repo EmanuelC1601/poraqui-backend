@@ -45,4 +45,4 @@ La suite de API usa SQLite en memoria y carpeta temporal para comprobantes. Cubr
 
 ## Límites
 
-WhatsApp/llamada se hace fuera de la API; esta registra canal y entrega datos autorizados. Las tarifas se basan en zonas configuradas; no hay GPS ni distancias inventadas. Falta OTP, horarios de catálogo, cancelación del pedido e incidencias/reembolsos completos, reconexión SignalR en cliente real, idempotencia en otros comandos, métricas, despliegue y validación SQL Server.
+WhatsApp/llamada se hace fuera de la API; esta registra canal y entrega datos autorizados. Las tarifas se basan en zonas configuradas; no hay GPS ni distancias inventadas. Opciones de catálogo, sincronización offline y SignalR están implementados en ramas apiladas que aún no llegaron a `main`. Falta OTP, horarios, cancelación del pedido e incidencias/reembolsos completos, reconexión SignalR en cliente real, idempotencia para los comandos pendientes, métricas, despliegue y pruebas aisladas de concurrencia SQL Server.
