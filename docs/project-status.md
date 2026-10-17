@@ -1,6 +1,6 @@
 # Estado verificable del proyecto
 
-Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167`. PR #6 (reparto externo), #7 (sincronización offline), #8 (SignalR) y #9 (opciones de catálogo) están abiertos y apilados sobre `main`. PR #10 (horarios) se apila sobre #9. `main` es la base de integración. El desarrollo tiene un único responsable; las asignaciones previas a OpenCode se conservan como antecedente, sin dependencia operativa.
+Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167`. PR #6 (reparto externo), #7 (sincronización offline), #8 (SignalR), #9 (opciones de catálogo) y #10 (horarios) están abiertos y apilados. `feature/order-cancellations-refunds-incidents` continúa desde PR #10. `main` es la base de integración. El desarrollo tiene un único responsable; las asignaciones previas a OpenCode se conservan como antecedente, sin dependencia operativa.
 
 ## Implementado en `main`
 
@@ -42,12 +42,19 @@ Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167`. PR #6 (repa
 - La creación valida la hora local del negocio. El comportamiento previo sigue hasta que el comercio configura su horario.
 - Migración aditiva `BusinessOpeningHours` y script `docs/sql/BusinessOpeningHours.sql`; no aplicado. Pruebas nuevas cubren horario local, cierre, rango y permisos entre negocios.
 
+## Rama actual: cancelaciones, incidencias y reembolsos manuales
+
+- Cliente cancela solo antes de enviar comprobante; negocio/admin puede cancelar antes de asignar courier. Las ofertas externas abiertas se cancelan junto con el pedido. La repetición del mismo comando de cancelación no duplica historial.
+- Si hay evidencia de transferencia enviada o el pago fue aprobado, se crea un caso de revisión manual. Rechazar un pedido con transferencia aprobada también crea el caso. El negocio registra si reembolsó manualmente, el importe y referencia; el cliente ve solo el estado del caso.
+- Participantes autorizados informan y consultan incidencias; negocio/admin las resuelve. Incidencias y reembolsos quedan en historial/versionado del pedido y notifican después de persistir.
+- Migraciones `OrderCancellationRefundsIncidents` y `OrderCancellationAuditConstraints`, script `docs/sql/OrderCancellationRefundsIncidents.sql`; no aplicadas. La alteración de `CancellationReason` solo afecta a una columna nullable que esta misma pila acaba de añadir, y el dominio limita el texto a 500 caracteres.
+
 ## Verificaciones actuales
 
 - Build: `dotnet build Poraqui.sln`, 0 advertencias y 0 errores.
-- Pruebas: `dotnet test Poraqui.sln`, 15/15 con SQLite en memoria y archivos temporales. El recorrido verifica horarios, opciones requeridas/no disponibles, permisos, importes, snapshots, SignalR y entrega persistida.
-- Scripts `ExternalCourierOffers`, `OfflineDeliveryCommandSync`, `CatalogProductOptions` y `BusinessOpeningHours` están disponibles para revisión. No hay cambios pendientes del modelo tras `BusinessOpeningHours`.
-- `BusinessOpeningHours` se generó desde el modelo actual; su script solo añade columnas/tabla y no altera filas existentes. Debe validarse en SQL Server antes de aplicar.
+- Pruebas: `dotnet test Poraqui.sln`, 18/18 con SQLite en memoria y archivos temporales. El recorrido verifica horarios, opciones, permisos entre negocios, importes, cancelación/refund manual, incidencias, snapshots, SignalR y entrega persistida.
+- Scripts `ExternalCourierOffers`, `OfflineDeliveryCommandSync`, `CatalogProductOptions`, `BusinessOpeningHours` y `OrderCancellationRefundsIncidents` están disponibles para revisión; la última migración agrega `OrderCancellationAuditConstraints`. No hay cambios pendientes del modelo.
+- `BusinessOpeningHours` y cancelaciones/incidencias se generaron desde el modelo; los scripts no eliminan tablas ni filas. El segundo script estrecha `CancellationReason`, una columna nueva y todavía sin datos; falta validarlo en SQL Server.
 - Portal MonsterASP, solo lectura: `dbo` aparece sin tablas. Esto informa el esquema actual; no verifica conexión EF ni restricciones/carreras SQL Server.
 
 ## Pendiente
@@ -56,9 +63,9 @@ Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167`. PR #6 (repa
 - Prueba de aceptación simultánea de ofertas y ejecución/revisión de migraciones en SQL Server.
 - Probar reconexión SignalR en cliente real; la suscripción ya devuelve instantánea persistida al reconectar.
 - PR #9: `feature/catalog-options` en commit `084acb3`, publicado en https://github.com/EmanuelC1601/poraqui-backend/pull/9.
-- Idempotencia para creación de pedidos, pagos y demás operaciones que aún no la tienen.
-- OTP, cancelación del pedido, incidencias y seguimiento completo de reembolsos manuales.
+- OTP e idempotencia general de operaciones que aún no la tienen.
 - PR #10: `feature/business-hours`, commit `d25e64f`, publicado en https://github.com/EmanuelC1601/poraqui-backend/pull/10. Requiere validación SQL Server antes de integrar.
+- El incremento de cancelaciones/incidencias/reembolsos está en `feature/order-cancellations-refunds-incidents`; falta verificar migraciones en SQL Server y publicar PR.
 - Métricas del piloto, instrucciones finales de despliegue en MonsterASP.NET y recorrido SQL Server reproducible.
 
 ## Bloqueado por configuración privada

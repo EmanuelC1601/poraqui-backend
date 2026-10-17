@@ -11,7 +11,7 @@ dotnet user-secrets set "PrivateFiles:Root" "<ruta privada fuera del web root>" 
 dotnet run --project src/Poraqui.Api
 ```
 
-El `UserSecretsId` ya está configurado. Las migraciones revisables incluyen `InitialCommerceAndIdentity`, `BusinessTransferInstructionsSnapshot`, `ExternalCourierOffers`, `OfflineDeliveryCommandSync`, `CatalogProductOptions` y `BusinessOpeningHours`. La API no migra al iniciar. Antes de aplicar migraciones, configura la clave privada, revisa que el esquema y los datos actuales coincidan y usa `dotnet tool run dotnet-ef database update --project src/Poraqui.Infrastructure --startup-project src/Poraqui.Api`. Las migraciones tienen scripts revisables en `docs/sql/`. En Development se publica OpenAPI en `/openapi/v1.json`.
+El `UserSecretsId` ya está configurado. Las migraciones revisables incluyen `InitialCommerceAndIdentity`, `BusinessTransferInstructionsSnapshot`, `ExternalCourierOffers`, `OfflineDeliveryCommandSync`, `CatalogProductOptions`, `BusinessOpeningHours`, `OrderCancellationRefundsIncidents` y `OrderCancellationAuditConstraints`. La API no migra al iniciar. Antes de aplicar migraciones, configura la clave privada, revisa que el esquema y los datos actuales coincidan y usa `dotnet tool run dotnet-ef database update --project src/Poraqui.Infrastructure --startup-project src/Poraqui.Api`. Las migraciones tienen scripts revisables en `docs/sql/`. En Development se publica OpenAPI en `/openapi/v1.json`.
 
 ## Secuencia
 
@@ -39,11 +39,13 @@ El `UserSecretsId` ya está configurado. Las migraciones revisables incluyen `In
 10. Courier inicia recorrido con `POST /api/orders/{orderId}/delivery/start`, `contactChannel` `whatsapp` o `call`. El teléfono se devuelve solo al courier asignado para contacto manual.
 11. Cliente entrega su código de recepción al courier; este confirma con `POST /api/orders/{orderId}/delivery/confirm`. Cliente y negocio consultan estado e historial en sus rutas GET autorizadas.
 12. Si la confirmación se capturó sin internet, el courier sincroniza con `POST /api/orders/{orderId}/sync/delivery-confirmation` usando `commandId`, código y `clientCapturedAtUtc`. El backend valida el estado/código actuales antes de aceptar. Repetir exactamente el mismo comando devuelve la respuesta persistida y no duplica historial; reutilizar el ID con otro payload da 409.
+13. Cliente cancela antes de enviar comprobante con `POST /api/orders/{orderId}/cancel`; negocio/admin cancela antes de asignar courier con la ruta equivalente bajo el negocio. Si se había enviado comprobante o aprobado el pago, se crea seguimiento manual de reembolso. El cliente consulta el estado en `GET /api/orders/{orderId}`; el negocio registra el resultado manual en `.../refund-review`.
+14. Cliente, negocio o courier asignado informa una incidencia con `POST /api/orders/{orderId}/incidents`. Participantes autorizados consultan incidencias y el negocio/admin registra resolución con `POST .../incidents/{incidentId}/resolve`.
 
 ## Verificaciones actuales
 
-La suite de API usa SQLite en memoria y carpeta temporal para comprobantes. Cubre opciones obligatorias/no disponibles, permisos, importes y snapshots, comprobante, revisión manual, configuración y snapshot de transferencia, oferta/cancelación/ausencia de repartidores/rechazo/aceptación externa, códigos, pago al recoger, sincronización idempotente, entrega y evento SignalR. SQLite no sustituye la prueba de migraciones, índices y aceptación simultánea en SQL Server.
+La suite de API usa SQLite en memoria y carpeta temporal para comprobantes. Cubre opciones obligatorias/no disponibles, permisos, importes y snapshots, comprobante, revisión manual, configuración y snapshot de transferencia, oferta/cancelación/ausencia de repartidores/rechazo/aceptación externa, cancelación de pedido con reembolso manual, incidencias, códigos, pago al recoger, sincronización idempotente, entrega y evento SignalR. SQLite no sustituye la prueba de migraciones, índices y aceptación simultánea en SQL Server.
 
 ## Límites
 
-WhatsApp/llamada se hace fuera de la API; esta registra canal y entrega datos autorizados. Las tarifas se basan en zonas configuradas; no hay GPS ni distancias inventadas. Falta OTP, horarios de catálogo, cancelación del pedido e incidencias/reembolsos completos, reconexión SignalR en cliente real, idempotencia en otros comandos, métricas, despliegue y validación SQL Server.
+WhatsApp/llamada se hace fuera de la API; esta registra canal y entrega datos autorizados. Las tarifas se basan en zonas configuradas; no hay GPS ni distancias inventadas. Falta OTP, reconexión SignalR en cliente real, idempotencia en otros comandos, métricas, despliegue y validación SQL Server. La cancelación del negocio está disponible hasta antes de asignar courier.

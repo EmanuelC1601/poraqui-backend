@@ -76,10 +76,17 @@ Cada transición de pedido incrementa `Order.Version`; la persistencia detecta e
 - `POST /api/orders` rechaza nuevos pedidos cuando el negocio está cerrado según su zona horaria. Los negocios sin horario configurado mantienen temporalmente su disponibilidad actual.
 - Migración `BusinessOpeningHours` añade `Businesses.TimeZoneId`, `Businesses.HasConfiguredOpeningHours` y una tabla con clave primaria `(BusinessId, Day)`. `docs/sql/BusinessOpeningHours.sql` es aditivo y no aplicado. Pruebas actuales con SQLite; falta verificar migración y tipo `time` en SQL Server.
 
+## En desarrollo: cancelaciones, incidencias y reembolsos manuales (`feature/order-cancellations-refunds-incidents`, basada en PR #10)
+
+- Cliente cancela con `POST /api/orders/{id}/cancel` solo antes de enviar comprobante; propietario/admin usa `POST /api/businesses/{businessId}/orders/{orderId}/cancel` antes de asignar courier. Si hay ofertas externas abiertas, se cancelan en el mismo guardado. Reintentar con el mismo actor y motivo no duplica historial.
+- Cancelar un pedido con comprobante enviado o pago confirmado crea un caso `ReviewRequired`; rechazo del negocio después del pago aprobado también lo crea. El cliente ve solo `refundStatus` en su consulta de pedido. Negocio/admin revisa el caso en `GET .../refund` y registra el resultado manualmente con `POST .../refund-review` (`refunded`, `amount`, `reference`, `note`); el importe se limita al total. No se inicia una transferencia bancaria.
+- Cliente, negocio propietario o courier asignado registra/consulta incidencias con `POST/GET /api/orders/{id}/incidents`; negocio/admin resuelve con `POST /api/businesses/{businessId}/orders/{orderId}/incidents/{incidentId}/resolve`. Cambios de pedido, incidente y reembolso incrementan versión y notifican después de persistir.
+- Migraciones `OrderCancellationRefundsIncidents` y `OrderCancellationAuditConstraints`; script `docs/sql/OrderCancellationRefundsIncidents.sql`. Añaden campos, tablas e índices; no aplicadas. Pruebas locales con SQLite; SQL Server sigue pendiente.
+
 ## Validación, antecedentes y pendientes
 
 `dotnet test Poraqui.sln` ejercita un recorrido aislado SQLite con importes, permisos, transferencia, comprobante, oferta externa, cancelación, ausencia de repartidores, rechazo, aceptación, códigos, pago al recoger y entrega. SQLite no verifica por sí solo los bloqueos, índices y concurrencia de SQL Server.
 
 El contrato provisional `src/Poraqui.Application/Delivery/DeliveryOrderContracts.cs` se eliminó en PR #4 al implementar reparto propio. La asignación previa a OpenCode se conserva como antecedente; hay un solo responsable.
 
-Pendiente: OTP, cancelación de pedido, incidencias/reembolsos completos, idempotencia general para otros comandos, métricas, despliegue y verificación SQL Server incluyendo carreras simultáneas. No hay GPS, distancias inferidas ni transferencias bancarias automáticas.
+Pendiente: OTP, idempotencia general para otros comandos, métricas, despliegue y verificación SQL Server incluyendo carreras simultáneas. No hay GPS, distancias inferidas ni transferencias bancarias automáticas.

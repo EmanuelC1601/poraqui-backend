@@ -9,7 +9,9 @@ public sealed class OrderWorkflowRepository(AppDbContext db) : IOrderWorkflowRep
     private IQueryable<Order> OrderGraph() => db.Orders
         .Include(order => order.Items).ThenInclude(item => item.Options)
         .Include(order => order.TransferReviews)
-        .Include(order => order.StatusHistory);
+        .Include(order => order.StatusHistory)
+        .Include(order => order.Incidents)
+        .Include(order => order.RefundCase);
 
     public Task<Order?> GetOrderAsync(Guid orderId, CancellationToken cancellationToken) =>
         OrderGraph().SingleOrDefaultAsync(order => order.Id == orderId, cancellationToken);
@@ -35,6 +37,13 @@ public sealed class OrderWorkflowRepository(AppDbContext db) : IOrderWorkflowRep
     public Task<OfflineDeliverySyncRecord?> GetOfflineDeliveryCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken) =>
         db.OfflineDeliverySyncRecords.SingleOrDefaultAsync(command => command.ActorUserId == actorUserId && command.Id == commandId, cancellationToken);
 
+    public async Task CancelOpenExternalOffersForOrderAsync(Guid orderId, CancellationToken cancellationToken)
+    {
+        var offers = await db.ExternalDeliveryOffers.Where(offer => offer.OrderId == orderId &&
+            offer.Status == ExternalDeliveryOfferStatus.Offered).ToListAsync(cancellationToken);
+        foreach (var offer in offers) offer.Cancel(DateTimeOffset.UtcNow);
+    }
+
     public void AddOfflineDeliveryCommand(OfflineDeliverySyncRecord command) => db.OfflineDeliverySyncRecords.Add(command);
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken)
@@ -42,6 +51,12 @@ public sealed class OrderWorkflowRepository(AppDbContext db) : IOrderWorkflowRep
         // Status history is append-only. EF's field-backed read-only collection can
         // detect the new shadow-FK dependent as Modified; persist it as an insert.
         foreach (var entry in db.ChangeTracker.Entries<OrderStatusChange>().Where(entry => entry.State == EntityState.Modified))
+            entry.State = EntityState.Added;
+        foreach (var entry in db.ChangeTracker.Entries<OrderIncident>()
+                     .Where(entry => entry.State == EntityState.Modified && entry.Entity.ResolverUserId is null))
+            entry.State = EntityState.Added;
+        foreach (var entry in db.ChangeTracker.Entries<ManualRefundCase>()
+                     .Where(entry => entry.State == EntityState.Modified && entry.Entity.ReviewedByUserId is null))
             entry.State = EntityState.Added;
         foreach (var entry in db.ChangeTracker.Entries<TransferReview>()
                      .Where(entry => entry.State == EntityState.Modified && entry.Entity.Decision is null && entry.Entity.ReviewerUserId is null))

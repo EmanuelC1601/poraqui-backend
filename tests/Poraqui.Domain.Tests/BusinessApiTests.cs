@@ -260,6 +260,76 @@ public sealed class BusinessApiTests
         Assert.Equal(HttpStatusCode.Forbidden, (await SendAsync(client, HttpMethod.Put,
             $"api/option-groups/{optionGroupId}/availability", otherMerchantToken,
             JsonContent.Create(new { isAvailable = false }))).StatusCode);
+        using var reportedIncidentResponse = await SendAsync(client, HttpMethod.Post, $"api/orders/{orderId}/incidents", customerToken,
+            JsonContent.Create(new { category = "OrderQuestion", description = "El cliente solicita una actualización." }));
+        Assert.Equal(HttpStatusCode.OK, reportedIncidentResponse.StatusCode);
+        using var reportedIncidentJson = JsonDocument.Parse(await reportedIncidentResponse.Content.ReadAsStringAsync());
+        var incidentId = reportedIncidentJson.RootElement.GetProperty("id").GetGuid();
+        Assert.Equal(HttpStatusCode.Forbidden, (await SendAsync(client, HttpMethod.Get,
+            $"api/orders/{orderId}/incidents", otherMerchantToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await SendAsync(client, HttpMethod.Post,
+            $"api/businesses/{businessId}/orders/{orderId}/incidents/{incidentId}/resolve", otherMerchantToken,
+            JsonContent.Create(new { resolution = "Intento de otro negocio." }))).StatusCode);
+        using (var resolvedIncident = await SendAsync(client, HttpMethod.Post,
+                   $"api/businesses/{businessId}/orders/{orderId}/incidents/{incidentId}/resolve", merchantToken,
+                   JsonContent.Create(new { resolution = "Se respondió al cliente." })))
+        {
+            using var resolvedJson = JsonDocument.Parse(await resolvedIncident.Content.ReadAsStringAsync());
+            Assert.Equal(HttpStatusCode.OK, resolvedIncident.StatusCode);
+            Assert.Equal("Resolved", resolvedJson.RootElement.GetProperty("status").GetString());
+        }
+        Assert.Equal(HttpStatusCode.OK, (await SendAsync(client, HttpMethod.Put,
+            $"api/businesses/{businessId}/opening-hours", merchantToken, JsonContent.Create(alwaysOpenHours))).StatusCode);
+
+        using var cancellableOrderResponse = await SendAsync(client, HttpMethod.Post, "api/orders", customerToken,
+            new StringContent(optionOrderRequest, Encoding.UTF8, "application/json"));
+        Assert.Equal(HttpStatusCode.Created, cancellableOrderResponse.StatusCode);
+        using var cancellableOrderJson = JsonDocument.Parse(await cancellableOrderResponse.Content.ReadAsStringAsync());
+        var cancellableOrderId = cancellableOrderJson.RootElement.GetProperty("id").GetGuid();
+        using (var evidenceContent = new MultipartFormDataContent())
+        {
+            var proof = new ByteArrayContent(Encoding.UTF8.GetBytes("%PDF-1.7 isolated refund proof"));
+            proof.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+            evidenceContent.Add(proof, "file", "refund-receipt.pdf");
+            using var evidenceRequest = new HttpRequestMessage(HttpMethod.Post, $"api/orders/{cancellableOrderId}/transfer-evidence") { Content = evidenceContent };
+            evidenceRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", customerToken);
+            using var evidenceResponse = await client.SendAsync(evidenceRequest);
+            Assert.Equal(HttpStatusCode.Accepted, evidenceResponse.StatusCode);
+        }
+        using (var cancelledOrder = await SendAsync(client, HttpMethod.Post,
+                   $"api/businesses/{businessId}/orders/{cancellableOrderId}/cancel", merchantToken,
+                   JsonContent.Create(new { reason = "El negocio no podrá preparar el pedido." })))
+        {
+            using var cancelledJson = JsonDocument.Parse(await cancelledOrder.Content.ReadAsStringAsync());
+            Assert.Equal(HttpStatusCode.OK, cancelledOrder.StatusCode);
+            Assert.Equal("Cancelled", cancelledJson.RootElement.GetProperty("status").GetString());
+        }
+        using (var customerCancelledOrder = await SendAsync(client, HttpMethod.Get,
+                   $"api/orders/{cancellableOrderId}", customerToken))
+        {
+            using var customerCancelledJson = JsonDocument.Parse(await customerCancelledOrder.Content.ReadAsStringAsync());
+            Assert.Equal("ReviewRequired", customerCancelledJson.RootElement.GetProperty("refundStatus").GetString());
+        }
+        Assert.Equal(HttpStatusCode.Forbidden, (await SendAsync(client, HttpMethod.Post,
+            $"api/orders/{cancellableOrderId}/cancel", otherMerchantToken,
+            JsonContent.Create(new { reason = "Cancelación ajena" }))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await SendAsync(client, HttpMethod.Get,
+            $"api/businesses/{businessId}/orders/{cancellableOrderId}/refund", otherMerchantToken)).StatusCode);
+        using (var refundCase = await SendAsync(client, HttpMethod.Get,
+                   $"api/businesses/{businessId}/orders/{cancellableOrderId}/refund", merchantToken))
+        {
+            using var refundJson = JsonDocument.Parse(await refundCase.Content.ReadAsStringAsync());
+            Assert.Equal(HttpStatusCode.OK, refundCase.StatusCode);
+            Assert.Equal("ReviewRequired", refundJson.RootElement.GetProperty("status").GetString());
+            var requestedRefund = refundJson.RootElement.GetProperty("requestedAmount").GetDecimal();
+            var reviewRequest = JsonContent.Create(new { refunded = true, amount = requestedRefund,
+                reference = "MANUAL-REFUND-TEST-001", note = "Reembolso realizado manualmente." });
+            using var reviewResponse = await SendAsync(client, HttpMethod.Post,
+                $"api/businesses/{businessId}/orders/{cancellableOrderId}/refund-review", merchantToken, reviewRequest);
+            Assert.Equal(HttpStatusCode.OK, reviewResponse.StatusCode);
+            using var reviewedRefund = JsonDocument.Parse(await reviewResponse.Content.ReadAsStringAsync());
+            Assert.Equal("Refunded", reviewedRefund.RootElement.GetProperty("status").GetString());
+        }
         using (var scope = factory.Services.CreateScope())
         {
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
@@ -457,7 +527,7 @@ public sealed class BusinessApiTests
         Assert.Equal(2, customerOrder.RootElement.GetProperty("items")[0].GetProperty("options").GetArrayLength());
         Assert.True(customerOrder.RootElement.GetProperty("courierPaymentAmount").ValueKind == JsonValueKind.Null);
         Assert.Equal("CLABE-TEST-001", customerOrder.RootElement.GetProperty("transferInstructions").GetProperty("accountReference").GetString());
-        Assert.Equal(10, customerOrder.RootElement.GetProperty("history").GetArrayLength());
+        Assert.Equal(12, customerOrder.RootElement.GetProperty("history").GetArrayLength());
     }
 
     private static async Task RegisterAsync(HttpClient client, string email)
