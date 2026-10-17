@@ -26,6 +26,8 @@ public sealed class ExternalCourierRepository(AppDbContext db) : IExternalCourie
             .Where(x => x.ExpiresAtUtc > now).Select(x => x.CourierUserId).ToHashSet();
     public Task<CourierAvailability?> GetAvailabilityAsync(Guid courierId, CancellationToken cancellationToken) =>
         db.CourierAvailabilities.SingleOrDefaultAsync(x => x.CourierUserId == courierId, cancellationToken);
+    public Task<bool> IsActiveZoneAsync(Guid zoneId, CancellationToken cancellationToken) =>
+        db.DeliveryZones.AnyAsync(x => x.Id == zoneId && x.IsActive, cancellationToken);
     public async Task<IReadOnlyList<ExternalDeliveryOffer>> GetOffersAsync(Guid courierId, CancellationToken cancellationToken) =>
         await db.ExternalDeliveryOffers.Where(x => x.CourierUserId == courierId && x.Status == ExternalDeliveryOfferStatus.Offered)
             .ToListAsync(cancellationToken);
