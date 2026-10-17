@@ -2,7 +2,7 @@
 
 ## Estado del contrato
 
-`main` contiene PR #1–#5 y es la base de integración. La pila funcional PR #6–#19 está publicada en ramas apiladas y pendiente de integración. `feature/transfer-proof-idempotency` agrega reintentos durables de carga de comprobantes. El desarrollo tiene un único responsable de módulos, contratos, `AppDbContext` y migraciones. En Development la API expone `/openapi/v1.json`. La API no migra al arrancar.
+`main` contiene PR #1–#5 y es la base de integración. PR #18 se integró en `feature/phone-verification`, PR #19 en `feature/command-idempotency-increment` y PR #20 en `feature/order-create-idempotency`; los tres siguen fuera de `main`. PR #21 agrega asignación propia idempotente y está abierto sobre PR #20. El desarrollo tiene un único responsable de módulos, contratos, `AppDbContext` y migraciones. En Development la API expone `/openapi/v1.json`. La API no migra al arrancar.
 
 La BD de desarrollo SQL Server recibió once migraciones, incluida `IncidentCommandIdempotency`, `OrderCreationCommandIdempotency` y `TransferEvidenceCommandIdempotency`. Se aplicaron explícitamente y no eliminan datos; la última migración agrega columnas nullable e índice único filtrado. La suite funcional API usa SQLite aislado. Las carreras y restricciones específicas requieren pruebas en una BD SQL Server aislada `PoraquiIntegrationTests` y siguen pendientes.
 

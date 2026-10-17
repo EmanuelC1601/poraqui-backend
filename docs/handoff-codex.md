@@ -1,16 +1,16 @@
 # Handoff de desarrollo
 
-## Incremento PR #20: comprobantes idempotentes
+## Incremento PR #20: comprobantes idempotentes (integrado en su base)
 
 Desarrollo de un solo responsable: OpenCode ya no participa; la asignación histórica de reparto se conserva como antecedente. `main` es la base de integración y PR #18/#19 siguen apilados fuera de ella. La rama de trabajo actual `feature/transfer-proof-idempotency` parte de la cabeza de PR #19. Añade `commandId` obligatorio a `POST /api/orders/{id}/transfer-evidence`; repetir mismo actor/clave/orden/hash devuelve la operación guardada, mientras una colisión de contenido responde 409. El incremento todavía está sin commit/PR.
 
 Migración `20261017212343_TransferEvidenceCommandIdempotency`: columnas nullable e índice único filtrado; no cambia la nulabilidad preexistente de `OrderId` ni elimina datos. Script revisable: `docs/sql/20261017212343_TransferEvidenceCommandIdempotency.sql`. Aplicada explícitamente en SQL Server de desarrollo. La conexión privada `ConnectionStrings:DefaultConnection` está en User Secrets. No se migrará al iniciar la API.
 
-Verificación antes de publicar: build limpio; 24 pruebas aprobadas y una optativa omitida por ausencia de `ConnectionStrings__SqlServerTest`; pruebas funcionales en SQLite aislado. `git diff --check` limpio. La prueba de concurrencia SQL Server aún no se ejecuta. El commit `60c0bbc` está publicado y PR #20 abierto contra PR #19.
+Verificación antes de integrar: build limpio; 24 pruebas aprobadas y una optativa omitida por ausencia de `ConnectionStrings__SqlServerTest`; pruebas funcionales en SQLite aislado. `git diff --check` limpio. La prueba de concurrencia SQL Server aún no se ejecuta. PR #20 se integró en `feature/order-create-idempotency` mediante `0a964ea`; continúa fuera de `main`.
 
 ## Incremento en curso: asignación propia idempotente
 
-La rama `feature/courier-assignment-idempotency`, apilada sobre PR #20, requiere `commandId` para `POST /api/businesses/{businessId}/orders/{orderId}/assign-courier`. Actor/orden/repartidor/importe forman la huella del comando; un reintento exacto devuelve el pedido asignado y el mismo código protegido, y una clave con datos distintos da 409. Comando y cambio del pedido se guardan juntos. Prueba API cubre creación, replay y conflicto. Migración `20261017212850_CourierAssignmentCommandIdempotency` crea una tabla nueva con FK/PK e índice único; SQL revisado, sin operaciones destructivas y aplicada explícitamente a desarrollo. Doce migraciones aplicadas; EF confirma modelo actualizado. Build 0 warnings/errors; suite 24 aprobadas, 1 omitida por falta de SQL Server aislado. No se ha probado carrera contra SQL Server.
+La rama `feature/courier-assignment-idempotency`, apilada sobre PR #20, requiere `commandId` para `POST /api/businesses/{businessId}/orders/{orderId}/assign-courier`. Actor/orden/repartidor/importe forman la huella del comando; un reintento exacto devuelve el pedido asignado y el mismo código protegido, y una clave con datos distintos da 409. Comando y cambio del pedido se guardan juntos. Prueba API cubre creación, replay y conflicto. Migración `20261017212850_CourierAssignmentCommandIdempotency` crea una tabla nueva con FK/PK e índice único; SQL revisado, sin operaciones destructivas y aplicada explícitamente a desarrollo. Doce migraciones aplicadas; EF confirma modelo actualizado. Build 0 warnings/errors; suite 24 aprobadas, 1 omitida por falta de SQL Server aislado. No se ha probado carrera contra SQL Server. Commit `12f0d97` y documentación `8ab8370` publicados; PR #21 sigue abierto, con mergeability pendiente de resolución por GitHub.
 
 ## Estado actual: idempotencia de incidencias
 
