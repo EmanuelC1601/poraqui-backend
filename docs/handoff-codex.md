@@ -1,23 +1,34 @@
-# Handoff de desarrollo
+# Guía de integración y ejecución
 
 ## Responsable y ramas
 
-Una sola persona mantiene todos los módulos, contratos, `AppDbContext`, migraciones, pruebas y despliegue. `main` es la base de integración; usar ramas `feature/*` y PR por incremento. OpenCode ya no participa; su asignación anterior queda como antecedente.
+Un solo responsable mantiene todos los módulos, contratos, `AppDbContext`, migraciones, pruebas y despliegue. `main` es la base de integración y contiene PR #1–#7; PR #22 (`8ed5cb3`) integró la sincronización offline. Crear incrementos desde el `main` actualizado, usar ramas `feature/*` y abrir PRs pequeños. OpenCode ya no participa; su asignación previa queda como antecedente.
 
-`main` contiene PR #1–#6 (`d39d265`). Este PR se prepara en `feature/offline-sync-main`, con solo el incremento offline de PR #7 y basado directamente en `main`. PR #8–#21 siguen en ramas apiladas; `feature/backend-integration-verified` conserva la punta completa para integrar los siguientes incrementos en orden.
+El trabajo previo de SignalR y módulos posteriores permanece en ramas apiladas. No asumir que está integrado ni que sus pruebas corresponden al `main`; revisar cada cambio y revalidarlo contra la rama actual antes de presentar PR.
 
-## PR de sincronización offline
+## Incremento activo: SignalR
 
-`POST /api/orders/{orderId}/sync/delivery-confirmation` recibe `commandId`, código y `clientCapturedAtUtc`. El servidor vuelve a validar actor, courier asignado, estado y código antes de confirmar. La hora del dispositivo solo sirve de auditoría; los reintentos con mismo ID y payload recuperan el resultado guardado, mientras que una colisión devuelve 409.
+Rama `feature/comercio-pedidos-next`, commit inicial `b2d015e` sobre el `main` integrado. El hub autenticado `/hubs/orders` autoriza suscripciones por relación con el pedido. Devuelve estado/versión actuales y publica `OrderChanged` después de persistir cada cambio. El snapshot se vuelve a leer tras unirse al grupo para evitar perder transiciones concurrentes. Payload no contiene datos personales.
 
-Verificación en `feature/offline-sync-main`: restore correcto, build .NET 9 limpio (0 warnings/errores) y 14/14 pruebas aprobadas con SQLite aislado. La migración añade una tabla e índice; SQL en `docs/sql/20261017192726_OfflineDeliveryCommandSync.sql`. No fue aplicada en este turno.
+Verificado en esta rama: `dotnet restore Poraqui.sln`, `dotnet build Poraqui.sln --no-restore` (0 warnings/errores) y `dotnet test Poraqui.sln --no-build --no-restore` (14/14 en SQLite aislado; `DOTNET_ROLL_FORWARD=Major` por runtime .NET 10). Las pruebas existentes ejercitan WebSocket SignalR en TestServer, autenticación y acceso cruzado. `dotnet ef migrations has-pending-model-changes` no reportó cambios de modelo. Este incremento no requiere migración. La reconexión de un cliente real sigue pendiente.
 
-## SQL y datos compartidos
+## SQL Server y datos compartidos
 
-La configuración privada `ConnectionStrings:DefaultConnection` funciona. EF comprobó desde la rama completa 12 migraciones aplicadas y sin cambios pendientes del modelo. No se aplicaron migraciones durante la revisión. Falta `ConnectionStrings:SqlServerTest`, necesaria para las pruebas concurrentes contra una base aislada `PoraquiIntegrationTests`. Nunca usar la BD compartida en pruebas que limpien datos; no borrar, recrear ni reiniciar datos de desarrollo. La API no migra al arrancar.
+`ConnectionStrings:DefaultConnection` está en User Secrets y se conectó desde la rama integrada acumulada. EF confirmó 12 migraciones aplicadas y ningún cambio de modelo pendiente en esa revisión; no se aplicaron migraciones durante este incremento. Falta `ConnectionStrings:SqlServerTest`, que debe apuntar a la base aislada `PoraquiIntegrationTests` para pruebas concurrentes. Nunca configurar las pruebas que limpian datos con la BD compartida.
 
-Antes de futuras migraciones: revisar historial y SQL generado, verificar que no haya operaciones destructivas, y aplicarlas explícitamente solo con destino validado. Mantener contraseñas fuera de Git, documentación y logs.
+Para desarrollo local, guardar la conexión privada con `dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<cadena privada>" --project src/Poraqui.Api`. No guardar ni imprimir el valor. Revisar todo SQL de migración por operaciones destructivas y aplicar migraciones explícitamente cuando el destino esté validado. La API no migra al arrancar.
 
-## Pendientes de la pila completa
+## Ejecución y OpenAPI
 
-Pruebas SQL Server de aceptación concurrente externa y asignación interna; SMS real con Twilio; reconexión SignalR desde cliente real; configuración de almacenamiento privado/Data Protection y publicación MonsterASP.NET. Ver [project-status.md](project-status.md), [api-contracts.md](api-contracts.md) y [order-flow.md](order-flow.md). Zonas/tarifas configuradas sustituyen distancias GPS; no hay transferencias automáticas ni frontend.
+Desde la raíz: `dotnet restore Poraqui.sln`, `dotnet build Poraqui.sln` y `dotnet test Poraqui.sln`. Si solo está instalado runtime .NET 10 para proyectos net9.0, en PowerShell puede usarse `$env:DOTNET_ROLL_FORWARD='Major'` para las pruebas y luego eliminar esa variable. OpenAPI está disponible en Development en `/openapi/v1.json`.
+
+El recorrido automatizado de API está en `tests/Poraqui.Domain.Tests/BusinessApiTests.cs`; cubre precios del servidor, permisos, revisión manual, reparto y códigos. SQLite aislado sirve para el recorrido, pero no valida concurrencia ni migraciones SQL Server.
+
+## Pendientes verificables
+
+- Confirmar reconexión SignalR desde cliente real y el comportamiento en el hosting de producción.
+- Opciones/horarios, OTP real, cancelación de pedido, seguimiento de reembolsos manuales, idempotencia restante, métricas y despliegue MonsterASP.NET.
+- Completar pruebas de concurrencia con `ConnectionStrings:SqlServerTest` aislada y prueba de reconexión SignalR desde cliente real.
+- Revisar el ledger de `docs/project-status.md` y los contratos de `docs/api-contracts.md` antes de cada PR.
+
+GPS, distancias calculadas, transferencias bancarias automáticas y frontend están fuera de alcance.

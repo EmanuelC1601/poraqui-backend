@@ -1,6 +1,6 @@
 # Contratos API y entre módulos
 
-Estado: `main` integra PR #1–#6 (`d39d265`). PR #7 se prepara como incremento acotado en `feature/offline-sync-main`; PR #8–#21 permanecen en ramas apiladas fuera de `main`. Un solo responsable mantiene contratos y migraciones. OpenAPI en Development: `/openapi/v1.json`.
+Estado: `main` integra PR #1–#7 (merge PR #22, `8ed5cb3`). SignalR está en desarrollo en `feature/comercio-pedidos-next`. Un solo responsable mantiene contratos y migraciones. OpenAPI en Development: `/openapi/v1.json`.
 
 ## Integrado en `main` (PR #1–#6)
 
@@ -47,7 +47,7 @@ Cada transición de pedido incrementa `Order.Version`; la persistencia detecta e
 - `ExternalDeliveryOffer.Version`, `Order.Version` y un índice único filtrado por pedido aceptado protegen frente a respuestas concurrentes. Falta ejecutar la carrera en SQL Server.
 - Migración `ExternalCourierOffers` y script SQL revisables en `src/Poraqui.Infrastructure/Persistence/Migrations/` y `docs/sql/20261017191548_ExternalCourierOffers.sql`. EF confirmó aplicada en la BD compartida dentro de la cadena actual.
 
-## Preparado para integrar: sincronización de entrega (PR #7, `feature/offline-sync-main`)
+## Integrado: sincronización de entrega (PR #22)
 
 - Courier asignado sube una confirmación capturada sin conexión con `POST /api/orders/{orderId}/sync/delivery-confirmation`, con `commandId`, `code` y `clientCapturedAtUtc`.
 - El servidor no confía en el resultado local: valida autorización del courier, asignación vigente, estado y código antes de persistir la entrega. La hora local se conserva solo como dato de auditoría; el servidor registra la hora de aceptación.
@@ -60,4 +60,14 @@ La rama de PR #7 pasa 14/14 pruebas con SQLite aislado; la pila completa pasa 24
 
 El contrato provisional `src/Poraqui.Application/Delivery/DeliveryOrderContracts.cs` se eliminó en PR #4 al implementar reparto propio. La asignación previa a OpenCode se conserva como antecedente; hay un solo responsable.
 
-La cadena privada `ConnectionStrings:DefaultConnection` existe y EF verificó SQL Server. `ConnectionStrings:SqlServerTest` falta; configura esa clave solo con una base aislada `PoraquiIntegrationTests` para ejecutar las carreras. Pendiente: opciones/horarios, OTP, cancelaciones/incidencias/reembolsos, SignalR y reconexión, idempotencia adicional, métricas y despliegue. No hay GPS, distancias inferidas ni transferencias bancarias automáticas.
+La cadena privada `ConnectionStrings:DefaultConnection` existe y EF verificó SQL Server. `ConnectionStrings:SqlServerTest` falta; configura esa clave solo con una base aislada `PoraquiIntegrationTests` para ejecutar las carreras.
+
+## En desarrollo: SignalR de pedidos (`feature/comercio-pedidos-next`)
+
+- Hub autenticado en `/hubs/orders`. La conexión usa el bearer de Identity; `access_token` de query string se procesa solo para esta ruta.
+- `SubscribeOrder(orderId)` autoriza cliente propietario, negocio propietario, courier asignado o administrador. Devuelve `{ orderId, status, version, changedAtUtc }` y suscribe al grupo asociado al pedido.
+- Tras guardar una transición, se publica `OrderChanged` con estado, versión y fecha. No incluye dirección, teléfono, comprobante ni códigos. Un fallo de publicación queda registrado y no revierte una transición persistida.
+- La suscripción vuelve a consultar el snapshot después de entrar al grupo para cubrir cambios que ocurran mientras se autoriza/conecta. Al reconectar, invocar `SubscribeOrder` otra vez para recuperar el estado actual.
+- Pruebas de acceso cruzado, negociación anónima y entrega WebSocket en TestServer existen en la rama; esta rama requiere volver a compilar y ejecutarlas tras el ajuste de snapshot.
+
+Pendiente: opciones/horarios, OTP real, cancelaciones/incidencias/reembolsos, idempotencia adicional, métricas, reconexión SignalR en cliente real y despliegue. No hay GPS, distancias inferidas ni transferencias bancarias automáticas.

@@ -17,9 +17,28 @@ public sealed class OrdersHub(OrderWorkflowService workflow) : Hub
 
         var isAdmin = Context.User?.IsInRole(ApplicationRoles.PlatformAdmin) == true;
         var subscription = await workflow.GetRealtimeSnapshotAsync(orderId, actorId, isAdmin, Context.ConnectionAborted);
-        await Groups.AddToGroupAsync(Context.ConnectionId,
-            OrderChangeGroups.For(orderId, subscription.Audience), Context.ConnectionAborted);
-        return subscription.Snapshot;
+        var group = OrderChangeGroups.For(orderId, subscription.Audience);
+        await Groups.AddToGroupAsync(Context.ConnectionId, group, Context.ConnectionAborted);
+
+        try
+        {
+            // Read after joining so a transition between authorization and group membership is
+            // reflected either by this snapshot or by a subsequent group event.
+            var current = await workflow.GetRealtimeSnapshotAsync(orderId, actorId, isAdmin, Context.ConnectionAborted);
+            if (current.Audience != subscription.Audience)
+            {
+                await Groups.RemoveFromGroupAsync(Context.ConnectionId, group, Context.ConnectionAborted);
+                group = OrderChangeGroups.For(orderId, current.Audience);
+                await Groups.AddToGroupAsync(Context.ConnectionId, group, Context.ConnectionAborted);
+                current = await workflow.GetRealtimeSnapshotAsync(orderId, actorId, isAdmin, Context.ConnectionAborted);
+            }
+            return current.Snapshot;
+        }
+        catch
+        {
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, group, Context.ConnectionAborted);
+            throw;
+        }
     }
 
     public async Task UnsubscribeOrder(Guid orderId)
