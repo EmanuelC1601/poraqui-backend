@@ -164,6 +164,9 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<bool>("HasConfiguredOpeningHours")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
@@ -174,6 +177,11 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid>("OwnerUserId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TimeZoneId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("TransferAccountReference")
                         .HasMaxLength(120)
@@ -196,6 +204,28 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                     b.HasIndex("OwnerUserId");
 
                     b.ToTable("Businesses", (string)null);
+                });
+
+            modelBuilder.Entity("Poraqui.Domain.Commerce.BusinessOpeningHours", b =>
+                {
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Day")
+                        .HasColumnType("int");
+
+                    b.Property<TimeOnly?>("ClosesAt")
+                        .HasColumnType("time");
+
+                    b.Property<bool>("IsClosed")
+                        .HasColumnType("bit");
+
+                    b.Property<TimeOnly?>("OpensAt")
+                        .HasColumnType("time");
+
+                    b.HasKey("BusinessId", "Day");
+
+                    b.ToTable("BusinessOpeningHours", (string)null);
                 });
 
             modelBuilder.Entity("Poraqui.Domain.Commerce.CatalogProduct", b =>
@@ -828,6 +858,15 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Poraqui.Domain.Commerce.BusinessOpeningHours", b =>
+                {
+                    b.HasOne("Poraqui.Domain.Commerce.Business", null)
+                        .WithMany("OpeningHours")
+                        .HasForeignKey("BusinessId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Poraqui.Domain.Commerce.CatalogProduct", b =>
                 {
                     b.HasOne("Poraqui.Domain.Commerce.Business", null)
@@ -993,6 +1032,11 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("ReviewerUserId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Poraqui.Domain.Commerce.Business", b =>
+                {
+                    b.Navigation("OpeningHours");
                 });
 
             modelBuilder.Entity("Poraqui.Domain.Commerce.CatalogProduct", b =>

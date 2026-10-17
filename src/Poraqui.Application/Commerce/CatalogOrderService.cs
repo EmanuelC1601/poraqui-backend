@@ -34,6 +34,9 @@ public sealed record OptionGroupRequest(string Name, int MinSelections, int MaxS
 public sealed record AvailabilityRequest(bool IsAvailable);
 public sealed record ZoneView(Guid Id, string Name, bool IsActive);
 public sealed record RateView(Guid Id, Guid BusinessId, Guid ZoneId, decimal Fee, bool IsActive);
+public sealed record OpeningHoursRequest(DayOfWeek Day, bool IsClosed, TimeOnly? OpensAt, TimeOnly? ClosesAt);
+public sealed record OpeningHoursView(string TimeZoneId, bool IsConfigured, bool IsAcceptingOrders,
+    IReadOnlyList<OpeningHoursRequest> Days);
 public sealed record OrderItemRequest(Guid ProductId, int Quantity, IReadOnlyCollection<Guid>? OptionIds = null);
 public sealed record CreatedOrderView(Guid Id, string OrderNumber, Guid BusinessId, Guid ZoneId,
     string DeliveryAddress, decimal Subtotal, decimal DeliveryFee, decimal Total, OrderStatus Status,
@@ -52,6 +55,25 @@ public sealed class CatalogOrderService(ICatalogOrderRepository repository, Pora
         return (await repository.GetProductsAsync(businessId, cancellationToken))
             .Where(product => product.IsAvailable)
             .Select(ToView).ToArray();
+    }
+
+    public async Task<OpeningHoursView?> GetOpeningHoursAsync(Guid businessId, CancellationToken cancellationToken)
+    {
+        var business = await repository.GetBusinessAsync(businessId, cancellationToken);
+        return business is null ? null : ToOpeningHoursView(business);
+    }
+
+    public async Task<OpeningHoursView?> ConfigureOpeningHoursAsync(Guid businessId, Guid actorId, bool isAdmin,
+        string timeZoneId, IReadOnlyCollection<OpeningHoursRequest> days, CancellationToken cancellationToken)
+    {
+        var business = await repository.GetBusinessAsync(businessId, cancellationToken);
+        if (business is null) return null;
+        if (!isAdmin && await repository.GetBusinessOwnedByAsync(businessId, actorId, cancellationToken) is null)
+            throw new BusinessAuthorizationException();
+        business.ConfigureOpeningHours(timeZoneId,
+            days.Select(day => (day.Day, day.IsClosed, day.OpensAt, day.ClosesAt)));
+        await repository.SaveChangesAsync(cancellationToken);
+        return ToOpeningHoursView(business);
     }
 
     public async Task<ProductView?> AddProductAsync(Guid businessId, Guid ownerId, string name, decimal price,
@@ -216,6 +238,8 @@ public sealed class CatalogOrderService(ICatalogOrderRepository repository, Pora
 
         var business = await repository.GetBusinessAsync(businessId, cancellationToken);
         if (business is null || !business.IsActive) throw new ArgumentException("Business is unavailable.", nameof(businessId));
+        if (!business.IsAcceptingOrdersAt(DateTimeOffset.UtcNow))
+            throw new ArgumentException("Business is currently outside its configured opening hours.", nameof(businessId));
         if (!business.HasTransferDetails) throw new ArgumentException("Business has not configured transfer payment details.", nameof(businessId));
         var zone = await repository.GetZoneAsync(zoneId, cancellationToken);
         if (zone is null || !zone.IsActive) throw new ArgumentException("Delivery zone is unavailable.", nameof(zoneId));
@@ -266,6 +290,14 @@ public sealed class CatalogOrderService(ICatalogOrderRepository repository, Pora
             group.Name, group.MinSelections, group.MaxSelections, group.IsAvailable,
             group.Options.Where(option => option.IsAvailable).Select(option => new ProductOptionView(option.Id, option.Name,
                 option.PriceDelta, option.IsAvailable)).ToArray())).ToArray());
+    private static OpeningHoursView ToOpeningHoursView(Business business) => new(business.TimeZoneId,
+        business.HasConfiguredOpeningHours, business.IsActive && business.IsAcceptingOrdersAt(DateTimeOffset.UtcNow),
+        Enum.GetValues<DayOfWeek>().OrderBy(day => (int)day).Select(day =>
+        {
+            var entry = business.OpeningHours.SingleOrDefault(item => item.Day == day);
+            return entry is null ? new OpeningHoursRequest(day, true, null, null)
+                : new OpeningHoursRequest(day, entry.IsClosed, entry.OpensAt, entry.ClosesAt);
+        }).ToArray());
     private static ProductOptionGroupView ToView(ProductOptionGroup group) => new(group.Id, group.Name, group.MinSelections,
         group.MaxSelections, group.IsAvailable, group.Options.Select(option => new ProductOptionView(option.Id, option.Name,
             option.PriceDelta, option.IsAvailable)).ToArray());
