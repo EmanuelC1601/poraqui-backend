@@ -1,25 +1,23 @@
 # Handoff de desarrollo
 
-## Base, ramas y responsabilidad
+## Responsable y ramas
 
-`main` contiene PR #1–#5 hasta `d677167`. PR #6 está abierto desde `feature/external-courier-offers`. El incremento actual está en `feature/offline-delivery-sync`, basado en PR #6; integra #6 antes de llevar esta rama a `main`. Un solo responsable mantiene todos los módulos, contratos, `AppDbContext` y migraciones. OpenCode ya no participa; su anterior asignación de reparto se conserva como antecedente.
+Una sola persona mantiene todos los módulos, contratos, `AppDbContext`, migraciones, pruebas y despliegue. `main` es la base de integración; usar ramas `feature/*` y PR por incremento. OpenCode ya no participa; su asignación anterior queda como antecedente.
 
-## Incremento actual
+`main` contiene PR #1–#6 (`d39d265`). Este PR se prepara en `feature/offline-sync-main`, con solo el incremento offline de PR #7 y basado directamente en `main`. PR #8–#21 siguen en ramas apiladas; `feature/backend-integration-verified` conserva la punta completa para integrar los siguientes incrementos en orden.
 
-Agrega `POST /api/orders/{orderId}/sync/delivery-confirmation` para confirmaciones capturadas offline. El servidor valida courier y código con el estado actual del pedido; el dato de hora del dispositivo se guarda como auditoría y no determina una transición. Guarda transición e ID/payload idempotente en una transacción. Un reintento idéntico devuelve la aceptación guardada; misma clave para datos distintos responde 409.
+## PR de sincronización offline
 
-Migración nueva `OfflineDeliveryCommandSync` crea tabla e índice por pedido. Script desde la migración externa anterior: `docs/sql/20261017192726_OfflineDeliveryCommandSync.sql`. No altera ni elimina tablas existentes. Aún no aplicada.
+`POST /api/orders/{orderId}/sync/delivery-confirmation` recibe `commandId`, código y `clientCapturedAtUtc`. El servidor vuelve a validar actor, courier asignado, estado y código antes de confirmar. La hora del dispositivo solo sirve de auditoría; los reintentos con mismo ID y payload recuperan el resultado guardado, mientras que una colisión devuelve 409.
 
-## Verificación
+Verificación en `feature/offline-sync-main`: restore correcto, build .NET 9 limpio (0 warnings/errores) y 14/14 pruebas aprobadas con SQLite aislado. La migración añade una tabla e índice; SQL en `docs/sql/20261017192726_OfflineDeliveryCommandSync.sql`. No fue aplicada en este turno.
 
-Verificado antes de publicar PR #7: `dotnet build Poraqui.sln` (0 advertencias, 0 errores), `dotnet test Poraqui.sln` (14/14; SQLite en memoria y archivos temporales), `git diff --check` y `dotnet tool run dotnet-ef migrations has-pending-model-changes --project src/Poraqui.Infrastructure --startup-project src/Poraqui.Api` (sin cambios pendientes en el modelo). La suite cubre código inválido, acceso del courier asignado, sync aceptado, repetición sin duplicado y colisión de clave.
+## SQL y datos compartidos
 
-PR #7 está publicado y apilado sobre PR #6. La base compartida se inspeccionó desde el portal de solo lectura: `dbo` sin tablas. Falta `ConnectionStrings:DefaultConnection` en la configuración privada de la API, así que no se verificó EF contra SQL Server, migraciones vivas ni aceptación simultánea real. Mantener PR #6/#7 abiertos hasta hacer esas verificaciones. No ejecutar migraciones hasta configurar la clave y revisar estado actual. La API no aplica migraciones automáticamente al iniciar.
+La configuración privada `ConnectionStrings:DefaultConnection` funciona. EF comprobó desde la rama completa 12 migraciones aplicadas y sin cambios pendientes del modelo. No se aplicaron migraciones durante la revisión. Falta `ConnectionStrings:SqlServerTest`, necesaria para las pruebas concurrentes contra una base aislada `PoraquiIntegrationTests`. Nunca usar la BD compartida en pruebas que limpien datos; no borrar, recrear ni reiniciar datos de desarrollo. La API no migra al arrancar.
 
-```powershell
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<cadena privada>" --project src/Poraqui.Api
-```
+Antes de futuras migraciones: revisar historial y SQL generado, verificar que no haya operaciones destructivas, y aplicarlas explícitamente solo con destino validado. Mantener contraseñas fuera de Git, documentación y logs.
 
-## Siguiente trabajo
+## Pendientes de la pila completa
 
-SignalR con autorización tras persistencia y estado al reconectar; idempotencia general de otras operaciones; cancelaciones de pedidos, incidencias y reembolsos; opciones/horarios de catálogo; métricas y despliegue. Ver contratos y ledger en `docs/api-contracts.md` y `docs/project-status.md`.
+Pruebas SQL Server de aceptación concurrente externa y asignación interna; SMS real con Twilio; reconexión SignalR desde cliente real; configuración de almacenamiento privado/Data Protection y publicación MonsterASP.NET. Ver [project-status.md](project-status.md), [api-contracts.md](api-contracts.md) y [order-flow.md](order-flow.md). Zonas/tarifas configuradas sustituyen distancias GPS; no hay transferencias automáticas ni frontend.

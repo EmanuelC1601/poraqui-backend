@@ -1,49 +1,28 @@
 # Estado verificable del proyecto
 
-Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167`. PR #6 (`feature/external-courier-offers`) está abierto. La rama actual `feature/offline-delivery-sync` está basada en PR #6 y depende de que se integre primero.
+Actualizado: 2026-10-17. `main` es la base de integración y contiene PR #1–#6 (`d39d265`). PR #7 ya se integró en la rama de PR #6 y está preparado en `feature/offline-sync-main` como incremento acotado hacia `main`. PR #8–#21 están en ramas apiladas y fuera de `main`; `feature/backend-integration-verified` contiene esa pila completa. Hay un solo responsable; OpenCode ya no participa.
 
-## Implementado en `main`
+## Ledger de funciones
 
-- Solución .NET 9 compilable: Domain, Application, Infrastructure y Api; EF Core SQL Server e Identity con GUID.
-- Identity API, roles y policies; negocio con permisos por propietario/recurso.
-- Catálogo básico, zonas, tarifas y pedido con importes calculados por el servidor.
-- Datos de transferencia del negocio y snapshot por pedido; comprobante privado y revisión manual.
-- Decisión del negocio, preparación explícita, repartidor propio, códigos de recogida/recepción, registro separado del pago al courier, contacto autorizado y consulta de estado/historial.
+| Estado | Función | Evidencia / pendiente |
+|---|---|---|
+| En `main` | Arquitectura, Identity y permisos por recurso, negocio, catálogo básico, zonas/tarifas, pedido con precio del servidor, transferencia/revisión manual, reparto propio y externo inicial | PR #1–#6, `d39d265` |
+| En PR #7 hacia `main` | Sincronización offline validada por el servidor, con commandId idempotente | `feature/offline-sync-main`; build limpio, 14/14 pruebas SQLite |
+| En la pila, fuera de `main` | SignalR autorizado, opciones/horarios, cancelaciones, incidencias/reembolsos, métricas, OTP, idempotencia de comandos y asignación | PR #8–#21, en `feature/backend-integration-verified` |
+| Pendiente | Aceptación simultánea de oferta y asignación simultánea de courier comprobadas en SQL Server | Falta `ConnectionStrings:SqlServerTest` para `PoraquiIntegrationTests` |
+| Pendiente | SMS real, reconexión SignalR desde cliente real, almacenamiento persistente y publicación MonsterASP.NET | Configuración externa no probada |
+| Fuera de alcance | GPS, distancias calculadas, transferencias bancarias automáticas y frontend | Usar zonas/tarifas configuradas y revisión manual |
 
-## PR #6 abierto: reparto externo
+## Verificación del incremento actual
 
-- Perfil externo administrado por admin, disponibilidad por zona, publicar/ver/rechazar/cancelar ofertas, vencimiento y respuesta `NoCouriersAvailable`.
-- La oferta muestra origen, destino, zona, condiciones y remuneración. Reintentos de publicación no generan ofertas duplicadas mientras exista una abierta.
-- Aceptar persiste oferta y asignación; `Order.Version`, `ExternalDeliveryOffer.Version` e índice filtrado único protegen frente a duplicidad.
-- Build/test locales pasan en SQLite; migración de tablas/índices y script SQL están en PR. SQL Server y la aceptación simultánea real aún no se han verificado.
+- Rama: `feature/offline-sync-main`, basada en `origin/main`; commits `cc83f10` y `231315c`.
+- `dotnet restore Poraqui.sln`: correcto.
+- `dotnet build Poraqui.sln --no-restore`: correcto, 0 advertencias y 0 errores con salida net9.0.
+- `dotnet test Poraqui.sln --no-build --no-restore`: 14/14 aprobadas, SQLite aislado. Se configuró `DOTNET_ROLL_FORWARD=Major` para ejecutar net9.0 con runtime .NET 10 disponible localmente.
+- La migración de este incremento crea una tabla e índice; el script está en `docs/sql/20261017192726_OfflineDeliveryCommandSync.sql`. No se aplicó durante esta verificación.
 
-## Rama actual: sincronización offline
+## SQL Server
 
-- `POST /api/orders/{orderId}/sync/delivery-confirmation` recibe ID idempotente, código y hora local de captura.
-- El servidor valida courier asignado, estado y código antes de aceptar. Hora del servidor es la de aceptación; la hora del dispositivo solo es auditoría.
-- Reintento igual reproduce la aceptación guardada sin duplicar historial; mismo ID con payload/orden distinto da conflicto. Código inválido no consume el ID.
-- Registro idempotente y transición de pedido se guardan en la misma transacción; la migración agrega una tabla nueva.
+`ConnectionStrings:DefaultConnection` existe en User Secrets y EF se conectó desde la rama completa de integración. EF confirmó 12 migraciones aplicadas hasta `CourierAssignmentCommandIdempotency` y ningún cambio pendiente del modelo. No se aplicaron migraciones durante esta revisión. `ConnectionStrings:SqlServerTest` no existe; no dirigir pruebas que limpian datos hacia la BD compartida.
 
-## Verificaciones actuales
-
-- Build: `dotnet build Poraqui.sln`, 0 advertencias y 0 errores después de implementar sync.
-- Pruebas: `dotnet test Poraqui.sln`, 14/14; SQLite en memoria y archivos temporales. Incluye recorrido de pago/reparto, autorización del courier asignado, código inválido, reintento sin duplicar historial y colisión de clave idempotente.
-- Migraciones `ExternalCourierOffers` y `OfflineDeliveryCommandSync` tienen scripts revisables. `has-pending-model-changes` se verificó después de crear migración de sync y no indicó cambios del modelo.
-- Portal MonsterASP, solo lectura: `dbo` aparece sin tablas. Esto informa el esquema actual; no verifica conexión EF ni restricciones/carreras SQL Server.
-
-## Pendiente
-
-- Verificar migraciones, restricciones y aceptación simultánea en SQL Server antes de integrar PR #6/#7.
-- Prueba de aceptación simultánea de ofertas y ejecución/revisión de migraciones en SQL Server.
-- SignalR tras persistencia, destinatarios autorizados y lectura de estado al reconectar.
-- Idempotencia para creación de pedidos, pagos y demás operaciones que aún no la tienen.
-- Catálogo de opciones, horarios, OTP, cancelación del pedido, incidencias y seguimiento completo de reembolsos manuales.
-- Métricas del piloto, instrucciones finales de despliegue en MonsterASP.NET y recorrido SQL Server reproducible.
-
-## Bloqueado por configuración privada
-
-No existe `ConnectionStrings:DefaultConnection` en User Secrets/entorno de la API. Configúrala con `dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<cadena privada>" --project src/Poraqui.Api`. No compartas el valor ni uses secretos del chat. Sin la clave no se verifica conexión EF, no se puede comprobar esquema vivo con la aplicación ni aplicar migraciones. Ninguna migración se ha aplicado.
-
-## Fuera de alcance
-
-GPS y distancias automáticas, transferencias bancarias automáticas y frontend.
+Configura `ConnectionStrings:DefaultConnection` en User Secrets (`src/Poraqui.Api`) o configuración privada del hosting; nunca guardes cadenas en Git. Las carreras SQL Server requieren otra base, `PoraquiIntegrationTests`. La API no migra automáticamente al iniciar.
