@@ -72,7 +72,7 @@ Verificado en este incremento: `dotnet build Poraqui.sln` (0 advertencias, 0 err
 
 ## Rama actual: verificación telefónica SMS
 
-Rama `feature/phone-verification`, basada en PR #13. `POST /api/account/phone/verification` solicita OTP por Twilio Verify; `POST /api/account/phone/verification/confirm` solo confirma el teléfono en Identity tras estado `approved`. Se exige E.164 y no se persiste el OTP. Error/caducidad responde 400; proveedor no configurado o inaccesible responde 503. OpenAPI se actualiza por los endpoints MVC.
+Rama `feature/phone-verification`, commit `81f2106`, PR #14: https://github.com/EmanuelC1601/poraqui-backend/pull/14, basada en PR #13. `POST /api/account/phone/verification` solicita OTP por Twilio Verify; `POST /api/account/phone/verification/confirm` solo confirma el teléfono en Identity tras estado `approved`. Se exige E.164 y no se persiste el OTP. Error/caducidad responde 400; proveedor no configurado o inaccesible responde 503. OpenAPI se actualiza por los endpoints MVC. El PR está abierto contra `feature/delivery-command-retries`.
 
 Pruebas: 2 nuevas pruebas verifican formularios/URLs de Twilio y aprobación/código inválido/404 usando HttpMessageHandler falso; el recorrido API usa fake solo en prueba para verificar que código inválido no confirma el teléfono y que el correcto sí lo confirma. Build limpio y 21/21 pasan; API con SQLite aislado. No se probaron credenciales reales ni envío SMS real. No cambia el modelo ni requiere migración.
 
