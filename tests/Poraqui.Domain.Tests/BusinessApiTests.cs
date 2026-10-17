@@ -258,16 +258,42 @@ public sealed class BusinessApiTests
                    JsonContent.Create(new { recipientName = "Mercado Poraqui", institution = "Banco de prueba", accountReference = "CLABE-TEST-CHANGED", instructions = "Nueva cuenta." })))
             Assert.Equal(HttpStatusCode.OK, changedDetails.StatusCode);
 
+        var proofCommandId = Guid.NewGuid();
         using (var proofContent = new MultipartFormDataContent())
         {
             var proof = new ByteArrayContent(Encoding.UTF8.GetBytes("%PDF-1.7 isolated transfer proof"));
             proof.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+            proofContent.Add(new StringContent(proofCommandId.ToString()), "commandId");
             proofContent.Add(proof, "file", "receipt.pdf");
             using var proofRequest = new HttpRequestMessage(HttpMethod.Post, $"api/orders/{orderId}/transfer-evidence") { Content = proofContent };
             proofRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", customerToken);
             using var proofResponse = await client.SendAsync(proofRequest);
             Assert.True(proofResponse.StatusCode == HttpStatusCode.Accepted,
                 $"Evidence submission returned {(int)proofResponse.StatusCode}: {await proofResponse.Content.ReadAsStringAsync()}");
+        }
+        using (var replayContent = new MultipartFormDataContent())
+        {
+            var proof = new ByteArrayContent(Encoding.UTF8.GetBytes("%PDF-1.7 isolated transfer proof"));
+            proof.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+            replayContent.Add(new StringContent(proofCommandId.ToString()), "commandId");
+            replayContent.Add(proof, "file", "receipt.pdf");
+            using var replayRequest = new HttpRequestMessage(HttpMethod.Post, $"api/orders/{orderId}/transfer-evidence") { Content = replayContent };
+            replayRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", customerToken);
+            using var replayResponse = await client.SendAsync(replayRequest);
+            Assert.Equal(HttpStatusCode.Accepted, replayResponse.StatusCode);
+            using var replayJson = JsonDocument.Parse(await replayResponse.Content.ReadAsStringAsync());
+            Assert.True(replayJson.RootElement.GetProperty("replayed").GetBoolean());
+        }
+        using (var conflictingContent = new MultipartFormDataContent())
+        {
+            var proof = new ByteArrayContent(Encoding.UTF8.GetBytes("%PDF-1.7 different proof"));
+            proof.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+            conflictingContent.Add(new StringContent(proofCommandId.ToString()), "commandId");
+            conflictingContent.Add(proof, "file", "receipt.pdf");
+            using var conflictRequest = new HttpRequestMessage(HttpMethod.Post, $"api/orders/{orderId}/transfer-evidence") { Content = conflictingContent };
+            conflictRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", customerToken);
+            using var conflictResponse = await client.SendAsync(conflictRequest);
+            Assert.Equal(HttpStatusCode.Conflict, conflictResponse.StatusCode);
         }
         using (var orderChanged = JsonDocument.Parse(await ReceiveSignalRFrameAsync(realtimeSocket)))
         {
@@ -341,6 +367,7 @@ public sealed class BusinessApiTests
         {
             var proof = new ByteArrayContent(Encoding.UTF8.GetBytes("%PDF-1.7 isolated refund proof"));
             proof.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+            evidenceContent.Add(new StringContent(Guid.NewGuid().ToString()), "commandId");
             evidenceContent.Add(proof, "file", "refund-receipt.pdf");
             using var evidenceRequest = new HttpRequestMessage(HttpMethod.Post, $"api/orders/{cancellableOrderId}/transfer-evidence") { Content = evidenceContent };
             evidenceRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", customerToken);

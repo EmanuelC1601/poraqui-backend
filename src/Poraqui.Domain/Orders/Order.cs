@@ -77,14 +77,20 @@ public sealed class Order
     public IReadOnlyCollection<OrderIncident> Incidents => _incidents.AsReadOnly();
     private readonly List<TransferReview> _transferReviews = [];
 
-    public void SubmitTransferEvidence(string evidenceReference, Guid? actorUserId = null)
+    public void SubmitTransferEvidence(string evidenceReference, Guid actorUserId, Guid commandId, string contentHash)
     {
         if (Status != OrderStatus.PendingPayment) throw new InvalidOperationException("Order is not awaiting payment evidence.");
         if (string.IsNullOrWhiteSpace(evidenceReference)) throw new ArgumentException("Evidence reference is required.", nameof(evidenceReference));
+        if (actorUserId == Guid.Empty) throw new ArgumentException("An actor is required.", nameof(actorUserId));
+        if (commandId == Guid.Empty) throw new ArgumentException("A command ID is required.", nameof(commandId));
+        if (string.IsNullOrWhiteSpace(contentHash)) throw new ArgumentException("A content hash is required.", nameof(contentHash));
         var now = DateTimeOffset.UtcNow;
-        _transferReviews.Add(TransferReview.Submitted(evidenceReference.Trim(), now));
-        ChangeStatus(OrderStatus.AwaitingPaymentReview, actorUserId ?? CustomerUserId, "Transfer evidence submitted", now);
+        _transferReviews.Add(TransferReview.Submitted(Id, evidenceReference.Trim(), actorUserId, commandId, contentHash, now));
+        ChangeStatus(OrderStatus.AwaitingPaymentReview, actorUserId, "Transfer evidence submitted", now);
     }
+
+    public void SubmitTransferEvidence(string evidenceReference, Guid? actorUserId = null) =>
+        SubmitTransferEvidence(evidenceReference, actorUserId ?? CustomerUserId, Guid.NewGuid(), new string('0', 64));
 
     public bool ReviewTransfer(Guid reviewerUserId, bool approved, string? note = null, DateTimeOffset? reviewedAtUtc = null)
     {
@@ -412,13 +418,19 @@ public sealed class TransferReview
 {
     private TransferReview() { }
 
-    internal static TransferReview Submitted(string evidenceReference, DateTimeOffset submittedAtUtc) => new()
+    internal static TransferReview Submitted(Guid orderId, string evidenceReference, Guid submittedByUserId, Guid commandId,
+        string contentHash, DateTimeOffset submittedAtUtc) => new()
     {
-        Id = Guid.NewGuid(), EvidenceReference = evidenceReference, SubmittedAtUtc = submittedAtUtc
+        Id = Guid.NewGuid(), OrderId = orderId, EvidenceReference = evidenceReference, SubmittedByUserId = submittedByUserId,
+        CommandId = commandId, ContentHash = contentHash, SubmittedAtUtc = submittedAtUtc
     };
 
     public Guid Id { get; private set; }
+    public Guid? OrderId { get; private set; }
     public string EvidenceReference { get; private set; } = string.Empty;
+    public Guid? SubmittedByUserId { get; private set; }
+    public Guid? CommandId { get; private set; }
+    public string? ContentHash { get; private set; }
     public DateTimeOffset SubmittedAtUtc { get; private set; }
     public Guid? ReviewerUserId { get; private set; }
     public TransferDecision? Decision { get; private set; }
