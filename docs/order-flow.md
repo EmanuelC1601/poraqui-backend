@@ -1,6 +1,6 @@
 # Recorrido reproducible de pedido
 
-Este recorrido documenta el flujo actualmente implementado. Requiere una BD de desarrollo aislada/aprobada, un `ConnectionStrings:DefaultConnection` privado, `Bootstrap:AdminKey` privado y almacenamiento privado persistente para comprobantes. No usar el password ni la cadena publicados en el chat.
+Este recorrido requiere `ConnectionStrings:DefaultConnection`, `Bootstrap:AdminKey` y `PrivateFiles:Root` privados. No uses valores de credenciales publicados en el chat.
 
 ## Ejecutar
 
@@ -11,14 +11,14 @@ dotnet user-secrets set "PrivateFiles:Root" "<ruta privada fuera del web root>" 
 dotnet run --project src/Poraqui.Api
 ```
 
-El `UserSecretsId` ya está configurado en el proyecto. Las migraciones revisables actuales son `InitialCommerceAndIdentity` y `BusinessTransferInstructionsSnapshot`. La API no migra al iniciar. Para SQL Server, tras configurar conexión y volver a comprobar que la BD conserva su esquema/datos esperados, revisar y aplicar explícitamente con `dotnet tool restore` y `dotnet tool run dotnet-ef database update --project src/Poraqui.Infrastructure --startup-project src/Poraqui.Api`. Hasta configurar la clave privada, no se puede verificar conexión EF ni aplicar migraciones. En Development se publica OpenAPI en `/openapi/v1.json`.
+El `UserSecretsId` ya está configurado. Las migraciones revisables son `InitialCommerceAndIdentity`, `BusinessTransferInstructionsSnapshot` y `ExternalCourierOffers`. La API no migra al iniciar. Antes de aplicar migraciones, configura la clave privada, revisa que el esquema y los datos actuales coincidan y usa `dotnet tool run dotnet-ef database update --project src/Poraqui.Infrastructure --startup-project src/Poraqui.Api`. La migración externa tiene script revisable en `docs/sql/20261017191548_ExternalCourierOffers.sql`. En Development se publica OpenAPI en `/openapi/v1.json`.
 
 ## Secuencia
 
-1. Crear primer administrador con `POST /api/auth/bootstrap-admin` usando `Bootstrap:AdminKey`; luego iniciar sesión en `POST /api/auth/login?useCookies=false` para obtener bearer token.
-2. Crear cuenta de negocio con `POST /api/auth/register`, iniciar sesión y registrar negocio con `POST /api/businesses`. El admin activa el negocio con `PUT /api/businesses/{id}/active`; el propietario configura instrucciones con `PUT /api/businesses/{id}/transfer-details`.
-3. El admin crea una zona con `POST /api/delivery-zones`. El negocio crea productos mediante `POST /api/businesses/{id}/products` y una tarifa con `POST /api/businesses/{id}/delivery-rates`.
-4. La cuenta cliente registra teléfono en `PUT /api/account/phone` y crea pedido con `POST /api/orders`:
+1. Crea el primer administrador con `POST /api/auth/bootstrap-admin` y luego inicia sesión en `POST /api/auth/login?useCookies=false`.
+2. Registra una cuenta de negocio, inicia sesión, crea negocio con `POST /api/businesses`, actívalo como admin con `PUT /api/businesses/{id}/active` y configura transferencia con `PUT /api/businesses/{id}/transfer-details`.
+3. El admin crea una zona con `POST /api/delivery-zones`. El negocio registra productos con `POST /api/businesses/{id}/products` y tarifa con `POST /api/businesses/{id}/delivery-rates`.
+4. Cliente registra teléfono con `PUT /api/account/phone` y crea pedido con `POST /api/orders`:
 
    ```json
    {
@@ -29,18 +29,19 @@ El `UserSecretsId` ya está configurado en el proyecto. Las migraciones revisabl
    }
    ```
 
-   El resultado contiene importes calculados por servidor, instrucciones snapshot de transferencia y un código de recepción para que el cliente lo conserve. No mandar un precio como fuente de cálculo. El pedido falla si faltan instrucciones de transferencia configuradas.
-5. El cliente sube su comprobante con `POST /api/orders/{orderId}/transfer-evidence` como `multipart/form-data` con campo `file`.
-6. El propietario revisa el pago en `POST /api/businesses/{businessId}/orders/{orderId}/payment-review`, acepta/rechaza en `.../decision`, y, si acepta, inicia `.../preparation` y luego marca `.../ready`.
-7. El admin asigna rol de repartidor propio con `PUT /api/admin/users/{courierId}/delivery-person`. El negocio registra la asignación con `POST /api/businesses/{businessId}/orders/{orderId}/assign-courier`, incluyendo `courierUserId` y `courierPaymentAmount`. El negocio recibe el código de recogida y se lo entrega al repartidor.
-8. El repartidor confirma recogida mediante `POST /api/orders/{orderId}/pickup` con el código. Esa acción registra por separado que recibió el pago del negocio.
-9. El repartidor llama `POST /api/orders/{orderId}/delivery/start` con `contactChannel` igual a `whatsapp` o `call`. El API autoriza el acceso y devuelve el teléfono del cliente para el contacto manual.
-10. Al recibir el pedido, el cliente comunica su código al repartidor, quien confirma con `POST /api/orders/{orderId}/delivery/confirm`. Cliente y negocio consultan el estado e historial con sus rutas GET autorizadas.
+   El servidor calcula importes. La respuesta contiene snapshot de transferencia y código de recepción para que el cliente lo conserve.
+5. Cliente sube comprobante privado en `POST /api/orders/{orderId}/transfer-evidence` con multipart `file`.
+6. Negocio revisa transferencia en `POST /api/businesses/{businessId}/orders/{orderId}/payment-review`, acepta/rechaza con `.../decision`, inicia preparación en `.../preparation` y marca listo en `.../ready`.
+7. Para reparto propio, admin asigna rol con `PUT /api/admin/users/{courierId}/delivery-person`; negocio asigna con `POST .../assign-courier`. Para reparto externo, admin usa `PUT /api/admin/users/{courierId}/external-courier`, courier marca disponibilidad y zona, y negocio publica ofertas con remuneración/condiciones en `POST .../external-offers`.
+8. Courier externo ve origen, destino, zona, condiciones y remuneración en `GET /api/courier/external/offers`; puede rechazar o aceptar. La aceptación asigna pedido y devuelve código de recogida al courier ganador. Si el negocio cancela ofertas abiertas se usa `POST .../external-offers/cancel`; si no hay candidatos la API devuelve `NoCouriersAvailable`.
+9. Courier confirma recogida con `POST /api/orders/{orderId}/pickup` y el código. Esto registra por separado el pago que recibió del negocio.
+10. Courier inicia recorrido con `POST /api/orders/{orderId}/delivery/start`, `contactChannel` `whatsapp` o `call`. El teléfono se devuelve solo al courier asignado para contacto manual.
+11. Cliente entrega su código de recepción al courier; este confirma con `POST /api/orders/{orderId}/delivery/confirm`. Cliente y negocio consultan estado e historial en sus rutas GET autorizadas.
 
-## Qué valida hoy
+## Verificaciones actuales
 
-`dotnet test Poraqui.sln` incluye un recorrido de API de pedido con comprobante privado, revisión manual, decisión del negocio, preparación, asignación de repartidor propio, códigos correctos/incorrectos, pago recibido por courier, contacto y estado/historial final. Verifica configuración de datos de transferencia y snapshot por pedido. La suite actual pasa 14/14 contra SQLite en memoria y directorio temporal de comprobantes. Esto no sustituye validaciones de migración, índices ni concurrencia en SQL Server.
+La suite de API usa SQLite en memoria y carpeta temporal para comprobantes. Cubre importes, permisos, comprobante, revisión manual, configuración y snapshot de transferencia, oferta/cancelación/ausencia de repartidores/rechazo/aceptación externa, códigos, pago al recoger y entrega. SQLite no sustituye la prueba de migraciones, índices y aceptación simultánea en SQL Server.
 
-## Límites actuales
+## Límites
 
-El negocio entrega manualmente el código de recogida al repartidor y cliente conserva el código de recepción desde la creación del pedido. El contacto WhatsApp/llamada lo realiza el repartidor fuera del API; el endpoint solo entrega datos autorizados y registra el canal seleccionado. Las tarifas siguen siendo zonas fijas; no hay GPS. Catálogo de opciones, estados/horarios comerciales, cancelaciones/reembolsos, notificaciones SignalR y reparto externo siguen pendientes.
+WhatsApp/llamada se hace fuera de la API; esta registra canal y entrega datos autorizados. Las tarifas se basan en zonas configuradas; no hay GPS ni distancias inventadas. Falta OTP, opciones/horarios de catálogo, cancelación del pedido e incidencias/reembolsos completos, SignalR y reconexión, idempotencia, sincronización offline validada, métricas, despliegue y validación SQL Server.

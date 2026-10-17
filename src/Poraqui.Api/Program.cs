@@ -26,6 +26,8 @@ if (!string.IsNullOrWhiteSpace(connectionString))
     builder.Services.AddScoped<CatalogOrderService>();
     builder.Services.AddScoped<IOrderWorkflowRepository, OrderWorkflowRepository>();
     builder.Services.AddScoped<OrderWorkflowService>();
+    builder.Services.AddScoped<IExternalCourierRepository, ExternalCourierRepository>();
+    builder.Services.AddScoped<ExternalCourierService>();
     builder.Services.AddSingleton<ITransferEvidenceStorage, FileTransferEvidenceStorage>();
 }
 builder.Services.AddPoraquiAuthorization();

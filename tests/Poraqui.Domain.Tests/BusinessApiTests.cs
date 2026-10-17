@@ -165,25 +165,104 @@ public sealed class BusinessApiTests
             $"api/businesses/{businessId}/orders/{orderId}/ready", merchantToken)).StatusCode);
 
         await RegisterAsync(client, "courier@example.test");
+        await RegisterAsync(client, "courier-two@example.test");
         Guid courierId;
+        Guid courierTwoId;
         using (var scope = factory.Services.CreateScope())
         {
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-            var courier = await userManager.FindByEmailAsync("courier@example.test");
-            courierId = courier!.Id;
+            courierId = (await userManager.FindByEmailAsync("courier@example.test"))!.Id;
+            courierTwoId = (await userManager.FindByEmailAsync("courier-two@example.test"))!.Id;
         }
         Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put,
-            $"api/admin/users/{courierId}/delivery-person", adminToken,
-            JsonContent.Create(new { isDeliveryPerson = true }))).StatusCode);
+            $"api/admin/users/{courierId}/external-courier", adminToken,
+            JsonContent.Create(new { isExternalCourier = true }))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put,
+            $"api/admin/users/{courierTwoId}/external-courier", adminToken,
+            JsonContent.Create(new { isExternalCourier = true }))).StatusCode);
         var courierToken = await LoginAsync(client, "courier@example.test");
-
-        using var assignmentResponse = await SendAsync(client, HttpMethod.Post,
-            $"api/businesses/{businessId}/orders/{orderId}/assign-courier", merchantToken,
-            JsonContent.Create(new { courierUserId = courierId, courierPaymentAmount = 37.50m }));
-        Assert.Equal(HttpStatusCode.OK, assignmentResponse.StatusCode);
-        using var assignment = JsonDocument.Parse(await assignmentResponse.Content.ReadAsStringAsync());
+        var courierTwoToken = await LoginAsync(client, "courier-two@example.test");
+        Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put, "api/courier/external/availability", courierToken,
+            JsonContent.Create(new { isAvailable = true, zoneId }))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put, "api/courier/external/availability", courierTwoToken,
+            JsonContent.Create(new { isAvailable = true, zoneId }))).StatusCode);
+        using (var dispatch = await SendAsync(client, HttpMethod.Post,
+                   $"api/businesses/{businessId}/orders/{orderId}/external-offers", merchantToken,
+                   JsonContent.Create(new { remuneration = 37.50m, conditions = "Pago en efectivo al recoger", expiresInMinutes = 15 })))
+        {
+            Assert.True(dispatch.StatusCode == HttpStatusCode.Accepted,
+                $"External offer dispatch returned {(int)dispatch.StatusCode}: {await dispatch.Content.ReadAsStringAsync()}");
+            using var dispatchJson = JsonDocument.Parse(await dispatch.Content.ReadAsStringAsync());
+            Assert.Equal(2, dispatchJson.RootElement.GetProperty("offerCount").GetInt32());
+        }
+        using (var dispatchRetry = await SendAsync(client, HttpMethod.Post,
+                   $"api/businesses/{businessId}/orders/{orderId}/external-offers", merchantToken,
+                   JsonContent.Create(new { remuneration = 37.50m, conditions = "Pago en efectivo al recoger", expiresInMinutes = 15 })))
+        {
+            Assert.Equal(HttpStatusCode.Accepted, dispatchRetry.StatusCode);
+            using var retryJson = JsonDocument.Parse(await dispatchRetry.Content.ReadAsStringAsync());
+            Assert.Equal("OffersAlreadyActive", retryJson.RootElement.GetProperty("outcome").GetString());
+            Assert.Equal(0, retryJson.RootElement.GetProperty("offerCount").GetInt32());
+        }
+        using var offersOneResponse = await SendAsync(client, HttpMethod.Get, "api/courier/external/offers", courierToken);
+        using var offersTwoResponse = await SendAsync(client, HttpMethod.Get, "api/courier/external/offers", courierTwoToken);
+        using var offersOne = JsonDocument.Parse(await offersOneResponse.Content.ReadAsStringAsync());
+        using var offersTwo = JsonDocument.Parse(await offersTwoResponse.Content.ReadAsStringAsync());
+        var offerOne = offersOne.RootElement[0];
+        var offerTwo = offersTwo.RootElement[0];
+        Assert.Equal("Domicilio prueba", offerOne.GetProperty("pickupAddress").GetString());
+        Assert.Equal("Calle de prueba", offerOne.GetProperty("destinationAddress").GetString());
+        Assert.Equal(37.50m, offerOne.GetProperty("remuneration").GetDecimal());
+        Assert.Equal("Pago en efectivo al recoger", offerOne.GetProperty("conditions").GetString());
+        using (var cancelled = await SendAsync(client, HttpMethod.Post,
+                   $"api/businesses/{businessId}/orders/{orderId}/external-offers/cancel", merchantToken))
+        {
+            Assert.Equal(HttpStatusCode.OK, cancelled.StatusCode);
+            using var cancelledJson = JsonDocument.Parse(await cancelled.Content.ReadAsStringAsync());
+            Assert.Equal(2, cancelledJson.RootElement.GetProperty("cancelledOffers").GetInt32());
+        }
+        Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put, "api/courier/external/availability", courierToken,
+            JsonContent.Create(new { isAvailable = false, zoneId = (Guid?)null }))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put, "api/courier/external/availability", courierTwoToken,
+            JsonContent.Create(new { isAvailable = false, zoneId = (Guid?)null }))).StatusCode);
+        using (var noCouriers = await SendAsync(client, HttpMethod.Post,
+                   $"api/businesses/{businessId}/orders/{orderId}/external-offers", merchantToken,
+                   JsonContent.Create(new { remuneration = 37.50m, conditions = "Pago en efectivo al recoger", expiresInMinutes = 15 })))
+        {
+            Assert.Equal(HttpStatusCode.Accepted, noCouriers.StatusCode);
+            using var noCourierJson = JsonDocument.Parse(await noCouriers.Content.ReadAsStringAsync());
+            Assert.Equal("NoCouriersAvailable", noCourierJson.RootElement.GetProperty("outcome").GetString());
+            Assert.Equal(0, noCourierJson.RootElement.GetProperty("offerCount").GetInt32());
+        }
+        Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put, "api/courier/external/availability", courierToken,
+            JsonContent.Create(new { isAvailable = true, zoneId }))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put, "api/courier/external/availability", courierTwoToken,
+            JsonContent.Create(new { isAvailable = true, zoneId }))).StatusCode);
+        using (var redispatch = await SendAsync(client, HttpMethod.Post,
+                   $"api/businesses/{businessId}/orders/{orderId}/external-offers", merchantToken,
+                   JsonContent.Create(new { remuneration = 37.50m, conditions = "Pago en efectivo al recoger", expiresInMinutes = 15 })))
+        {
+            Assert.Equal(HttpStatusCode.Accepted, redispatch.StatusCode);
+            using var redispatchJson = JsonDocument.Parse(await redispatch.Content.ReadAsStringAsync());
+            Assert.Equal(2, redispatchJson.RootElement.GetProperty("offerCount").GetInt32());
+        }
+        using var refreshedOffersOneResponse = await SendAsync(client, HttpMethod.Get, "api/courier/external/offers", courierToken);
+        using var refreshedOffersTwoResponse = await SendAsync(client, HttpMethod.Get, "api/courier/external/offers", courierTwoToken);
+        using var refreshedOffersOne = JsonDocument.Parse(await refreshedOffersOneResponse.Content.ReadAsStringAsync());
+        using var refreshedOffersTwo = JsonDocument.Parse(await refreshedOffersTwoResponse.Content.ReadAsStringAsync());
+        var offerOneId = refreshedOffersOne.RootElement[0].GetProperty("id").GetGuid();
+        var offerTwoId = refreshedOffersTwo.RootElement[0].GetProperty("id").GetGuid();
+        Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Post,
+            $"api/courier/external/offers/{offerTwoId}/reject", courierTwoToken)).StatusCode);
+        using var acceptResponse = await SendAsync(client, HttpMethod.Post,
+            $"api/courier/external/offers/{offerOneId}/accept", courierToken);
+        Assert.True(acceptResponse.StatusCode == HttpStatusCode.OK,
+            $"Offer acceptance returned {(int)acceptResponse.StatusCode}: {await acceptResponse.Content.ReadAsStringAsync()}");
+        using var assignment = JsonDocument.Parse(await acceptResponse.Content.ReadAsStringAsync());
         var pickupCode = assignment.RootElement.GetProperty("pickupCode").GetString()!;
         Assert.Equal(6, pickupCode.Length);
+        Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(client, HttpMethod.Post,
+            $"api/courier/external/offers/{offerTwoId}/accept", courierTwoToken)).StatusCode);
 
         using (var courierOrder = await SendAsync(client, HttpMethod.Get, $"api/courier/orders/{orderId}", courierToken))
         {

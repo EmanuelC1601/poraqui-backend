@@ -1,48 +1,44 @@
 # Estado verificable del proyecto
 
-Actualizado: 2026-10-17. `main` contiene PR #1 a #4 y apunta a `e9c4435`. Rama de trabajo: `feature/business-payment-details`. Esta página diferencia código existente, pruebas ejecutadas y trabajo pendiente.
+Actualizado: 2026-10-17. `main` es la base de integración y contiene PR #1–#5 hasta `d677167`. El incremento de ofertas externas está en `feature/external-courier-offers`, basado en ese commit. Este registro separa implementación, verificación, pendientes y bloqueos.
 
-## Implementado y verificado
+## Implementado
 
-- Arquitectura .NET 9 compilable con proyectos Domain, Application, Infrastructure y Api; EF Core SQL Server e Identity con GUID.
-- Modelos y mapeos iniciales EF para negocio, producto, zona, tarifa, pedido, líneas y revisión de transferencia.
-- Identity API para registro/login cuando existe configuración privada de conexión; roles iniciales y policies.
-- Primer administrador instalable con `Bootstrap:AdminKey` privado y transacción.
-- Alta y configuración de negocio, listado público activo y activación administrativa.
-- Autorización por rol y recurso para leer/configurar negocio; prueba integrada cubre denegación entre propietarios.
-- PR #2: `dotnet build Poraqui.sln` (0 advertencias/errores), `dotnet test Poraqui.sln` (10/10 SQLite en memoria; API Identity/negocio y dominio/persistencia).
-- En `feature/catalog-pricing` local: rutas CRUD básico de productos, zonas, tarifas; creación de pedido autenticado con totales calculados por productos y tarifa persistidos. Suite actual: build 0 warnings/errors y `dotnet test Poraqui.sln` 11/11 con SQLite aislado, incluyendo permiso entre propietarios, importes autoritativos y recorrido de pedido. Todavía no hay commit/PR para este incremento.
-- PR #4 integrado: evidencia PDF/JPEG/PNG privada, revisión manual, aceptación/rechazo del negocio, inicio/fin de preparación, courier interno, códigos hash, confirmación separada del pago al courier al recoger, contacto autorizado y entrega. Incluye historial y token optimista de concurrencia.
-- Repartidor propio consulta solo asignaciones propias con origen, destino y remuneración. Teléfono de cliente puede actualizarse por cuenta y solo lo recibe el courier asignado al iniciar recorrido.
-- La prueba API integral recorre creación a entrega en SQLite aislado/directorio temporal; una prueba con dos contextos comprueba conflicto ante decisión concurrente.
-- Migración inicial revisable `InitialCommerceAndIdentity`, snapshot EF y script SQL Server idempotente creados. `dotnet ef migrations has-pending-model-changes` confirma que snapshot coincide. La operación `Up` solo crea tablas/índices.
-- `feature/business-payment-details` local: propietario/admin configura datos de transferencia. Pedido guarda snapshot que solo ve su cliente; el API impide crear el pedido antes de la configuración. Prueba cubre cambio posterior sin alterar pedido previo. Suite actual pasa 14/14 con SQLite y build 0 warnings/errors; aún sin commit/PR.
-- Migración `BusinessTransferInstructionsSnapshot` añade columnas nullable a Businesses y Orders; no aplica cambios destructivos en `Up`. Generada localmente, sin aplicar.
-- API no migra automáticamente al iniciar. La migración inicial está generada pero no aplicada.
+- Solución .NET 9 compilable con Domain, Application, Infrastructure y Api; EF Core SQL Server e Identity con GUID.
+- Identity API, roles y policies; alta de negocio y autorización por propietario/recurso.
+- Catálogo básico, zonas, tarifas y pedido con precios y tarifa calculados por el servidor.
+- Configuración privada de transferencia del negocio y snapshot por pedido; creación de pedido requiere los datos configurados.
+- Comprobante privado, revisión manual, decisión del negocio, preparación explícita, asignación de repartidor propio, códigos de recogida/recepción, pago al courier registrado aparte, contacto autorizado y consulta de estados/historial.
+- Reparto externo en esta rama: alta de rol/perfil por admin, disponibilidad por zona, publicación a repartidores disponibles, oferta con origen/destino/condiciones/remuneración, rechazo, cancelación, expiración al consultar o aceptar, respuesta `NoCouriersAvailable` y aceptación con asignación atómica respaldada por `Order.Version`, token de versión de oferta e índice único filtrado por pedido aceptado.
+- La migración `ExternalCourierOffers` crea tablas e índices nuevos; el script SQL revisable está en `docs/sql/20261017191548_ExternalCourierOffers.sql`. `Up` no modifica ni elimina tablas existentes. No se ha aplicado.
+- No hay migración automática al iniciar la API.
+
+## Verificaciones
+
+- `dotnet build Poraqui.sln`: debe pasar sin advertencias ni errores antes de integrar este incremento.
+- `dotnet test Poraqui.sln`: 14 pruebas con SQLite en memoria y almacenamiento temporal aislado; incluye recorrido desde pago manual hasta entrega por oferta externa, rechazo, cancelación, sin repartidores disponibles y una aceptación posterior.
+- `dotnet ef migrations has-pending-model-changes`: modelo alineado con la migración generada.
+- SQL Server: todavía no verificado desde EF; SQLite no demuestra compatibilidad de índices/restricciones ni concurrencia de aceptación simultánea en SQL Server.
 
 ## Pendiente
 
-- Aplicar migración revisada y verificar restricciones/concurrencia en SQL Server desde la aplicación.
-- Opciones de producto; disponibilidad tiene CRUD básico, falta validación por horario.
-- Consulta y actualización del pedido; aceptación/rechazo del negocio, pagos manuales, evidencia privada y confirmación de revisión.
-- Reparto externo: disponibilidad, ofertas, aceptación/rechazo concurrentes, cancelación, vencimiento y ausencia de repartidores.
-- Opciones de productos y disponibilidad por horario; flujo de cancelaciones/reembolsos.
-- Verificación de teléfono del cliente antes del contacto.
-- SignalR autorizado, estado tras reconexión, idempotencia, sincronización offline validada, incidencias/reembolsos, métricas y despliegue MonsterASP.NET.
-- Verificar esquema y concurrencia en SQL Server; OpenAPI y recorrido escritos, aún requieren validación de servicio y despliegue.
+- Ejecutar y revisar el caso de aceptación simultánea en SQL Server configurado; el test existente cubre una única aceptación y el modelo usa token optimista e índice único como protección concurrente.
+- Opciones de producto; horarios y disponibilidad de negocio; verificación de teléfono.
+- Cancelación de pedidos e incidencias con seguimiento de reembolso manual completo.
+- SignalR con destinatarios autorizados y persistencia previa a notificación; lectura del estado actual al reconectar.
+- Idempotencia con clave de operación y sincronización offline con validación de entrega al recibir acciones.
+- Métricas del piloto y validación de despliegue en MonsterASP.NET.
+- OpenAPI se sirve en Development; falta una sesión SQL configurada y un recorrido contra SQL Server.
 
 ## Bloqueado
 
-- Configuración privada `ConnectionStrings:DefaultConnection` ausente en la copia local. La variable equivalente es `ConnectionStrings__DefaultConnection`. El portal MonsterASP respondió a una consulta de solo lectura y reportó cero tablas de usuario, pero eso no verifica conexión EF. Sin secreto local no se ejecutan pruebas SQL Server ni se aplica la migración ya generada.
-- No se usan credenciales copiadas del chat y no se realizaron cambios de esquema ni de datos compartidos.
+- Falta `ConnectionStrings:DefaultConnection` privada en User Secrets/variables de entorno. Configúrala con `dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<cadena privada>" --project src/Poraqui.Api`; no imprimas ni subas el valor.
+- Sin esa clave no se verifica conexión EF, no se revisa esquema vivo y no se aplica ninguna migración. No se cambió el esquema ni se limpiaron datos compartidos.
 
 ## Fuera de alcance
 
-GPS/distancias automáticas, transferencias bancarias automáticas y frontend.
+GPS y distancias calculadas, transferencias bancarias automáticas y frontend.
 
-## Integración vigente
+## Flujo Git
 
-- `main`: base de integración, contiene merge de PR #1 (`e346995`).
-- `main`: PR #2 `a38ed4e`, PR #3 `962e74a`.
-- `feature/order-lifecycle`: flujo de pedido de extremo a extremo todavía local; sin commit ni PR.
-- Ver el handoff en `docs/handoff-codex.md` y contratos vigentes/provisionales en `docs/api-contracts.md`.
+Un solo responsable desarrolla ramas `feature/*`, compila, prueba y revisa migraciones antes de abrir PR. La integración se hace a `main` cuando las verificaciones pasan. Los merges confirmados son PR #1 `e346995`, PR #2 `a38ed4e`, PR #3 `962e74a`, PR #4 `e9c4435` y PR #5 `d677167`.
