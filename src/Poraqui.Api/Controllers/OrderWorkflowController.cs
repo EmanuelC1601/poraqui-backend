@@ -56,9 +56,10 @@ public sealed class OrderWorkflowController(OrderWorkflowService workflow, UserM
     public async Task<IActionResult> ReportIncident(Guid orderId, ReportIncidentRequest request, CancellationToken cancellationToken)
     {
         if (!TryGetActor(out var actorId, out var isAdmin)) return Unauthorized();
-        try { return Ok(await workflow.ReportIncidentAsync(orderId, actorId, isAdmin, request.Category, request.Description, cancellationToken)); }
+        try { return Ok(await workflow.ReportIncidentAsync(orderId, actorId, isAdmin, request.CommandId, request.Category, request.Description, cancellationToken)); }
         catch (OrderResourceForbiddenException) { return Forbid(); }
         catch (KeyNotFoundException) { return NotFound(); }
+        catch (IncidentCommandConflictException) { return Conflict(new { error = "Command ID was already used for a different order or incident payload." }); }
         catch (ArgumentException exception) { return BadRequest(new { error = exception.Message }); }
         catch (DbUpdateConcurrencyException) { return Conflict(new { error = "Order changed; reload its current state." }); }
     }
@@ -372,7 +373,7 @@ public sealed class OrderWorkflowController(OrderWorkflowService workflow, UserM
 
 public sealed record ReviewPaymentRequest(bool Approved, string? Note);
 public sealed record CancelOrderRequest(string Reason);
-public sealed record ReportIncidentRequest(string Category, string Description);
+public sealed record ReportIncidentRequest(Guid CommandId, string Category, string Description);
 public sealed record ResolveIncidentRequest(string Resolution);
 public sealed record ReviewRefundRequest(bool Refunded, decimal? Amount, string? Reference, string? Note);
 public sealed record BusinessDecisionRequest(bool Accept, string? Reason);
