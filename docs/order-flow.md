@@ -11,7 +11,7 @@ dotnet user-secrets set "PrivateFiles:Root" "<ruta privada fuera del web root>" 
 dotnet run --project src/Poraqui.Api
 ```
 
-El `UserSecretsId` ya está configurado. Las migraciones revisables son `InitialCommerceAndIdentity`, `BusinessTransferInstructionsSnapshot` y `ExternalCourierOffers`. La API no migra al iniciar. Antes de aplicar migraciones, configura la clave privada, revisa que el esquema y los datos actuales coincidan y usa `dotnet tool run dotnet-ef database update --project src/Poraqui.Infrastructure --startup-project src/Poraqui.Api`. La migración externa tiene script revisable en `docs/sql/20261017191548_ExternalCourierOffers.sql`. En Development se publica OpenAPI en `/openapi/v1.json`.
+El `UserSecretsId` ya está configurado. Las migraciones revisables son `InitialCommerceAndIdentity`, `BusinessTransferInstructionsSnapshot`, `ExternalCourierOffers` y `OfflineDeliveryCommandSync`. La API no migra al iniciar. Antes de aplicar migraciones, configura la clave privada, revisa que el esquema y los datos actuales coincidan y usa `dotnet tool run dotnet-ef database update --project src/Poraqui.Infrastructure --startup-project src/Poraqui.Api`. Las migraciones externas tienen scripts revisables en `docs/sql/`. En Development se publica OpenAPI en `/openapi/v1.json`.
 
 ## Secuencia
 
@@ -37,11 +37,12 @@ El `UserSecretsId` ya está configurado. Las migraciones revisables son `Initial
 9. Courier confirma recogida con `POST /api/orders/{orderId}/pickup` y el código. Esto registra por separado el pago que recibió del negocio.
 10. Courier inicia recorrido con `POST /api/orders/{orderId}/delivery/start`, `contactChannel` `whatsapp` o `call`. El teléfono se devuelve solo al courier asignado para contacto manual.
 11. Cliente entrega su código de recepción al courier; este confirma con `POST /api/orders/{orderId}/delivery/confirm`. Cliente y negocio consultan estado e historial en sus rutas GET autorizadas.
+12. Si la confirmación se capturó sin internet, el courier sincroniza con `POST /api/orders/{orderId}/sync/delivery-confirmation` usando `commandId`, código y `clientCapturedAtUtc`. El backend valida el estado/código actuales antes de aceptar. Repetir exactamente el mismo comando devuelve la respuesta persistida y no duplica historial; reutilizar el ID con otro payload da 409.
 
 ## Verificaciones actuales
 
-La suite de API usa SQLite en memoria y carpeta temporal para comprobantes. Cubre importes, permisos, comprobante, revisión manual, configuración y snapshot de transferencia, oferta/cancelación/ausencia de repartidores/rechazo/aceptación externa, códigos, pago al recoger y entrega. SQLite no sustituye la prueba de migraciones, índices y aceptación simultánea en SQL Server.
+La suite de API usa SQLite en memoria y carpeta temporal para comprobantes. Cubre importes, permisos, comprobante, revisión manual, configuración y snapshot de transferencia, oferta/cancelación/ausencia de repartidores/rechazo/aceptación externa, códigos, pago al recoger, sincronización idempotente y entrega. SQLite no sustituye la prueba de migraciones, índices y aceptación simultánea en SQL Server.
 
 ## Límites
 
-WhatsApp/llamada se hace fuera de la API; esta registra canal y entrega datos autorizados. Las tarifas se basan en zonas configuradas; no hay GPS ni distancias inventadas. Falta OTP, opciones/horarios de catálogo, cancelación del pedido e incidencias/reembolsos completos, SignalR y reconexión, idempotencia, sincronización offline validada, métricas, despliegue y validación SQL Server.
+WhatsApp/llamada se hace fuera de la API; esta registra canal y entrega datos autorizados. Las tarifas se basan en zonas configuradas; no hay GPS ni distancias inventadas. Falta OTP, opciones/horarios de catálogo, cancelación del pedido e incidencias/reembolsos completos, SignalR y reconexión, idempotencia en otros comandos, métricas, despliegue y validación SQL Server.
