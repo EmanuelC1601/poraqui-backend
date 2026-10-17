@@ -24,13 +24,15 @@ Actualizado: 2026-10-17. `main` es la base de integración y tiene un único res
 
 ## Verificaciones de la rama activa
 
-Última verificación (rama `feature/external-offer-expiration-worker`): `dotnet test Poraqui.sln` aprobó 30 pruebas y omitió 2 carreras SQL porque falta `ConnectionStrings__SqlServerTest`; `dotnet build Poraqui.sln --no-restore` terminó con cero advertencias y errores; `git diff --check` pasó. Las carreras todavía no se han ejecutado contra SQL Server.
+Última verificación (rama `feature/external-offer-change-events`): `dotnet test Poraqui.sln` aprobó 31 pruebas y omitió 2 carreras SQL porque falta `ConnectionStrings__SqlServerTest`; `dotnet build Poraqui.sln --no-restore` terminó con cero advertencias y errores; `git diff --check` pasó. Las carreras todavía no se han ejecutado contra SQL Server.
 
 PR #43 (`6063058`) valida que courier externo active disponibilidad solo en zona existente y activa; prueba API SQLite cubre zona inexistente.
 
 PR #44 (`099c3ad`) añade un proceso hospedado que barre ofertas vencidas cada minuto y persiste el estado `Expired`; prueba SQLite confirma que solo se actualizan las ofertas debidas.
 
-En curso en `feature/external-offer-signalr`: suscripción SignalR privada por usuario para ofertas externas; nuevos avisos se publican después de persistir y la suscripción devuelve snapshot actual. Prueba API con cliente SignalR y rechazo para usuario sin rol; rama aún no integrada.
+PR #45 (`2988a00`) añade grupo SignalR privado por courier para ofertas externas; el cliente suscrito recibe la oferta después de persistir y obtiene snapshot actual al suscribirse.
+
+En curso en `feature/external-offer-change-events`: aceptación, rechazo, cancelación y vencimiento notifican el nuevo estado al courier tras persistir; aceptar una oferta cancela las restantes del pedido. Prueba SignalR cubre cancelación sincronizada para dos couriers; rama aún no integrada.
 
 ## SQL Server privado
 

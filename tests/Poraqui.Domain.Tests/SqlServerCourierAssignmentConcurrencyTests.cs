@@ -53,7 +53,7 @@ public sealed class SqlServerCourierAssignmentConcurrencyTests
                     .Options;
                 await using var db = new AppDbContext(options);
                 var service = new OrderWorkflowService(new OrderWorkflowRepository(db), new NullOrderChangePublisher(),
-                    new TestCommandSecretProtector());
+                    new TestCommandSecretProtector(), new NullExternalOfferPublisher());
                 try
                 {
                     var assignment = await service.AssignCourierAsync(order.Id, owner.Id, courierId, 35m,

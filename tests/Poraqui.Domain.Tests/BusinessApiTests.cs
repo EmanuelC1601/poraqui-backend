@@ -531,12 +531,22 @@ public sealed class BusinessApiTests
         var courierTwoToken = await LoginAsync(client, "courier-two@example.test");
         await using var courierOfferHub = CreateSignalRClient(factory, client, courierToken);
         var offerNotice = new TaskCompletionSource<ExternalOfferNotice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cancelledNoticeOne = new TaskCompletionSource<ExternalOfferChangedNotice>(TaskCreationOptions.RunContinuationsAsynchronously);
         courierOfferHub.On<ExternalOfferNotice>("ExternalOfferAvailable", notice => offerNotice.TrySetResult(notice));
+        courierOfferHub.On<ExternalOfferChangedNotice>("ExternalOfferChanged", notice =>
+        {
+            if (notice.Status == "Cancelled") cancelledNoticeOne.TrySetResult(notice);
+        });
         await courierOfferHub.StartAsync();
         Assert.Empty(await courierOfferHub.InvokeAsync<IReadOnlyList<ExternalOfferView>>("SubscribeCourierOffers"));
         await using var courierTwoOfferHub = CreateSignalRClient(factory, client, courierTwoToken);
         var offerNoticeTwo = new TaskCompletionSource<ExternalOfferNotice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cancelledNoticeTwo = new TaskCompletionSource<ExternalOfferChangedNotice>(TaskCreationOptions.RunContinuationsAsynchronously);
         courierTwoOfferHub.On<ExternalOfferNotice>("ExternalOfferAvailable", notice => offerNoticeTwo.TrySetResult(notice));
+        courierTwoOfferHub.On<ExternalOfferChangedNotice>("ExternalOfferChanged", notice =>
+        {
+            if (notice.Status == "Cancelled") cancelledNoticeTwo.TrySetResult(notice);
+        });
         await courierTwoOfferHub.StartAsync();
         Assert.Empty(await courierTwoOfferHub.InvokeAsync<IReadOnlyList<ExternalOfferView>>("SubscribeCourierOffers"));
         Assert.Equal(HttpStatusCode.BadRequest, (await SendAsync(client, HttpMethod.Put, "api/courier/external/availability", courierToken,
@@ -565,8 +575,6 @@ public sealed class BusinessApiTests
         using (var persistedOffer = await SendAsync(client, HttpMethod.Get, "api/courier/external/offers", courierTwoToken))
         using (var persistedOffers = JsonDocument.Parse(await persistedOffer.Content.ReadAsStringAsync()))
             Assert.Contains(persistedOffers.RootElement.EnumerateArray(), offer => offer.GetProperty("id").GetGuid() == receivedOfferNoticeTwo.OfferId);
-        await courierOfferHub.StopAsync();
-        await courierTwoOfferHub.StopAsync();
         using (var dispatchRetry = await SendAsync(client, HttpMethod.Post,
                    $"api/businesses/{businessId}/orders/{orderId}/external-offers", merchantToken,
                    JsonContent.Create(new { remuneration = 37.50m, conditions = "Pago en efectivo al recoger", expiresInMinutes = 15 })))
@@ -593,6 +601,18 @@ public sealed class BusinessApiTests
             using var cancelledJson = JsonDocument.Parse(await cancelled.Content.ReadAsStringAsync());
             Assert.Equal(2, cancelledJson.RootElement.GetProperty("cancelledOffers").GetInt32());
         }
+        var cancelledOne = await cancelledNoticeOne.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var cancelledTwo = await cancelledNoticeTwo.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(receivedOfferNotice.OfferId, cancelledOne.OfferId);
+        Assert.Equal(receivedOfferNoticeTwo.OfferId, cancelledTwo.OfferId);
+        Assert.Equal("Cancelled", cancelledOne.Status);
+        Assert.Equal("Cancelled", cancelledTwo.Status);
+        using (var noOffersOne = await SendAsync(client, HttpMethod.Get, "api/courier/external/offers", courierToken))
+        using (var offers = JsonDocument.Parse(await noOffersOne.Content.ReadAsStringAsync())) Assert.Empty(offers.RootElement.EnumerateArray());
+        using (var noOffersTwo = await SendAsync(client, HttpMethod.Get, "api/courier/external/offers", courierTwoToken))
+        using (var offers = JsonDocument.Parse(await noOffersTwo.Content.ReadAsStringAsync())) Assert.Empty(offers.RootElement.EnumerateArray());
+        await courierOfferHub.StopAsync();
+        await courierTwoOfferHub.StopAsync();
         Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put, "api/courier/external/availability", courierToken,
             JsonContent.Create(new { isAvailable = false, zoneId = (Guid?)null }))).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put, "api/courier/external/availability", courierTwoToken,

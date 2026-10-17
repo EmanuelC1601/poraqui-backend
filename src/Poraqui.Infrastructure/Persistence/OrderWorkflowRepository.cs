@@ -49,11 +49,17 @@ public sealed class OrderWorkflowRepository(AppDbContext db) : IOrderWorkflowRep
         db.Set<CourierAssignmentCommand>().SingleOrDefaultAsync(command => command.BusinessUserId == actorUserId &&
             command.CommandId == commandId, cancellationToken);
 
-    public async Task CancelOpenExternalOffersForOrderAsync(Guid orderId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<ExternalDeliveryOffer>> CancelOpenExternalOffersForOrderAsync(Guid orderId, CancellationToken cancellationToken)
     {
         var offers = await db.ExternalDeliveryOffers.Where(offer => offer.OrderId == orderId &&
             offer.Status == ExternalDeliveryOfferStatus.Offered).ToListAsync(cancellationToken);
-        foreach (var offer in offers) offer.Cancel(DateTimeOffset.UtcNow);
+        var now = DateTimeOffset.UtcNow;
+        foreach (var offer in offers)
+        {
+            offer.Expire(now);
+            if (offer.Status == ExternalDeliveryOfferStatus.Offered) offer.Cancel(now);
+        }
+        return offers;
     }
 
     public void AddOfflineDeliveryCommand(OfflineDeliverySyncRecord command) => db.OfflineDeliverySyncRecords.Add(command);

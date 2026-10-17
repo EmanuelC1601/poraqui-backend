@@ -37,8 +37,8 @@ PR #33 integra `GET /api/admin/metrics/pilot`, restringido a PlatformAdmin, con 
 
 ## Incrementos recientes
 
-PR #43 se integró en `main` como `6063058`: la disponibilidad de courier externo valida zona existente y activa; una prueba API con SQLite confirma `400` para una zona inexistente. PR #44 se integró como `099c3ad`: worker hospedado y barrido de expiración cada minuto, validado con SQLite.
+PR #43 se integró en `main` como `6063058`: la disponibilidad de courier externo valida zona existente y activa; una prueba API con SQLite confirma `400` para una zona inexistente. PR #44 se integró como `099c3ad`: worker hospedado y barrido de expiración cada minuto, validado con SQLite. PR #45 se integró como `2988a00`: SignalR privado por courier para nuevas ofertas, con snapshot actual.
 
-En `feature/external-offer-signalr` se añade suscripción autenticada a ofertas por courier y evento publicado después de persistir. Se valida con cliente SignalR en prueba API; pendiente verificaciones y PR. Sin cambios de esquema.
+En `feature/external-offer-change-events` aceptación, rechazo, cancelación y vencimiento publican el estado actualizado después de persistir; aceptar cancela las otras ofertas abiertas. La prueba API verifica con dos clientes que la cancelación notifica cada oferta propia y deja ambos snapshots vacíos; otra prueba SQLite confirma que aceptar una cancela la restante. `dotnet test Poraqui.sln`: 31 aprobadas, 2 carreras SQL Server omitidas; `dotnet build Poraqui.sln --no-restore`: 0 advertencias/errores; `git diff --check`: pasó. Pendiente commit y PR; sin cambios de esquema.
 
 El ledger vigente de implementado, pendiente y bloqueado está en `docs/project-status.md`; ejecución reproducible del recorrido está en `docs/order-flow.md`.

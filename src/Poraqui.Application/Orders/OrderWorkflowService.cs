@@ -17,7 +17,7 @@ public interface IOrderWorkflowRepository
     Task<OrderIncident?> GetIncidentCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken);
     Task<TransferReview?> GetTransferEvidenceCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken);
     Task<CourierAssignmentCommand?> GetCourierAssignmentCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken);
-    Task CancelOpenExternalOffersForOrderAsync(Guid orderId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ExternalDeliveryOffer>> CancelOpenExternalOffersForOrderAsync(Guid orderId, CancellationToken cancellationToken);
     void AddOfflineDeliveryCommand(OfflineDeliverySyncRecord command);
     Task<bool> SaveTransferEvidenceCommandAsync(Order order, CancellationToken cancellationToken);
     Task<bool> SaveCourierAssignmentCommandAsync(Order order, CourierAssignmentCommand command, CancellationToken cancellationToken);
@@ -51,7 +51,7 @@ public sealed record OrderRealtimeSnapshot(Guid OrderId, string Status, long Ver
 public sealed record OrderRealtimeSubscription(OrderRealtimeSnapshot Snapshot, string Audience);
 
 public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IOrderChangePublisher publisher,
-    IOrderCommandSecretProtector secretProtector)
+    IOrderCommandSecretProtector secretProtector, IExternalOfferPublisher offerPublisher)
 {
     public async Task<bool> HasTransferEvidenceReplayAsync(Guid orderId, Guid customerId, Guid commandId,
         string contentHash, CancellationToken cancellationToken)
@@ -162,8 +162,11 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IO
         await EnsureBusinessAccess(businessId, actorId, isAdmin, cancellationToken);
         if (order.CancelByBusiness(actorId, reason))
         {
-            await repository.CancelOpenExternalOffersForOrderAsync(orderId, cancellationToken);
+            var cancelledOffers = await repository.CancelOpenExternalOffersForOrderAsync(orderId, cancellationToken);
             await repository.SaveChangesAsync(cancellationToken);
+            foreach (var offer in cancelledOffers)
+                await offerPublisher.PublishChangedAsync(offer.CourierUserId,
+                    new ExternalOfferChangedNotice(offer.Id, offer.OrderId, offer.Status.ToString()), cancellationToken);
             await PublishChange(order, cancellationToken);
         }
         return ToView(order, await repository.GetBusinessAddressAsync(order.BusinessId, cancellationToken) ?? string.Empty);
