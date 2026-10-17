@@ -2,6 +2,7 @@ namespace Poraqui.Domain.Commerce;
 
 public sealed class CatalogProduct
 {
+    private readonly List<ProductOptionGroup> _optionGroups = [];
     private CatalogProduct() { }
 
     public CatalogProduct(Guid businessId, string name, decimal price)
@@ -18,6 +19,17 @@ public sealed class CatalogProduct
     public string Name { get; private set; } = string.Empty;
     public decimal Price { get; private set; }
     public bool IsAvailable { get; private set; } = true;
+    public IReadOnlyCollection<ProductOptionGroup> OptionGroups => _optionGroups.AsReadOnly();
+
+    public ProductOptionGroup AddOptionGroup(string name, int minSelections, int maxSelections,
+        IEnumerable<(string Name, decimal PriceDelta)> options)
+    {
+        if (_optionGroups.Any(group => string.Equals(group.Name, name?.Trim(), StringComparison.OrdinalIgnoreCase)))
+            throw new ArgumentException("An option group with this name already exists.", nameof(name));
+        var group = new ProductOptionGroup(Id, name, minSelections, maxSelections, options);
+        _optionGroups.Add(group);
+        return group;
+    }
 
     public void Rename(string name) => Name = string.IsNullOrWhiteSpace(name)
         ? throw new ArgumentException("A product name is required.", nameof(name))
