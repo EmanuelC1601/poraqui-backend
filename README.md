@@ -35,6 +35,18 @@ Publica la API con `dotnet publish src/Poraqui.Api/Poraqui.Api.csproj -c Release
 
 La API no ejecuta migraciones al arrancar. Revisa los scripts SQL de la versión que despliegas y aplica las migraciones de forma explícita en la base elegida. OpenAPI se publica en `/openapi/v1.json` en Development; no habilites Development para un sitio público.
 
+## Recorrido reproducible del pedido
+
+El recorrido automatizado de comercio, pago manual y repartidor propio se puede repetir con:
+
+```powershell
+dotnet test tests/Poraqui.Domain.Tests --filter FullyQualifiedName~Manual_payment_and_internal_delivery_flow_preserves_server_pricing_and_history
+```
+
+La prueba ejecuta la API con TestServer y SQLite temporal. Registra clientes y negocios, configura transferencia, catálogo, zona y tarifa, crea un pedido cuyo precio calcula el servidor, carga un comprobante de prueba, revisa el pago, acepta y prepara el pedido, asigna un repartidor, registra el pago del negocio al recoger, inicia el recorrido por WhatsApp y confirma la entrega con el código. Verifica permisos cruzados, importes, códigos, historial y estado final. No utiliza la BD de desarrollo ni envía SMS reales.
+
+La secuencia HTTP equivalente está documentada en [contratos API](docs/api-contracts.md). OpenAPI lista actualmente 61 rutas bajo `/openapi/v1.json` en Development.
+
 ## Prueba de concurrencia SQL Server
 
 La aceptación simultánea de ofertas tiene una prueba optativa que aplica las migraciones y crea/elimina únicamente filas de prueba en una base aislada llamada `PoraquiIntegrationTests`. Configura `ConnectionStrings__SqlServerTest` en la sesión local de PowerShell con la cadena privada de esa base y ejecuta:

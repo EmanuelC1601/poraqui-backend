@@ -42,7 +42,7 @@ Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167` y es la base
 
 - Dueño/admin configura los siete días y una zona horaria; consulta pública devuelve horario y si acepta pedidos ahora.
 - La creación valida la hora local del negocio. El comportamiento previo sigue hasta que el comercio configura su horario.
-- Migración aditiva `BusinessOpeningHours` y script `docs/sql/BusinessOpeningHours.sql`; no aplicado. Pruebas nuevas cubren horario local, cierre, rango y permisos entre negocios.
+- Migración aditiva `BusinessOpeningHours` y script `docs/sql/BusinessOpeningHours.sql`; aplicada en la BD de desarrollo. Pruebas nuevas cubren horario local, cierre, rango y permisos entre negocios; la ruta de horario aún no se ha ejecutado contra SQL Server.
 
 ## PR #11 abierto: cancelaciones, incidencias y reembolsos manuales
 
@@ -51,7 +51,7 @@ Rama `feature/order-cancellations-refunds-incidents`, commit `1347648`, PR https
 - Cliente cancela solo antes de enviar comprobante; negocio/admin puede cancelar antes de asignar courier. Las ofertas externas abiertas se cancelan junto con el pedido. La repetición del mismo comando de cancelación no duplica historial.
 - Si hay evidencia de transferencia enviada o el pago fue aprobado, se crea un caso de revisión manual. Rechazar un pedido con transferencia aprobada también crea el caso. El negocio registra si reembolsó manualmente, el importe y referencia; el cliente ve solo el estado del caso.
 - Participantes autorizados informan y consultan incidencias; negocio/admin las resuelve. Incidencias y reembolsos quedan en historial/versionado del pedido y notifican después de persistir.
-- Migraciones `OrderCancellationRefundsIncidents` y `OrderCancellationAuditConstraints`, script `docs/sql/OrderCancellationRefundsIncidents.sql`; no aplicadas. La alteración de `CancellationReason` solo afecta a una columna nullable que esta misma pila acaba de añadir, y el dominio limita el texto a 500 caracteres.
+- Migraciones `OrderCancellationRefundsIncidents` y `OrderCancellationAuditConstraints`, script `docs/sql/OrderCancellationRefundsIncidents.sql`; aplicadas en la BD de desarrollo. La alteración de `CancellationReason` solo afecta a la columna nullable creada en la migración anterior; al aplicar el conjunto, la BD estaba vacía.
 
 ## PR #12 integrado en la rama de PR #11: métricas del piloto
 
@@ -63,8 +63,8 @@ Rama `feature/order-cancellations-refunds-incidents`, commit `1347648`, PR https
 - Build: `dotnet build Poraqui.sln`, 0 advertencias y 0 errores.
 - Pruebas: `dotnet test Poraqui.sln`, 19/19: 18 de recorrido API con SQLite en memoria/archivos temporales y una prueba de traducción SQL Server que no abre conexión. El recorrido verifica horarios, opciones, permisos entre negocios, importes, cancelación/refund manual, incidencias, métricas, snapshots, SignalR y entrega persistida.
 - Scripts `ExternalCourierOffers`, `OfflineDeliveryCommandSync`, `CatalogProductOptions`, `BusinessOpeningHours` y `OrderCancellationRefundsIncidents` están disponibles para revisión; la última migración agrega `OrderCancellationAuditConstraints`. No hay cambios pendientes del modelo.
-- `BusinessOpeningHours` y cancelaciones/incidencias se generaron desde el modelo; los scripts no eliminan tablas ni filas. El segundo script estrecha `CancellationReason`, una columna nueva y todavía sin datos; falta validarlo en SQL Server.
-- Panel MonsterASP: el test de acceso remoto reportó `Connected in 201 ms` y el panel muestra `dbo` sin tablas. Esto confirma conectividad del propio panel y estado visible del esquema; no verifica conexión EF desde la API ni restricciones/carreras SQL Server.
+- Las ocho migraciones hasta `OrderCancellationAuditConstraints` se aplicaron a la BD de desarrollo. EF las listó como pendientes antes y todas aplicadas después. El script consolidado desde la migración inicial no contiene `DROP`, `DELETE FROM` ni `TRUNCATE TABLE`; la BD no tenía tablas antes. La prueba confirma migración de esquema SQL Server, no comportamiento concurrente.
+- `dotnet-ef migrations list` verificó la conexión EF desde la API a SQL Server. El panel ya muestra tablas del esquema aplicado; no se guardaron registros funcionales ni de prueba durante esta tarea.
 
 ## Incremento local: reintentos de recogida y entrega
 
@@ -103,9 +103,9 @@ Verificado localmente: `dotnet build Poraqui.sln` (0 advertencias/errores), `dot
 - PR #13 hace idempotentes reintentos de recogida/entrega; está abierto para revisión/integración en la rama anterior. No necesita migración.
 - Instrucciones finales de despliegue en MonsterASP.NET y recorrido SQL Server reproducible.
 
-## Bloqueado por configuración privada
+## Pendiente: base SQL Server aislada para pruebas de concurrencia
 
-No existe `ConnectionStrings:DefaultConnection` en User Secrets/entorno de la API. Configúrala con `dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<cadena privada>" --project src/Poraqui.Api`. No compartas el valor ni uses secretos del chat. Sin la clave no se verifica conexión EF desde la API ni se aplican migraciones, aunque el panel sí haya probado su propia conectividad. Ninguna migración se ha aplicado.
+`ConnectionStrings:DefaultConnection` está configurada localmente en User Secrets y EF comprobó la conexión. La prueba optativa de concurrencia permanece omitida hasta configurar `ConnectionStrings__SqlServerTest` con una base de pruebas separada llamada exactamente `PoraquiIntegrationTests`. No apuntar esa prueba a la BD compartida. Los endpoints y migraciones aún no se han desplegado a un sitio MonsterASP.
 
 ## Fuera de alcance
 

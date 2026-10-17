@@ -1,5 +1,11 @@
 # Contratos API y entre módulos
 
+## Estado del contrato
+
+`main` contiene PR #1–#5. La rama `feature/phone-verification` incorpora la pila funcional PR #6–#17 y sigue fuera de `main`; la implementación y sus contratos están disponibles en esa rama para integración progresiva. En esta pila, Development expone 61 rutas OpenAPI en `/openapi/v1.json`. La API no migra al arrancar.
+
+La BD de desarrollo SQL Server recibió las migraciones `InitialCommerceAndIdentity`, `BusinessTransferInstructionsSnapshot`, `ExternalCourierOffers`, `OfflineDeliveryCommandSync`, `CatalogProductOptions`, `BusinessOpeningHours`, `OrderCancellationRefundsIncidents` y `OrderCancellationAuditConstraints`. EF las aplicó de forma explícita y confirmó que no quedan pendientes. La prueba funcional API usa SQLite; la prueba real de aceptación concurrente requiere una BD aislada `PoraquiIntegrationTests` y sigue pendiente.
+
 ## Integrado en `main` (PR #1–#5)
 
 ### Identidad, permisos y negocio
@@ -39,7 +45,7 @@
 
 Cada transición de pedido incrementa `Order.Version`; la persistencia detecta escrituras obsoletas. Los códigos son de seis dígitos y se guardan hasheados; el código de recepción se entrega al cliente al crear el pedido y el código de recogida se entrega una vez al asignar.
 
-## En desarrollo: reparto externo (`feature/external-courier-offers`)
+## Implementado en la pila; pendiente integrar a `main`: reparto externo (`feature/external-courier-offers`)
 
 - Admin habilita/deshabilita perfil externo con `PUT /api/admin/users/{id}/external-courier` (`isExternalCourier`).
 - Courier establece disponibilidad y zona con `PUT /api/courier/external/availability` (`isAvailable`, `zoneId`).
@@ -48,16 +54,16 @@ Cada transición de pedido incrementa `Order.Version`; la persistencia detecta e
 - Courier rechaza o acepta con `POST /api/courier/external/offers/{offerId}/reject` y `/accept`. Aceptar guarda oferta y asignación del pedido en una transacción y devuelve una vez el código de recogida. Al recoger se conserva el registro existente de pago del negocio.
 - Negocio cancela ofertas abiertas con `POST /api/businesses/{businessId}/orders/{orderId}/external-offers/cancel`. Al listar o aceptar, las ofertas vencidas se marcan como expiradas.
 - `ExternalDeliveryOffer.Version`, `Order.Version` y un índice único filtrado por pedido aceptado protegen frente a respuestas concurrentes. Falta ejecutar la carrera en SQL Server.
-- Migración `ExternalCourierOffers` y script SQL revisables en `src/Poraqui.Infrastructure/Persistence/Migrations/` y `docs/sql/20261017191548_ExternalCourierOffers.sql`; no aplicados.
+- Migración `ExternalCourierOffers` y script SQL revisables en `src/Poraqui.Infrastructure/Persistence/Migrations/` y `docs/sql/20261017191548_ExternalCourierOffers.sql`; aplicada en la BD de desarrollo como parte de las ocho migraciones pendientes verificadas por EF.
 
-## En desarrollo: sincronización de entrega (`feature/offline-delivery-sync`, basada en PR #6)
+## Implementado en la pila; pendiente integrar a `main`: sincronización de entrega (`feature/offline-delivery-sync`, basada en PR #6)
 
 - Courier asignado sube una confirmación capturada sin conexión con `POST /api/orders/{orderId}/sync/delivery-confirmation`, con `commandId`, `code` y `clientCapturedAtUtc`.
 - El servidor no confía en el resultado local: valida autorización del courier, asignación vigente, estado y código antes de persistir la entrega. La hora local se conserva solo como dato de auditoría; el servidor registra la hora de aceptación.
 - Repetir el mismo ID, orden y payload devuelve el resultado previamente persistido con `replayed: true` y no agrega otra transición al historial. Reutilizar ID para otro payload/orden responde 409. Código incorrecto no registra el comando y puede reintentarse con el mismo ID.
-- El cambio de estado y el registro idempotente se guardan en la misma transacción EF. Migración `OfflineDeliveryCommandSync` crea tabla de claves de comando; script revisable `docs/sql/20261017192726_OfflineDeliveryCommandSync.sql`. No aplicado ni validado en SQL Server.
+- El cambio de estado y el registro idempotente se guardan en la misma transacción EF. Migración `OfflineDeliveryCommandSync` crea tabla de claves de comando; script revisable `docs/sql/20261017192726_OfflineDeliveryCommandSync.sql`. Aplicada en la BD de desarrollo; la prueba funcional usa SQLite y la concurrencia del proveedor SQL Server queda pendiente.
 
-## En desarrollo: actualizaciones en tiempo real (`feature/realtime-order-updates`, basada en PR #7)
+## Implementado en la pila; pendiente integrar a `main`: actualizaciones en tiempo real (`feature/realtime-order-updates`, basada en PR #7)
 
 - Hub autenticado en `/hubs/orders`. Los clientes SignalR envían el bearer de Identity en `access_token` al negociar/conectar; el servidor acepta ese parámetro solo en esta ruta.
 - Tras conectar, invocar `SubscribeOrder(orderId)`. El servidor valida la relación con el pedido: cliente propietario, negocio propio, courier asignado o administrador. Devuelve una instantánea actual `{ orderId, status, version, changedAtUtc }` y agrega la conexión al grupo de ese pedido autorizado.
@@ -66,24 +72,24 @@ Cada transición de pedido incrementa `Order.Version`; la persistencia detecta e
 - Un fallo de SignalR no revierte la transición guardada; se registra y el cliente puede consultar `GET /api/orders/{id}`, `GET /api/businesses/{businessId}/orders/{orderId}` o `GET /api/courier/orders/{orderId}` con su permiso. Las notificaciones no son una cola durable.
 - Pruebas: conexión WebSocket SignalR real en TestServer/SQLite temporal; el cliente recibe `OrderChanged` después del envío del comprobante y la consulta confirma el estado persistido. También se verifica negociación anónima rechazada y acceso cruzado de otro negocio denegado. SQL Server sigue sin comprobar.
 
-## En desarrollo: opciones de catálogo (`feature/catalog-options`, basada en PR #8)
+## Implementado en la pila; pendiente integrar a `main`: opciones de catálogo (`feature/catalog-options`, basada en PR #8)
 
 - Grupos con selección mínima/máxima y variantes con diferencia de precio no negativa. Grupo/variante se puede poner no disponible; la lectura pública oculta los no disponibles y el servidor rechaza su selección.
 - El precio unitario de línea refleja las opciones y el pedido guarda una copia de nombre/importe para conservar el recibo si el negocio cambia el catálogo después.
-- Migración `CatalogProductOptions` y `docs/sql/CatalogProductOptions.sql` crean tres tablas e índices aditivos. No elimina datos ni está aplicada. La suite pasa en SQLite; SQL Server aún no se ha validado.
+- Migración `CatalogProductOptions` y `docs/sql/CatalogProductOptions.sql` crean tres tablas e índices aditivos. Está aplicada en la BD de desarrollo. La suite funcional pasa en SQLite; faltan pruebas de restricciones y consultas de este módulo contra SQL Server.
 
-## En desarrollo: horarios del negocio (`feature/business-hours`, basada en PR #9)
+## Implementado en la pila; pendiente integrar a `main`: horarios del negocio (`feature/business-hours`, basada en PR #9)
 
 - El propietario o admin configura los siete días y zona horaria; la API rechaza días duplicados/incompletos, zona inválida, horas ausentes y rangos invertidos. `GET /api/businesses/{id}/opening-hours` expone horario y disponibilidad actual.
 - `POST /api/orders` rechaza nuevos pedidos cuando el negocio está cerrado según su zona horaria. Los negocios sin horario configurado mantienen temporalmente su disponibilidad actual.
-- Migración `BusinessOpeningHours` añade `Businesses.TimeZoneId`, `Businesses.HasConfiguredOpeningHours` y una tabla con clave primaria `(BusinessId, Day)`. `docs/sql/BusinessOpeningHours.sql` es aditivo y no aplicado. Pruebas actuales con SQLite; falta verificar migración y tipo `time` en SQL Server.
+- Migración `BusinessOpeningHours` añade `Businesses.TimeZoneId`, `Businesses.HasConfiguredOpeningHours` y una tabla con clave primaria `(BusinessId, Day)`. `docs/sql/BusinessOpeningHours.sql` es aditivo y está aplicada. Las pruebas de reglas usan SQLite; el tipo `time` fue creado en SQL Server, pero aún falta probar la ruta de horario sobre ese proveedor.
 
-## PR #11 abierto: cancelaciones, incidencias y reembolsos manuales (`feature/order-cancellations-refunds-incidents`, basada en PR #10)
+## Implementado en la pila; pendiente integrar a `main`: cancelaciones, incidencias y reembolsos manuales (PR #11, basada en PR #10)
 
 - Cliente cancela con `POST /api/orders/{id}/cancel` solo antes de enviar comprobante; propietario/admin usa `POST /api/businesses/{businessId}/orders/{orderId}/cancel` antes de asignar courier. Si hay ofertas externas abiertas, se cancelan en el mismo guardado. Reintentar con el mismo actor y motivo no duplica historial.
 - Cancelar un pedido con comprobante enviado o pago confirmado crea un caso `ReviewRequired`; rechazo del negocio después del pago aprobado también lo crea. El cliente ve solo `refundStatus` en su consulta de pedido. Negocio/admin revisa el caso en `GET .../refund` y registra el resultado manualmente con `POST .../refund-review` (`refunded`, `amount`, `reference`, `note`); el importe se limita al total. No se inicia una transferencia bancaria.
 - Cliente, negocio propietario o courier asignado registra/consulta incidencias con `POST/GET /api/orders/{id}/incidents`; negocio/admin resuelve con `POST /api/businesses/{businessId}/orders/{orderId}/incidents/{incidentId}/resolve`. Cambios de pedido, incidente y reembolso incrementan versión y notifican después de persistir.
-- Migraciones `OrderCancellationRefundsIncidents` y `OrderCancellationAuditConstraints`; script `docs/sql/OrderCancellationRefundsIncidents.sql`. Añaden campos, tablas e índices; no aplicadas. Pruebas locales con SQLite; SQL Server sigue pendiente.
+- Migraciones `OrderCancellationRefundsIncidents` y `OrderCancellationAuditConstraints`; script `docs/sql/OrderCancellationRefundsIncidents.sql`. Añaden campos, tablas e índices y están aplicadas en la BD de desarrollo. Pruebas funcionales locales con SQLite; las consultas/reglas aún requieren validación de proveedor SQL Server.
 
 ## PR #12 integrado en rama de PR #11: métricas del piloto (`feature/pilot-metrics`)
 

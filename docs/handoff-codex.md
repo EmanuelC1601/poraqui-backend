@@ -8,6 +8,8 @@ PR #17 (`https://github.com/EmanuelC1601/poraqui-backend/pull/17`) se integró e
 
 La configuración local se guarda en User Secrets como `ConnectionStrings:DefaultConnection`; el test de concurrencia requiere una base aislada separada `ConnectionStrings__SqlServerTest` con nombre exacto `PoraquiIntegrationTests`. No configures esa prueba contra la BD compartida. La cadena funcional sigue fuera de `main`; al integrar sus PR, coordina el código con este esquema ya aplicado.
 
+Las secciones inferiores conservan los detalles de cada incremento cuando se preparó. Si algún estado de migración o acceso contradice este resumen reciente, prevalece el resumen de esta sección y `docs/project-status.md`.
+
 ## Base, ramas y responsabilidad
 
 `main` contiene PR #1–#5 hasta `d677167` y es la base de integración. PR #6 agrega reparto externo; PR #7 sincronización offline está apilado sobre #6; PR #8 SignalR está apilado sobre #7; PR #9 opciones de catálogo se apila sobre #8; PR #10 horarios se apila sobre #9; PR #11 cancelaciones/incidencias/reembolsos continúa desde #10. Un solo responsable mantiene todos los módulos, contratos, `AppDbContext` y migraciones. OpenCode ya no participa; su anterior asignación de reparto se conserva como antecedente.
