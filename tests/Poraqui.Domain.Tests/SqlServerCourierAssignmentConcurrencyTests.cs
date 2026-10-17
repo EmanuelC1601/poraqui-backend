@@ -1,4 +1,3 @@
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Poraqui.Application.Commerce;
@@ -16,8 +15,6 @@ public sealed class SqlServerCourierAssignmentConcurrencyTests
     public async Task Concurrent_internal_assignments_persist_exactly_one_courier()
     {
         var connectionString = Environment.GetEnvironmentVariable(SqlServerIntegrationFactAttribute.ConnectionStringEnvironmentVariable)!;
-        var connection = new SqlConnectionStringBuilder(connectionString);
-        Assert.Equal(SqlServerIntegrationFactAttribute.RequiredDatabaseName, connection.InitialCatalog, ignoreCase: true);
 
         var setupOptions = new DbContextOptionsBuilder<AppDbContext>().UseSqlServer(connectionString).Options;
         await using var setup = new AppDbContext(setupOptions);

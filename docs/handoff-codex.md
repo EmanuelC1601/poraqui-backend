@@ -6,7 +6,7 @@ El backend tiene un único responsable. `main` es la base de integración; cada 
 
 ## Cambios integrados
 
-- PR #1 y PR #22–#39 están integrados en `main` (merge actual `e9d77e4`). El recorrido cubre identidad y autorización por rol/recurso, configuración comercial y catálogo, pedidos con precios de servidor, comprobante privado y revisión manual, preparación, reparto propio/externo, ofertas, códigos, contacto autorizado, historial, incidencias, reembolsos manuales, sincronización offline, SignalR, idempotencia, métricas piloto y verificación telefónica OTP. PR #32 agrega pruebas de concurrencia SQL Server; los casos están añadidos pero no se han ejecutado aún contra SQL Server.
+- PR #1 y PR #22–#40 están integrados en `main` antes de esta rama. El recorrido cubre identidad y autorización por rol/recurso, configuración comercial y catálogo, pedidos con precios de servidor, comprobante privado y revisión manual, preparación, reparto propio/externo, ofertas, códigos, contacto autorizado, historial, incidencias, reembolsos manuales, sincronización offline, SignalR, idempotencia, métricas piloto y verificación telefónica OTP. PR #32 agrega pruebas de concurrencia SQL Server; los casos están añadidos pero no se han ejecutado aún contra SQL Server.
 - PR #29 incorpora idempotencia de creación de pedido.
 - PR #30 incorpora idempotencia de subida del comprobante.
 - PR #31 incorpora idempotencia de asignación de courier propio.
@@ -19,10 +19,10 @@ PR #33 integra `GET /api/admin/metrics/pilot`, restringido a PlatformAdmin, con 
 ## Configuración privada y verificaciones
 
 - `ConnectionStrings:DefaultConnection` existe en User Secrets; una consulta de solo lectura confirmó acceso al SQL Server compartido. No se revela su valor.
-- Falta `ConnectionStrings:SqlServerTest`. Configurar `ConnectionStrings__SqlServerTest` como variable de entorno privada o User Secrets y apuntarla a una instancia aislada cuyo catálogo sea `PoraquiIntegrationTests`.
+- Se creó una base MSSQL gratuita nueva para pruebas; permanece vacía y su acceso remoto está deshabilitado. Las pruebas comparan el destino de `ConnectionStrings__SqlServerTest` con `DefaultConnection` (cargada desde User Secrets) y omiten ejecución si servidor y catálogo coinciden. Desde este equipo, falta habilitar el acceso Remote a esa base y configurar en privado la cadena Remote con la clave `ConnectionStrings__SqlServerTest`.
 - En 2026-10-17, `dotnet ef migrations list` se ejecutó en lectura sobre SQL Server y devolvió las 12 migraciones actuales; no reportó IDs pendientes. No se ejecutó ninguna migración durante esta entrega.
-- Restore y build de solución: correctos, 0 advertencias y errores.
-- Tests de solución en la rama activa: 24 correctos, 2 omitidos (requieren conexión aislada SQL Server).
+- `dotnet build Poraqui.sln --no-restore`: correcto, 0 advertencias y errores.
+- `dotnet test Poraqui.sln`: 29 correctos; 2 carreras SQL omitidas por falta de `ConnectionStrings__SqlServerTest`.
 - `dotnet ef migrations has-pending-model-changes`: sin cambios pendientes del modelo.
 - OpenAPI local: HTTP 200; snapshot versionado.
 - La API no aplica migraciones automáticamente. Antes de futuras migraciones compartidas, conciliar `__EFMigrationsHistory` y revisar el SQL generado para asegurar que preserva datos.

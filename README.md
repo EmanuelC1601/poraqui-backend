@@ -23,7 +23,7 @@ dotnet user-secrets set "PrivateFiles:Root" "<ruta privada fuera del web root>" 
 dotnet run --project src/Poraqui.Api
 ```
 
-La API no ejecuta migraciones al iniciar. Revisa scripts SQL y aplica migraciones explícitamente solo tras reconciliar el historial y comprobar el destino. Para pruebas SQL Server, configura `ConnectionStrings:SqlServerTest` (variable de entorno `ConnectionStrings__SqlServerTest`) con el catálogo aislado `PoraquiIntegrationTests`; las pruebas de concurrencia se omiten si falta o apunta a otro catálogo. En Development, OpenAPI está en `/openapi/v1.json`; snapshot en [docs/openapi.json](docs/openapi.json). El hub autenticado está en `/hubs/orders`.
+La API no ejecuta migraciones al iniciar. Revisa scripts SQL y aplica migraciones explícitamente solo tras reconciliar el historial y comprobar el destino. Para pruebas SQL Server, configura `ConnectionStrings__SqlServerTest` en User Secrets o como variable privada. El test loader también lee `ConnectionStrings:DefaultConnection` de User Secrets y omite las pruebas si ambos catálogos coinciden, incluso si se usan alias de servidor distintos; las pruebas de concurrencia crean su esquema en la BD aislada y limpian únicamente los registros con identificadores de prueba. En Development, OpenAPI está en `/openapi/v1.json`; snapshot en [docs/openapi.json](docs/openapi.json). El hub autenticado está en `/hubs/orders`.
 
 La verificación telefónica usa Twilio Verify. Configura en User Secrets o el gestor privado de secretos `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid` y `TwilioVerify:ApiKeySecret`. La API limita los endpoints de inicio y confirmación a cinco solicitudes por IP cada diez minutos. Nunca guardes esos valores en archivos versionados.
 

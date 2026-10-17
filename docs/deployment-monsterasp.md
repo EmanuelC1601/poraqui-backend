@@ -30,7 +30,7 @@ ASP.NET Core interpreta `__` como separador de secciones (`ConnectionStrings__De
 
 La API no aplica migraciones al iniciar. Antes de usar una base de producción, el responsable de migraciones debe revisar el destino, conciliar `__EFMigrationsHistory`, generar scripts SQL revisables, verificar que sean aditivos y preserven datos, y aplicarlos explícitamente. No confundas la base de desarrollo con la base destino de producción.
 
-No ejecutes pruebas que inserten y limpien datos sobre la base compartida de desarrollo o producción. Las pruebas SQL de concurrencia requieren el catálogo aislado `PoraquiIntegrationTests`.
+No ejecutes pruebas que inserten y limpien datos sobre la base compartida de desarrollo o producción. Las pruebas SQL de concurrencia usan `ConnectionStrings__SqlServerTest` y comparan su destino con `ConnectionStrings:DefaultConnection` desde User Secrets antes de ejecutarse; si coinciden, se omiten. En MonsterASP.NET, la conexión Local solo sirve desde un sitio en el hosting; las pruebas ejecutadas desde una estación externa requieren habilitar Remote access únicamente para la base aislada y guardar su cadena Remote en configuración local privada.
 
 ## Verificación posterior a publicación
 
