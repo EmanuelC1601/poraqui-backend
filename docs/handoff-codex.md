@@ -2,7 +2,7 @@
 
 ## Base publicada
 
-`main` y `origin/main` apuntan a `a5d9dd8`, conservando `origin/feature/clean-architecture-foundation`. `main` es la base compartida de integración. Codex trabaja en `feature/comercio-pedidos`, creada desde `main`; incremento publicado en `6ea7f8a`. Crear el PR contra `main`: [abrir PR de comercio/pedidos](https://github.com/EmanuelC1601/poraqui-backend/pull/new/feature/comercio-pedidos).
+`main` y `origin/main` apuntan a `a5d9dd8`, conservando `origin/feature/clean-architecture-foundation`. `main` es la rama predeterminada y base compartida de integración. Codex trabaja en `feature/comercio-pedidos`, creada desde `main`; commits publicados `6ea7f8a` y `9897824`. PR abierto contra `main`: [#1 Add initial commerce and order domain](https://github.com/EmanuelC1601/poraqui-backend/pull/1).
 
 ## Incluido
 
@@ -24,4 +24,4 @@ Para iniciar desde la base: `git fetch origin` y `git switch -c feature/reparto 
 
 Para configurar la conexión localmente, crea User Secrets con `dotnet user-secrets init --project src/Poraqui.Api` y agrega `ConnectionStrings:DefaultConnection` con `dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<cadena privada>" --project src/Poraqui.Api`. La clave no debe guardarse en Git.
 
-`main` ya está publicada, pero no se pudo cambiar la rama predeterminada desde este entorno. En GitHub, abre **Settings → General → Default branch → Edit**, selecciona `main` y guarda.
+La rama predeterminada de GitHub está configurada como `main`.
