@@ -162,6 +162,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Category).HasMaxLength(80).IsRequired();
             entity.Property(x => x.Description).HasMaxLength(2000).IsRequired();
+            entity.HasIndex(x => new { x.ReporterUserId, x.CommandId }).IsUnique().HasFilter("[CommandId] IS NOT NULL");
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
             entity.Property(x => x.Resolution).HasMaxLength(2000);
             entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ReporterUserId).OnDelete(DeleteBehavior.Restrict);

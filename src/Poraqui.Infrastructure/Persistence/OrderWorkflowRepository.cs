@@ -37,6 +37,10 @@ public sealed class OrderWorkflowRepository(AppDbContext db) : IOrderWorkflowRep
     public Task<OfflineDeliverySyncRecord?> GetOfflineDeliveryCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken) =>
         db.OfflineDeliverySyncRecords.SingleOrDefaultAsync(command => command.ActorUserId == actorUserId && command.Id == commandId, cancellationToken);
 
+    public Task<OrderIncident?> GetIncidentCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken) =>
+        db.Set<OrderIncident>().SingleOrDefaultAsync(incident => incident.ReporterUserId == actorUserId &&
+            incident.CommandId == commandId, cancellationToken);
+
     public async Task CancelOpenExternalOffersForOrderAsync(Guid orderId, CancellationToken cancellationToken)
     {
         var offers = await db.ExternalDeliveryOffers.Where(offer => offer.OrderId == orderId &&

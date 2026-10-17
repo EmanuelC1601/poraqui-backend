@@ -17,7 +17,7 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.10")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -670,6 +670,9 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("nvarchar(80)");
 
+                    b.Property<Guid?>("CommandId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(2000)
@@ -701,11 +704,13 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ReporterUserId");
-
                     b.HasIndex("ResolverUserId");
 
                     b.HasIndex("OrderId", "ReportedAtUtc");
+
+                    b.HasIndex("ReporterUserId", "CommandId")
+                        .IsUnique()
+                        .HasFilter("[CommandId] IS NOT NULL");
 
                     b.ToTable("OrderIncidents", (string)null);
                 });
