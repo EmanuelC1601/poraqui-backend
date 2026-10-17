@@ -76,3 +76,9 @@ public sealed class TestPhoneVerificationProvider : IPhoneVerificationProvider
     public Task<bool> IsApprovedAsync(string phoneNumber, string code, CancellationToken cancellationToken) =>
         Task.FromResult(phoneNumber == LastStartedPhoneNumber && code == "123456");
 }
+
+internal sealed class TestExternalOfferSecretProtector : Poraqui.Application.Orders.IExternalOfferSecretProtector
+{
+    public string Protect(string secret) => Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(secret));
+    public string Unprotect(string protectedSecret) => System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(protectedSecret));
+}

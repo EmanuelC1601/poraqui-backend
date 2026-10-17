@@ -653,6 +653,14 @@ public sealed class BusinessApiTests
         using var assignment = JsonDocument.Parse(await acceptResponse.Content.ReadAsStringAsync());
         var pickupCode = assignment.RootElement.GetProperty("pickupCode").GetString()!;
         Assert.Equal(6, pickupCode.Length);
+        using (var acceptedReplay = await SendAsync(client, HttpMethod.Post,
+                   $"api/courier/external/offers/{offerOneId}/accept", courierToken))
+        using (var acceptedReplayJson = JsonDocument.Parse(await acceptedReplay.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(HttpStatusCode.OK, acceptedReplay.StatusCode);
+            Assert.Equal(offerOneId, acceptedReplayJson.RootElement.GetProperty("offerId").GetGuid());
+            Assert.Equal(pickupCode, acceptedReplayJson.RootElement.GetProperty("pickupCode").GetString());
+        }
         Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(client, HttpMethod.Post,
             $"api/courier/external/offers/{offerTwoId}/accept", courierTwoToken)).StatusCode);
 
