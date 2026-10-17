@@ -13,6 +13,16 @@ Roles: `PlatformAdmin`, `BusinessOwner`, `DeliveryPerson`, `ExternalCourier`. Po
 
 La prueba integrada registra dos usuarios, crea sus negocios, verifica acceso al negocio propio y 403 sobre recurso ajeno. La suite completa pasa 10 pruebas con SQLite en memoria aislado. SQL Server todavía no fue probado desde la aplicación.
 
+## Implementado localmente en `feature/catalog-pricing` (sin PR todavía)
+
+- `GET /api/businesses/{businessId}/products`: productos disponibles de negocios activos.
+- `POST /api/businesses/{businessId}/products`, `PUT /api/products/{productId}`: propietario del negocio o administrador administra nombre, precio y disponibilidad.
+- `GET /api/delivery-zones/active`; `POST /api/delivery-zones` y `PUT /api/delivery-zones/{zoneId}` solo para administradores.
+- `GET/POST /api/businesses/{businessId}/delivery-rates` y `PUT /api/businesses/{businessId}/delivery-rates/{zoneId}`: dueño del negocio o administrador administra tarifa en zona.
+- `POST /api/orders`: usuario autenticado envía negocio, zona, dirección, IDs de producto y cantidades. Servidor carga productos disponibles y tarifa activa; no acepta precios del cliente como fuente de importe.
+
+La prueba de recorrido de creación de pedido confirma subtotal, envío y total calculados con catálogo/tarifa del servidor incluso si el JSON incluye un campo de precio engañoso adicional. Este recorrido solo se probó sobre SQLite aislado; catálogo, tarifas y pedido aún no están verificados en SQL Server. Opciones de producto siguen pendientes.
+
 ## Contratos preliminares pendientes de implementación
 
 `IDeliveryOrderQueries` y `IDeliveryOrderOperations` son interfaces provisionales. No hay endpoints o servicios operativos de reparto que las implementen. Sus operaciones propuestas (`GetAvailableOrdersAsync`, `GetOrderAsync`, `AcceptAsync`, `MarkPickedUpAsync`, `MarkDeliveredAsync`) deberán sustituirse/ajustarse junto con el flujo comprobado, incluyendo pago al repartidor al recoger, códigos e historial.

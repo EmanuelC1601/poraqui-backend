@@ -67,7 +67,7 @@ public sealed class AdminBootstrapController(
 }
 
 public sealed record BootstrapAdminRequest(
-    [property: Required, EmailAddress, StringLength(256)] string Email,
-    [property: Required, StringLength(120, MinimumLength = 2)] string DisplayName,
-    [property: Required, StringLength(256, MinimumLength = 12)] string Password,
-    [property: Required, StringLength(256, MinimumLength = 32)] string BootstrapKey);
+    [Required, EmailAddress, StringLength(256)] string Email,
+    [Required, StringLength(120, MinimumLength = 2)] string DisplayName,
+    [Required, StringLength(256, MinimumLength = 12)] string Password,
+    [Required, StringLength(256, MinimumLength = 32)] string BootstrapKey);

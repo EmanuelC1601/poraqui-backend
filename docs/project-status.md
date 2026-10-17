@@ -1,6 +1,6 @@
 # Estado verificable del proyecto
 
-Actualizado: 2026-10-17. La rama de trabajo es `feature/functional-order-flow`, basada en `main` (`e346995`). El PR #1 está integrado. Esta página diferencia código existente, pruebas ejecutadas y trabajo pendiente.
+Actualizado: 2026-10-17. `main` contiene PR #1 y PR #2 (`a38ed4e`). Rama de trabajo: `feature/catalog-pricing`. Esta página diferencia código existente, pruebas ejecutadas y trabajo pendiente.
 
 ## Implementado y verificado
 
@@ -10,14 +10,15 @@ Actualizado: 2026-10-17. La rama de trabajo es `feature/functional-order-flow`, 
 - Primer administrador instalable con `Bootstrap:AdminKey` privado y transacción.
 - Alta y configuración de negocio, listado público activo y activación administrativa.
 - Autorización por rol y recurso para leer/configurar negocio; prueba integrada cubre denegación entre propietarios.
-- Suite de pruebas compila solución y pasa 10/10 en SQLite en memoria. Incluye API Identity/negocio y pruebas de dominio/persistencia.
+- PR #2: `dotnet build Poraqui.sln` (0 advertencias/errores), `dotnet test Poraqui.sln` (10/10 SQLite en memoria; API Identity/negocio y dominio/persistencia).
+- En `feature/catalog-pricing` local: rutas CRUD básico de productos, zonas, tarifas; creación de pedido autenticado con totales calculados por productos y tarifa persistidos. Suite actual: build 0 warnings/errors y `dotnet test Poraqui.sln` 11/11 con SQLite aislado, incluyendo permiso entre propietarios, importes autoritativos y recorrido de pedido. Todavía no hay commit/PR para este incremento.
 - API no migra automáticamente al iniciar. Sin migraciones generadas o aplicadas.
 
 ## Pendiente
 
 - Revisión de migración inicial y restricciones sobre SQL Server; conectividad EF desde aplicación.
-- Catálogo con opciones y disponibilidad, zonas/tarifas administrables y precio calculado en servidor.
-- Creación de pedido, aceptación/rechazo del negocio, pagos manuales, evidencia privada y confirmación de revisión.
+- Opciones de producto; disponibilidad tiene CRUD básico, falta validación por horario.
+- Consulta y actualización del pedido; aceptación/rechazo del negocio, pagos manuales, evidencia privada y confirmación de revisión.
 - Preparación explícita, reparto propio, asignación, pago al repartidor al recoger, códigos y recorrido/entrega.
 - Reparto externo: disponibilidad, ofertas, aceptación/rechazo concurrentes, cancelación, vencimiento y ausencia de repartidores.
 - SignalR autorizado, estado tras reconexión, idempotencia, sincronización offline validada, incidencias/reembolsos, métricas y despliegue MonsterASP.NET.
