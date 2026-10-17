@@ -6,15 +6,15 @@ El backend tiene un único responsable. `main` es la base de integración; cada 
 
 ## Cambios integrados
 
-- PR #1 y PR #22–#36 están integrados en `main` (merge actual `0f4dd51`). El recorrido cubre identidad y autorización por rol/recurso, configuración comercial y catálogo, pedidos con precios de servidor, comprobante privado y revisión manual, preparación, reparto propio/externo, ofertas, códigos, contacto autorizado, historial, incidencias, reembolsos manuales, sincronización offline, SignalR, idempotencia, métricas piloto y verificación telefónica OTP. PR #32 agrega pruebas de concurrencia SQL Server; los casos están añadidos pero no se han ejecutado aún contra SQL Server.
+- PR #1 y PR #22–#39 están integrados en `main` (merge actual `e9d77e4`). El recorrido cubre identidad y autorización por rol/recurso, configuración comercial y catálogo, pedidos con precios de servidor, comprobante privado y revisión manual, preparación, reparto propio/externo, ofertas, códigos, contacto autorizado, historial, incidencias, reembolsos manuales, sincronización offline, SignalR, idempotencia, métricas piloto y verificación telefónica OTP. PR #32 agrega pruebas de concurrencia SQL Server; los casos están añadidos pero no se han ejecutado aún contra SQL Server.
 - PR #29 incorpora idempotencia de creación de pedido.
 - PR #30 incorpora idempotencia de subida del comprobante.
 - PR #31 incorpora idempotencia de asignación de courier propio.
 - Esas migraciones son revisables y aditivas; todavía no se han aplicado a SQL Server.
 
-## Rama activa
+## Incrementos recientes integrados
 
-PR #33 integra `GET /api/admin/metrics/pilot`, restringido a PlatformAdmin, con rango UTC de hasta 366 días, conteos, suma bruta, tiempo medio de entrega, incidencias abiertas y reembolsos en revisión. PR #36 integra Twilio Verify, endpoints de inicio/confirmación OTP y límite por IP. El proveedor tiene pruebas con HTTP simulado; SMS real pendiente de credenciales privadas.
+PR #33 integra `GET /api/admin/metrics/pilot`, restringido a PlatformAdmin, con rango UTC de hasta 366 días, conteos, suma bruta, tiempo medio de entrega, incidencias abiertas y reembolsos en revisión. PR #36 integra Twilio Verify, endpoints de inicio/confirmación OTP y límite por IP. PR #38 cubre reconexión SignalR y recuperación del snapshot actual. PR #39 documenta publicación en MonsterASP.NET. El proveedor tiene pruebas con HTTP simulado; SMS real y publicación real siguen pendientes.
 
 ## Configuración privada y verificaciones
 
@@ -31,7 +31,7 @@ PR #33 integra `GET /api/admin/metrics/pilot`, restringido a PlatformAdmin, con 
 
 1. Configurar la cadena privada SQL Server de pruebas aisladas y ejecutar las dos carreras concurrentes; conservar la BD y verificar las restricciones afectadas.
 2. Para cambios futuros del modelo, generar y revisar la migración; revisar el historial de nuevo antes de aplicar cualquier migración compartida.
-3. Seguir `docs/deployment-monsterasp.md` para preparar el sitio, secretos, almacenamiento y publicación; verificar health, SignalR y comprobantes en el hosting.
+3. Seguir `docs/deployment-monsterasp.md` para preparar el sitio, secretos, almacenamiento y publicación; verificar health, SignalR y comprobantes en el hosting. La guía está integrada, pero el sitio aún no se ha publicado.
 4. Configurar privadamente `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid` y `TwilioVerify:ApiKeySecret`, y verificar un SMS de extremo a extremo con un número autorizado.
 
-La rama `feature/signalr-reconnect-snapshot` añade prueba del cliente SignalR que se reconecta y consulta el snapshot actual. El ledger vigente de implementado, pendiente y bloqueado está en `docs/project-status.md`; ejecución reproducible del recorrido está en `docs/order-flow.md`.
+El ledger vigente de implementado, pendiente y bloqueado está en `docs/project-status.md`; ejecución reproducible del recorrido está en `docs/order-flow.md`.
