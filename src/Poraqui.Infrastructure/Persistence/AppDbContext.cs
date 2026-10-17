@@ -17,6 +17,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<CourierAvailability> CourierAvailabilities => Set<CourierAvailability>();
     public DbSet<ExternalDeliveryOffer> ExternalDeliveryOffers => Set<ExternalDeliveryOffer>();
+    public DbSet<OfflineDeliverySyncRecord> OfflineDeliverySyncRecords => Set<OfflineDeliverySyncRecord>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -150,6 +151,16 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasOne<DeliveryZone>().WithMany().HasForeignKey(x => x.ZoneId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(x => new { x.CourierUserId, x.Status, x.ExpiresAtUtc });
             entity.HasIndex(x => x.OrderId).IsUnique().HasFilter("[Status] = 'Accepted'");
+        });
+
+        builder.Entity<OfflineDeliverySyncRecord>(entity =>
+        {
+            entity.ToTable("OfflineDeliverySyncRecords");
+            entity.HasKey(x => new { x.ActorUserId, x.Id });
+            entity.Property(x => x.PayloadHash).HasMaxLength(64).IsRequired();
+            entity.HasOne<Order>().WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.OrderId);
         });
     }
 }

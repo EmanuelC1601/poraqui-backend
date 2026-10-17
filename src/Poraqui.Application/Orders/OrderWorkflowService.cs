@@ -11,6 +11,8 @@ public interface IOrderWorkflowRepository
     Task<string?> GetBusinessAddressAsync(Guid businessId, CancellationToken cancellationToken);
     Task<bool> BusinessBelongsToAsync(Guid businessId, Guid ownerUserId, CancellationToken cancellationToken);
     Task<string?> GetCustomerPhoneAsync(Guid customerUserId, CancellationToken cancellationToken);
+    Task<OfflineDeliverySyncRecord?> GetOfflineDeliveryCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken);
+    void AddOfflineDeliveryCommand(OfflineDeliverySyncRecord command);
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }
 
@@ -30,6 +32,7 @@ public sealed record OrderWorkflowView(Guid Id, string OrderNumber, Guid Custome
     IReadOnlyList<OrderWorkflowHistory> History, TransferInstructionsView? TransferInstructions);
 public sealed record CourierAssignment(string PickupCode, decimal PaymentAmount, OrderWorkflowView Order);
 public sealed record CustomerContact(string? PhoneNumber, string WhatsAppDialString, string Channel);
+public sealed record OfflineDeliverySyncResult(Guid CommandId, Guid OrderId, string Status, DateTimeOffset AcceptedAtUtc, bool Replayed);
 
 public sealed class OrderWorkflowService(IOrderWorkflowRepository repository)
 {
@@ -148,6 +151,7 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository)
     public async Task MarkPickedUpAsync(Guid orderId, Guid courierId, string pickupCode, CancellationToken cancellationToken)
     {
         var order = await RequiredOrder(orderId, cancellationToken);
+        EnsureCourier(order, courierId);
         order.MarkPickedUp(courierId, OrderAccessCode.Hash(pickupCode));
         await repository.SaveChangesAsync(cancellationToken);
     }
@@ -167,8 +171,34 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository)
     public async Task MarkDeliveredAsync(Guid orderId, Guid courierId, string deliveryCode, CancellationToken cancellationToken)
     {
         var order = await RequiredOrder(orderId, cancellationToken);
+        EnsureCourier(order, courierId);
         order.MarkDelivered(courierId, OrderAccessCode.Hash(deliveryCode));
         await repository.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<OfflineDeliverySyncResult> SyncDeliveryConfirmationAsync(Guid orderId, Guid courierId, Guid commandId,
+        string deliveryCode, DateTimeOffset clientCapturedAtUtc, CancellationToken cancellationToken)
+    {
+        if (commandId == Guid.Empty) throw new ArgumentException("Command id is required.", nameof(commandId));
+        if (clientCapturedAtUtc == default) throw new ArgumentException("Client capture time is required.", nameof(clientCapturedAtUtc));
+        var payloadHash = OrderAccessCode.Hash($"{orderId:N}|{deliveryCode}|{clientCapturedAtUtc:O}");
+        var existing = await repository.GetOfflineDeliveryCommandAsync(courierId, commandId, cancellationToken);
+        if (existing is not null)
+        {
+            if (existing.OrderId != orderId || !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                    Convert.FromHexString(existing.PayloadHash), Convert.FromHexString(payloadHash)))
+                throw new OfflineDeliveryCommandConflictException();
+            return new OfflineDeliverySyncResult(commandId, orderId, OrderStatus.Delivered.ToString(), existing.ServerAcceptedAtUtc, true);
+        }
+
+        var order = await RequiredOrder(orderId, cancellationToken);
+        EnsureCourier(order, courierId);
+        var acceptedAt = DateTimeOffset.UtcNow;
+        order.MarkDelivered(courierId, OrderAccessCode.Hash(deliveryCode));
+        repository.AddOfflineDeliveryCommand(new OfflineDeliverySyncRecord(commandId, courierId, orderId, payloadHash,
+            clientCapturedAtUtc, acceptedAt));
+        await repository.SaveChangesAsync(cancellationToken);
+        return new OfflineDeliverySyncResult(commandId, orderId, OrderStatus.Delivered.ToString(), acceptedAt, false);
     }
 
     private async Task<Order> RequiredOrder(Guid id, CancellationToken cancellationToken) =>
@@ -197,3 +227,4 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository)
 }
 
 public sealed class OrderResourceForbiddenException : Exception { }
+public sealed class OfflineDeliveryCommandConflictException : Exception { }

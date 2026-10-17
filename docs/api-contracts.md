@@ -1,6 +1,8 @@
 # Contratos API y entre módulos
 
-## Integrado en `main` (PR #1–#5)
+Estado: `main` integra PR #1–#6 (`d39d265`). PR #7 se prepara como incremento acotado en `feature/offline-sync-main`; PR #8–#21 permanecen en ramas apiladas fuera de `main`. Un solo responsable mantiene contratos y migraciones. OpenAPI en Development: `/openapi/v1.json`.
+
+## Integrado en `main` (PR #1–#6)
 
 ### Identidad, permisos y negocio
 
@@ -34,7 +36,7 @@
 
 Cada transición de pedido incrementa `Order.Version`; la persistencia detecta escrituras obsoletas. Los códigos son de seis dígitos y se guardan hasheados; el código de recepción se entrega al cliente al crear el pedido y el código de recogida se entrega una vez al asignar.
 
-## En desarrollo: reparto externo (`feature/external-courier-offers`)
+## Integrado en `main`: reparto externo (PR #6)
 
 - Admin habilita/deshabilita perfil externo con `PUT /api/admin/users/{id}/external-courier` (`isExternalCourier`).
 - Courier establece disponibilidad y zona con `PUT /api/courier/external/availability` (`isAvailable`, `zoneId`).
@@ -43,12 +45,19 @@ Cada transición de pedido incrementa `Order.Version`; la persistencia detecta e
 - Courier rechaza o acepta con `POST /api/courier/external/offers/{offerId}/reject` y `/accept`. Aceptar guarda oferta y asignación del pedido en una transacción y devuelve una vez el código de recogida. Al recoger se conserva el registro existente de pago del negocio.
 - Negocio cancela ofertas abiertas con `POST /api/businesses/{businessId}/orders/{orderId}/external-offers/cancel`. Al listar o aceptar, las ofertas vencidas se marcan como expiradas.
 - `ExternalDeliveryOffer.Version`, `Order.Version` y un índice único filtrado por pedido aceptado protegen frente a respuestas concurrentes. Falta ejecutar la carrera en SQL Server.
-- Migración `ExternalCourierOffers` y script SQL revisables en `src/Poraqui.Infrastructure/Persistence/Migrations/` y `docs/sql/20261017191548_ExternalCourierOffers.sql`; no aplicados.
+- Migración `ExternalCourierOffers` y script SQL revisables en `src/Poraqui.Infrastructure/Persistence/Migrations/` y `docs/sql/20261017191548_ExternalCourierOffers.sql`. EF confirmó aplicada en la BD compartida dentro de la cadena actual.
+
+## Preparado para integrar: sincronización de entrega (PR #7, `feature/offline-sync-main`)
+
+- Courier asignado sube una confirmación capturada sin conexión con `POST /api/orders/{orderId}/sync/delivery-confirmation`, con `commandId`, `code` y `clientCapturedAtUtc`.
+- El servidor no confía en el resultado local: valida autorización del courier, asignación vigente, estado y código antes de persistir la entrega. La hora local se conserva solo como dato de auditoría; el servidor registra la hora de aceptación.
+- Repetir el mismo ID, orden y payload devuelve el resultado previamente persistido con `replayed: true` y no agrega otra transición al historial. Reutilizar ID para otro payload/orden responde 409. Código incorrecto no registra el comando y puede reintentarse con el mismo ID.
+- El cambio de estado y el registro idempotente se guardan en la misma transacción EF. Migración `OfflineDeliveryCommandSync` crea tabla de claves de comando; script revisable `docs/sql/20261017192726_OfflineDeliveryCommandSync.sql`. EF reportó la migración aplicada en la BD compartida; la rama específica del PR no ejecutó migraciones.
 
 ## Validación, antecedentes y pendientes
 
-`dotnet test Poraqui.sln` ejercita un recorrido aislado SQLite con importes, permisos, transferencia, comprobante, oferta externa, cancelación, ausencia de repartidores, rechazo, aceptación, códigos, pago al recoger y entrega. SQLite no verifica por sí solo los bloqueos, índices y concurrencia de SQL Server.
+La rama de PR #7 pasa 14/14 pruebas con SQLite aislado; la pila completa pasa 24 y omite dos carreras que requieren SQL Server aislado. SQLite no verifica por sí solo los bloqueos, índices y concurrencia de SQL Server.
 
 El contrato provisional `src/Poraqui.Application/Delivery/DeliveryOrderContracts.cs` se eliminó en PR #4 al implementar reparto propio. La asignación previa a OpenCode se conserva como antecedente; hay un solo responsable.
 
-Pendiente: opciones de producto, horarios, OTP, cancelación de pedido, incidencias/reembolsos completos, SignalR y reconexión, idempotencia, sincronización offline validada, métricas, despliegue y verificación SQL Server. No hay GPS, distancias inferidas ni transferencias bancarias automáticas.
+La cadena privada `ConnectionStrings:DefaultConnection` existe y EF verificó SQL Server. `ConnectionStrings:SqlServerTest` falta; configura esa clave solo con una base aislada `PoraquiIntegrationTests` para ejecutar las carreras. Pendiente: opciones/horarios, OTP, cancelaciones/incidencias/reembolsos, SignalR y reconexión, idempotencia adicional, métricas y despliegue. No hay GPS, distancias inferidas ni transferencias bancarias automáticas.

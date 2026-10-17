@@ -362,6 +362,35 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                     b.ToTable("ExternalDeliveryOffers", (string)null);
                 });
 
+            modelBuilder.Entity("Poraqui.Domain.Orders.OfflineDeliverySyncRecord", b =>
+                {
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ClientCapturedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTimeOffset>("ServerAcceptedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("ActorUserId", "Id");
+
+                    b.HasIndex("OrderId");
+
+                    b.ToTable("OfflineDeliverySyncRecords", (string)null);
+                });
+
             modelBuilder.Entity("Poraqui.Domain.Orders.Order", b =>
                 {
                     b.Property<Guid>("Id")
@@ -767,6 +796,21 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("ZoneId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Poraqui.Domain.Orders.OfflineDeliverySyncRecord", b =>
+                {
+                    b.HasOne("Poraqui.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Poraqui.Domain.Orders.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
