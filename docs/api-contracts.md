@@ -1,8 +1,8 @@
 # Contratos API y entre módulos
 
-Estado: `main` integra la base inicial y PR #22–#25 hasta `c372018`: sincronización offline, SignalR, opciones de catálogo y horarios comerciales. El cambio actual de cancelaciones/incidencias/reembolsos está en `feature/order-incidents-refunds`. Un responsable mantiene contratos y migraciones. OpenAPI en Development: `/openapi/v1.json`.
+Estado: `main` integra la base inicial y PR #22–#26 hasta `1d75577`: sincronización offline, SignalR, opciones de catálogo, horarios comerciales, cancelaciones/incidencias y reembolsos manuales. Un responsable mantiene contratos y migraciones. OpenAPI en Development: `/openapi/v1.json`.
 
-## Integrado en `main` (base inicial y PR #22–#24)
+## Integrado en `main` (base inicial y PR #22–#26)
 
 ### Identidad, permisos y negocio
 
@@ -77,20 +77,24 @@ La cadena privada `ConnectionStrings:DefaultConnection` existe y EF verificó SQ
 - `POST /api/products/{productId}/option-groups` recibe `name`, `minSelections`, `maxSelections` y `options[]` (`name`, `priceDelta`). Cada opción parte disponible.
 - Grupo y opción pueden habilitarse/deshabilitarse solo por propietario del negocio o admin.
 - El pedido envía `optionIds` por renglón; selecciones repetidas/no disponibles o límites inválidos se rechazan. Se conservan opciones, nombres e importes en el pedido.
-- Migración aditiva `CatalogProductOptions`; script revisable en `docs/sql/CatalogProductOptions.sql`. Aún no aplicada a SQL Server.
+- Migración aditiva `CatalogProductOptions`; el historial y las tablas se observaron en SQL Server de desarrollo. Script revisable en `docs/sql/CatalogProductOptions.sql`.
 
 ## Integrado en `main`: horarios del negocio (PR #25)
 
 - `PUT /api/businesses/{businessId}/opening-hours` configura zona horaria y exactamente un registro por cada día. Días cerrados no aceptan horas; los días abiertos requieren hora de apertura anterior al cierre.
 - `GET /api/businesses/{businessId}/opening-hours` es público y devuelve zona horaria, los siete días configurados y `isAcceptingOrders` calculado con el reloj UTC del servidor convertido a la zona del negocio.
 - Solo el dueño del negocio o un administrador puede modificar el horario. El servidor rechaza pedidos cuando la empresa está cerrada. Un negocio sin horario configurado conserva el comportamiento anterior y acepta pedidos cuando está activo.
-- Migración aditiva `BusinessOpeningHours`: agrega dos columnas a `Businesses` con defaults y una tabla semanal con FK. Script revisable: `docs/sql/BusinessOpeningHours.sql`.
+- Migración aditiva `BusinessOpeningHours`: agrega dos columnas a `Businesses` con defaults y una tabla semanal con FK. Su tabla figura en la BD de desarrollo. Script revisable: `docs/sql/BusinessOpeningHours.sql`.
 
-## En desarrollo: cancelaciones, incidencias y reembolsos manuales
+## Integrado en `main`: cancelaciones, incidencias y reembolsos manuales (PR #26)
 
 - Cliente cancela antes de enviar comprobante; negocio propietario/admin puede cancelar hasta antes de que el repartidor recoja. Se guarda motivo, actor, fecha e historial; las ofertas externas abiertas se cancelan con el pedido.
 - Si existe transferencia pendiente o aprobada, se registra un caso de reembolso manual. `GET .../refund` consulta el caso y `POST .../refund-review` permite al negocio propietario/admin marcarlo reembolsado con importe y referencia, o marcar que no se requiere. La API no transfiere dinero.
 - Los participantes autorizados consultan y reportan incidencias con `GET/POST /api/orders/{orderId}/incidents`; el negocio propietario/admin resuelve por `POST .../incidents/{incidentId}/resolve`.
 - Migraciones aditivas `OrderCancellationRefundsIncidents` y `OrderCancellationAuditConstraints`, con SQL revisable en `docs/sql/OrderCancellationRefundsIncidents.sql`.
 
-Pendiente: OTP real, idempotencia restante, métricas, reconexión SignalR en cliente real, pruebas SQL Server aisladas y despliegue. No hay GPS, distancias inferidas ni transferencias bancarias automáticas.
+## En desarrollo: idempotencia de transiciones
+
+Decisiones de negocio, inicio/listo de preparación, recogida, inicio del recorrido y confirmación de entrega toleran reintentos con el mismo actor y datos, sin duplicar eventos o pago de recogida. Acciones sobre ofertas externas también comparan su estado ya persistido. Parámetros distintos continúan sujetos a validación/conflicto. No se añade migración en este incremento.
+
+Pendiente: OTP real, idempotencia de reportes, creación de pedidos, comprobantes y asignación, métricas, reconexión SignalR en cliente real, pruebas SQL Server aisladas y despliegue. No hay GPS, distancias inferidas ni transferencias bancarias automáticas.
