@@ -12,7 +12,7 @@ Una persona mantiene todos los módulos: identidad y permisos, comercio, pedidos
 
 ## Ramas y base de datos
 
-`main` es la base de integración. Trabajar en incrementos pequeños `feature/*`, con PR revisado, `dotnet build Poraqui.sln`, `dotnet test Poraqui.sln` y los chequeos SQL Server pertinentes antes de integrar. Actualizar `docs/project-status.md`, `docs/handoff-codex.md` y `docs/api-contracts.md` por incremento. PR #1, #2 y #3 están integrados; el ledger detalla verificaciones y pendientes.
+`main` es la base de integración. Trabajar en incrementos pequeños `feature/*`, con PR revisado, `dotnet build Poraqui.sln`, `dotnet test Poraqui.sln` y los chequeos SQL Server pertinentes antes de integrar. Actualizar `docs/project-status.md`, `docs/handoff-codex.md` y `docs/api-contracts.md` por incremento. PR #1–#4 están integrados; el ledger detalla verificaciones y pendientes.
 
 Las pruebas que creen o limpien datos usan bases aisladas. La BD de desarrollo puede recibir solo registros identificables de prueba. No borrar ni recrear datos ni reiniciar la BD compartida. No incluir credenciales en Git; usar User Secrets localmente y la configuración privada del hosting en despliegue. La API no aplica migraciones al arrancar.
 

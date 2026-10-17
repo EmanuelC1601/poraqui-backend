@@ -1,4 +1,5 @@
 using System.Data;
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -79,6 +80,35 @@ public sealed class BusinessesController(
         catch (ArgumentException exception) { return BadRequest(new { error = exception.Message }); }
     }
 
+    [Authorize(Policy = ApplicationPolicies.ManageBusiness)]
+    [HttpGet("{businessId:guid}/transfer-details")]
+    public async Task<IActionResult> GetTransferDetails(Guid businessId, CancellationToken cancellationToken)
+    {
+        if (!TryGetActor(out var actorId, out var isAdmin)) return Unauthorized();
+        try
+        {
+            var result = await businesses.GetTransferDetailsAsync(businessId, actorId, isAdmin, cancellationToken);
+            return result is null ? NotFound() : Ok(result);
+        }
+        catch (BusinessAuthorizationException) { return Forbid(); }
+    }
+
+    [Authorize(Policy = ApplicationPolicies.ManageBusiness)]
+    [HttpPut("{businessId:guid}/transfer-details")]
+    public async Task<IActionResult> ConfigureTransferDetails(Guid businessId, ConfigureTransferDetailsRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetActor(out var actorId, out var isAdmin)) return Unauthorized();
+        try
+        {
+            var result = await businesses.ConfigureTransferDetailsAsync(businessId, actorId, isAdmin,
+                request.RecipientName, request.Institution, request.AccountReference, request.Instructions, cancellationToken);
+            return result is null ? NotFound() : Ok(result);
+        }
+        catch (BusinessAuthorizationException) { return Forbid(); }
+        catch (ArgumentException exception) { return BadRequest(new { error = exception.Message }); }
+    }
+
     [Authorize(Policy = ApplicationPolicies.PlatformAdministration)]
     [HttpPut("{businessId:guid}/active")]
     public async Task<IActionResult> SetActive(Guid businessId, SetBusinessActiveRequest request, CancellationToken cancellationToken)
@@ -98,3 +128,8 @@ public sealed record RegisterBusinessRequest(string Name, string Address);
 public sealed record ConfigureBusinessRequest(string Name, string Address);
 public sealed record SetBusinessActiveRequest(bool Active);
 public sealed record PublicBusiness(Guid Id, string Name, string Address);
+public sealed record ConfigureTransferDetailsRequest(
+    [Required, StringLength(160, MinimumLength = 2)] string RecipientName,
+    [Required, StringLength(120, MinimumLength = 2)] string Institution,
+    [Required, StringLength(120, MinimumLength = 4)] string AccountReference,
+    [StringLength(500)] string? Instructions);

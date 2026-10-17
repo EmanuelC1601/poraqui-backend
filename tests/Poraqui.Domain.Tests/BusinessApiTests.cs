@@ -47,13 +47,18 @@ public sealed class BusinessApiTests
             (await SendAsync(client, HttpMethod.Put, $"api/businesses/{firstBusinessId}", secondToken,
                 JsonContent.Create(new { name = "Cambio ajeno", address = "Centro" }))).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden,
+            (await SendAsync(client, HttpMethod.Put, $"api/businesses/{firstBusinessId}/transfer-details", secondToken,
+                JsonContent.Create(new { recipientName = "Otro", institution = "Otro banco", accountReference = "123456", instructions = "" }))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await SendAsync(client, HttpMethod.Get, $"api/businesses/{firstBusinessId}/transfer-details", secondToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,
             (await SendAsync(client, HttpMethod.Put, $"api/products/{productId}", secondToken,
                 JsonContent.Create(new { name = "Cambio ajeno", price = 1m, isAvailable = false }))).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("api/businesses/active")).StatusCode);
     }
 
     [Fact]
-    public async Task Order_prices_are_loaded_from_catalog_and_delivery_rate_on_server()
+    public async Task Manual_payment_and_internal_delivery_flow_preserves_server_pricing_and_history()
     {
         await using var factory = new ApiTestHost();
         using var client = factory.CreateClient();
@@ -73,7 +78,6 @@ public sealed class BusinessApiTests
         merchantToken = await LoginAsync(client, "merchant@example.test");
         Assert.Equal(HttpStatusCode.OK, (await SendAsync(client, HttpMethod.Put,
             $"api/businesses/{businessId}/active", adminToken, JsonContent.Create(new { active = true }))).StatusCode);
-
         using var zoneResponse = await SendAsync(client, HttpMethod.Post, "api/delivery-zones", adminToken,
             JsonContent.Create(new { name = "Centro de prueba" }));
         Assert.Equal(HttpStatusCode.OK, zoneResponse.StatusCode);
@@ -95,6 +99,12 @@ public sealed class BusinessApiTests
         Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put, "api/account/phone", customerToken,
             JsonContent.Create(new { phoneNumber = "+52 55 1234 5678" }))).StatusCode);
         var requestJson = $$"""{"businessId":"{{businessId}}","zoneId":"{{zoneId}}","deliveryAddress":"Calle de prueba","items":[{"productId":"{{productId}}","quantity":2,"unitPrice":0.01}]}""";
+        Assert.Equal(HttpStatusCode.BadRequest, (await SendAsync(client, HttpMethod.Post, "api/orders", customerToken,
+            new StringContent(requestJson, Encoding.UTF8, "application/json"))).StatusCode);
+        using var paymentDetailsResponse = await SendAsync(client, HttpMethod.Put,
+            $"api/businesses/{businessId}/transfer-details", merchantToken,
+            JsonContent.Create(new { recipientName = "Mercado Poraqui", institution = "Banco de prueba", accountReference = "CLABE-TEST-001", instructions = "Usa el número de pedido como concepto." }));
+        Assert.Equal(HttpStatusCode.OK, paymentDetailsResponse.StatusCode);
         using var orderResponse = await SendAsync(client, HttpMethod.Post, "api/orders", customerToken,
             new StringContent(requestJson, Encoding.UTF8, "application/json"));
 
@@ -103,9 +113,14 @@ public sealed class BusinessApiTests
         Assert.Equal(51.00m, orderJson.RootElement.GetProperty("subtotal").GetDecimal());
         Assert.Equal(18.25m, orderJson.RootElement.GetProperty("deliveryFee").GetDecimal());
         Assert.Equal(69.25m, orderJson.RootElement.GetProperty("total").GetDecimal());
+        Assert.Equal("CLABE-TEST-001", orderJson.RootElement.GetProperty("transferInstructions").GetProperty("accountReference").GetString());
         var customerDeliveryCode = orderJson.RootElement.GetProperty("customerDeliveryCode").GetString()!;
         Assert.Equal(6, customerDeliveryCode.Length);
         var orderId = orderJson.RootElement.GetProperty("id").GetGuid();
+        using (var changedDetails = await SendAsync(client, HttpMethod.Put,
+                   $"api/businesses/{businessId}/transfer-details", merchantToken,
+                   JsonContent.Create(new { recipientName = "Mercado Poraqui", institution = "Banco de prueba", accountReference = "CLABE-TEST-CHANGED", instructions = "Nueva cuenta." })))
+            Assert.Equal(HttpStatusCode.OK, changedDetails.StatusCode);
 
         using (var proofContent = new MultipartFormDataContent())
         {
@@ -207,6 +222,7 @@ public sealed class BusinessApiTests
         using var customerOrder = JsonDocument.Parse(await customerOrderResponse.Content.ReadAsStringAsync());
         Assert.Equal("Delivered", customerOrder.RootElement.GetProperty("status").GetString());
         Assert.True(customerOrder.RootElement.GetProperty("courierPaymentAmount").ValueKind == JsonValueKind.Null);
+        Assert.Equal("CLABE-TEST-001", customerOrder.RootElement.GetProperty("transferInstructions").GetProperty("accountReference").GetString());
         Assert.Equal(10, customerOrder.RootElement.GetProperty("history").GetArrayLength());
     }
 

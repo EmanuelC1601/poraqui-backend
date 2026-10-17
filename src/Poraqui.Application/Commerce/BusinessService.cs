@@ -11,6 +11,8 @@ public interface IBusinessRepository
 }
 
 public sealed record BusinessView(Guid Id, Guid OwnerUserId, string Name, string Address, bool IsActive);
+public sealed record BusinessTransferDetailsView(string? RecipientName, string? Institution, string? AccountReference,
+    string? Instructions, bool IsConfigured);
 
 public sealed class BusinessAuthorizationException : Exception { }
 
@@ -56,6 +58,29 @@ public sealed class BusinessService(IBusinessRepository repository)
 
     public async Task<IReadOnlyList<BusinessView>> GetActiveAsync(CancellationToken cancellationToken) =>
         (await repository.GetActiveAsync(cancellationToken)).Select(ToView).ToArray();
+
+    public async Task<BusinessTransferDetailsView?> GetTransferDetailsAsync(Guid businessId, Guid actorUserId,
+        bool isPlatformAdmin, CancellationToken cancellationToken)
+    {
+        var business = await repository.GetByIdAsync(businessId, cancellationToken);
+        if (business is null) return null;
+        EnsureCanManage(business, actorUserId, isPlatformAdmin);
+        return new BusinessTransferDetailsView(business.TransferRecipientName, business.TransferInstitution,
+            business.TransferAccountReference, business.TransferInstructions, business.HasTransferDetails);
+    }
+
+    public async Task<BusinessTransferDetailsView?> ConfigureTransferDetailsAsync(Guid businessId, Guid actorUserId,
+        bool isPlatformAdmin, string recipientName, string institution, string accountReference, string? instructions,
+        CancellationToken cancellationToken)
+    {
+        var business = await repository.GetByIdAsync(businessId, cancellationToken);
+        if (business is null) return null;
+        EnsureCanManage(business, actorUserId, isPlatformAdmin);
+        business.ConfigureTransferDetails(recipientName, institution, accountReference, instructions);
+        await repository.SaveChangesAsync(cancellationToken);
+        return new BusinessTransferDetailsView(business.TransferRecipientName, business.TransferInstitution,
+            business.TransferAccountReference, business.TransferInstructions, business.HasTransferDetails);
+    }
 
     private static void EnsureCanManage(Business business, Guid actorUserId, bool isPlatformAdmin)
     {

@@ -7,7 +7,8 @@ public sealed class Order
     private Order() { }
 
     public Order(Guid customerUserId, Guid businessId, Guid zoneId, string deliveryAddress, decimal deliveryFee,
-        IEnumerable<(Guid ProductId, string ProductName, decimal UnitPrice, int Quantity)> items)
+        IEnumerable<(Guid ProductId, string ProductName, decimal UnitPrice, int Quantity)> items,
+        OrderTransferDetails? transferDetails = null)
     {
         if (customerUserId == Guid.Empty) throw new ArgumentException("A customer is required.", nameof(customerUserId));
         if (businessId == Guid.Empty) throw new ArgumentException("A business is required.", nameof(businessId));
@@ -25,6 +26,13 @@ public sealed class Order
         ZoneId = zoneId;
         DeliveryAddress = deliveryAddress.Trim();
         DeliveryFee = decimal.Round(deliveryFee, 2, MidpointRounding.AwayFromZero);
+        if (transferDetails is not null)
+        {
+            TransferRecipientName = RequiredText(transferDetails.RecipientName, nameof(transferDetails.RecipientName));
+            TransferInstitution = RequiredText(transferDetails.Institution, nameof(transferDetails.Institution));
+            TransferAccountReference = RequiredText(transferDetails.AccountReference, nameof(transferDetails.AccountReference));
+            TransferInstructions = string.IsNullOrWhiteSpace(transferDetails.Instructions) ? null : transferDetails.Instructions.Trim();
+        }
         foreach (var line in lines)
             _items.Add(new OrderLine(line.ProductId, line.ProductName, line.UnitPrice, line.Quantity));
         Total = decimal.Round(_items.Sum(item => item.LineTotal) + DeliveryFee, 2, MidpointRounding.AwayFromZero);
@@ -54,6 +62,10 @@ public sealed class Order
     public string? ContactChannel { get; private set; }
     public DateTimeOffset? DeliveryStartedAtUtc { get; private set; }
     public DateTimeOffset? DeliveredAtUtc { get; private set; }
+    public string? TransferRecipientName { get; private set; }
+    public string? TransferInstitution { get; private set; }
+    public string? TransferAccountReference { get; private set; }
+    public string? TransferInstructions { get; private set; }
     public IReadOnlyCollection<OrderLine> Items => _items.AsReadOnly();
     public IReadOnlyCollection<TransferReview> TransferReviews => _transferReviews.AsReadOnly();
     public IReadOnlyCollection<OrderStatusChange> StatusHistory => _statusHistory.AsReadOnly();
@@ -192,7 +204,13 @@ public sealed class Order
         Version++;
         _statusHistory.Add(new OrderStatusChange(Guid.NewGuid(), actorUserId, status, changedAtUtc, reason));
     }
+
+    private static string RequiredText(string? value, string parameter) => string.IsNullOrWhiteSpace(value)
+        ? throw new ArgumentException("A value is required.", parameter)
+        : value.Trim();
 }
+
+public sealed record OrderTransferDetails(string RecipientName, string Institution, string AccountReference, string? Instructions);
 
 public sealed class OrderStatusChange(Guid id, Guid actorUserId, OrderStatus status, DateTimeOffset changedAtUtc, string reason)
 {

@@ -26,6 +26,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Name).HasMaxLength(160).IsRequired();
             entity.Property(x => x.Address).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.TransferRecipientName).HasMaxLength(160);
+            entity.Property(x => x.TransferInstitution).HasMaxLength(120);
+            entity.Property(x => x.TransferAccountReference).HasMaxLength(120);
+            entity.Property(x => x.TransferInstructions).HasMaxLength(500);
             entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.OwnerUserId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(x => x.OwnerUserId);
         });
@@ -73,6 +77,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(x => x.DeliveryCodeHash).HasMaxLength(128);
             entity.Property(x => x.ContactChannel).HasMaxLength(20);
             entity.Property(x => x.CourierPaymentAmount).HasPrecision(18, 2);
+            entity.Property(x => x.TransferRecipientName).HasMaxLength(160);
+            entity.Property(x => x.TransferInstitution).HasMaxLength(120);
+            entity.Property(x => x.TransferAccountReference).HasMaxLength(120);
+            entity.Property(x => x.TransferInstructions).HasMaxLength(500);
             entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CourierUserId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CourierPaymentReceivedByUserId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CustomerUserId).OnDelete(DeleteBehavior.Restrict);

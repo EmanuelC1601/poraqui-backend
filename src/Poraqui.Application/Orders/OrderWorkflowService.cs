@@ -27,7 +27,7 @@ public sealed record OrderWorkflowView(Guid Id, string OrderNumber, Guid Custome
     Guid? CourierUserId, string DeliveryAddress, decimal Subtotal, decimal DeliveryFee, decimal Total,
     decimal? CourierPaymentAmount, bool CourierPaymentReceived, string Status, DateTimeOffset CreatedAtUtc,
     DateTimeOffset? DeliveryStartedAtUtc, DateTimeOffset? DeliveredAtUtc, IReadOnlyList<OrderWorkflowLine> Items,
-    IReadOnlyList<OrderWorkflowHistory> History);
+    IReadOnlyList<OrderWorkflowHistory> History, TransferInstructionsView? TransferInstructions);
 public sealed record CourierAssignment(string PickupCode, decimal PaymentAmount, OrderWorkflowView Order);
 public sealed record CustomerContact(string? PhoneNumber, string WhatsAppDialString, string Channel);
 
@@ -57,7 +57,13 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository)
         if (order is null) return null;
         if (order.CustomerUserId != customerId) throw new OrderResourceForbiddenException();
         var address = await repository.GetBusinessAddressAsync(order.BusinessId, cancellationToken) ?? string.Empty;
-        return ToView(order, address) with { CourierPaymentAmount = null, CourierPaymentReceived = false };
+        return ToView(order, address) with
+        {
+            CourierPaymentAmount = null,
+            CourierPaymentReceived = false,
+            TransferInstructions = order.TransferRecipientName is null ? null : new TransferInstructionsView(
+                order.TransferRecipientName, order.TransferInstitution!, order.TransferAccountReference!, order.TransferInstructions)
+        };
     }
 
     public async Task<OrderWorkflowView?> GetForBusinessAsync(Guid orderId, Guid actorId, bool isAdmin, CancellationToken cancellationToken)
@@ -187,7 +193,7 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository)
         order.Status.ToString(), order.CreatedAtUtc, order.DeliveryStartedAtUtc, order.DeliveredAtUtc,
         order.Items.Select(item => new OrderWorkflowLine(item.ProductId, item.ProductName, item.UnitPrice, item.Quantity, item.LineTotal)).ToArray(),
         order.StatusHistory.OrderBy(entry => entry.ChangedAtUtc)
-            .Select(entry => new OrderWorkflowHistory(entry.ActorUserId, entry.Status.ToString(), entry.ChangedAtUtc, entry.Reason)).ToArray());
+            .Select(entry => new OrderWorkflowHistory(entry.ActorUserId, entry.Status.ToString(), entry.ChangedAtUtc, entry.Reason)).ToArray(), null);
 }
 
 public sealed class OrderResourceForbiddenException : Exception { }

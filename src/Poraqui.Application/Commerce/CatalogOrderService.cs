@@ -27,8 +27,9 @@ public sealed record RateView(Guid Id, Guid BusinessId, Guid ZoneId, decimal Fee
 public sealed record OrderItemRequest(Guid ProductId, int Quantity);
 public sealed record CreatedOrderView(Guid Id, string OrderNumber, Guid BusinessId, Guid ZoneId,
     string DeliveryAddress, decimal Subtotal, decimal DeliveryFee, decimal Total, OrderStatus Status,
-    IReadOnlyList<CreatedOrderLineView> Items, string CustomerDeliveryCode);
+    IReadOnlyList<CreatedOrderLineView> Items, string CustomerDeliveryCode, TransferInstructionsView TransferInstructions);
 public sealed record CreatedOrderLineView(Guid ProductId, string ProductName, decimal UnitPrice, int Quantity, decimal LineTotal);
+public sealed record TransferInstructionsView(string RecipientName, string Institution, string AccountReference, string? Instructions);
 
 public sealed class CatalogOrderService(ICatalogOrderRepository repository)
 {
@@ -155,6 +156,7 @@ public sealed class CatalogOrderService(ICatalogOrderRepository repository)
 
         var business = await repository.GetBusinessAsync(businessId, cancellationToken);
         if (business is null || !business.IsActive) throw new ArgumentException("Business is unavailable.", nameof(businessId));
+        if (!business.HasTransferDetails) throw new ArgumentException("Business has not configured transfer payment details.", nameof(businessId));
         var zone = await repository.GetZoneAsync(zoneId, cancellationToken);
         if (zone is null || !zone.IsActive) throw new ArgumentException("Delivery zone is unavailable.", nameof(zoneId));
         var rate = await repository.GetRateAsync(businessId, zoneId, cancellationToken);
@@ -167,7 +169,9 @@ public sealed class CatalogOrderService(ICatalogOrderRepository repository)
 
         var byId = products.ToDictionary(product => product.Id);
         var lines = requestedItems.Select(item => (item.ProductId, byId[item.ProductId].Name, byId[item.ProductId].Price, item.Quantity)).ToArray();
-        var order = new Order(customerId, businessId, zoneId, deliveryAddress, rate.Fee, lines);
+        var transferDetails = new OrderTransferDetails(business.TransferRecipientName!, business.TransferInstitution!,
+            business.TransferAccountReference!, business.TransferInstructions);
+        var order = new Order(customerId, businessId, zoneId, deliveryAddress, rate.Fee, lines, transferDetails);
         var deliveryCode = OrderAccessCode.Generate();
         order.SetDeliveryCodeHash(OrderAccessCode.Hash(deliveryCode));
         await repository.AddOrderAsync(order, cancellationToken);
@@ -178,7 +182,8 @@ public sealed class CatalogOrderService(ICatalogOrderRepository repository)
     private static ProductView ToView(CatalogProduct product) => new(product.Id, product.BusinessId, product.Name, product.Price, product.IsAvailable);
     private static CreatedOrderView ToView(Order order, string deliveryCode) => new(order.Id, order.OrderNumber, order.BusinessId, order.ZoneId,
         order.DeliveryAddress, order.Items.Sum(item => item.LineTotal), order.DeliveryFee, order.Total, order.Status,
-        order.Items.Select(item => new CreatedOrderLineView(item.ProductId, item.ProductName, item.UnitPrice, item.Quantity, item.LineTotal)).ToArray(), deliveryCode);
+        order.Items.Select(item => new CreatedOrderLineView(item.ProductId, item.ProductName, item.UnitPrice, item.Quantity, item.LineTotal)).ToArray(), deliveryCode,
+        new TransferInstructionsView(order.TransferRecipientName!, order.TransferInstitution!, order.TransferAccountReference!, order.TransferInstructions));
 }
 
 public static class OrderAccessCode
