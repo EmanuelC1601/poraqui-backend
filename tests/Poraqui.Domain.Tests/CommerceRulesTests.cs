@@ -105,6 +105,29 @@ public sealed class CommerceRulesTests
     }
 
     [Fact]
+    public void Repeated_payment_decision_acceptance_and_preparation_commands_do_not_duplicate_history()
+    {
+        var order = CreateOrder();
+        var reviewer = Guid.NewGuid();
+        var merchant = Guid.NewGuid();
+        order.SubmitTransferEvidence("test-transfer-idempotent");
+
+        Assert.True(order.ReviewTransfer(reviewer, approved: true, note: "Pago localizado"));
+        Assert.False(order.ReviewTransfer(reviewer, approved: true, note: "Pago localizado"));
+        Assert.True(order.AcceptByBusiness(merchant));
+        Assert.False(order.AcceptByBusiness(merchant));
+        Assert.True(order.BeginPreparation(merchant));
+        Assert.False(order.BeginPreparation(merchant));
+        Assert.True(order.MarkReadyForPickup(merchant));
+        Assert.False(order.MarkReadyForPickup(merchant));
+
+        Assert.Equal(OrderStatus.ReadyForPickup, order.Status);
+        Assert.Equal(6, order.StatusHistory.Count);
+        Assert.Equal(6, order.Version);
+        Assert.Throws<InvalidOperationException>(() => order.AcceptByBusiness(Guid.NewGuid()));
+    }
+
+    [Fact]
     public void Rejected_transfer_does_not_confirm_order_and_cannot_be_reviewed_twice()
     {
         var order = CreateOrder();
@@ -181,7 +204,7 @@ public sealed class CommerceRulesTests
         order.MarkReadyForPickup(businessUserId);
 
         Assert.Equal(OrderStatus.ReadyForPickup, order.Status);
-        Assert.Throws<InvalidOperationException>(() => order.MarkReadyForPickup(businessUserId));
+        Assert.False(order.MarkReadyForPickup(businessUserId));
     }
 
     [Fact]
@@ -215,6 +238,46 @@ public sealed class CommerceRulesTests
         Assert.Equal(OrderStatus.Delivered, order.Status);
         Assert.NotNull(order.DeliveredAtUtc);
         Assert.Equal(OrderStatus.Delivered, order.StatusHistory.Last().Status);
+    }
+
+    [Fact]
+    public void Repeated_delivery_start_is_safe_only_for_same_courier_and_contact_channel()
+    {
+        var order = CreateOrder();
+        var merchant = Guid.NewGuid();
+        var courier = Guid.NewGuid();
+        order.SetDeliveryCodeHash(Hash("654321"));
+        order.SubmitTransferEvidence("private/idempotent-proof");
+        order.ReviewTransfer(Guid.NewGuid(), approved: true);
+        order.AcceptByBusiness(merchant);
+        order.BeginPreparation(merchant);
+        order.MarkReadyForPickup(merchant);
+        order.AssignCourier(merchant, courier, Hash("123456"), 42.75m);
+        order.MarkPickedUp(courier, Hash("123456"));
+        var version = order.Version;
+
+        Assert.True(order.BeginDelivery(courier, "whatsapp"));
+        var transitionedVersion = order.Version;
+        Assert.False(order.BeginDelivery(courier, "WHATSAPP"));
+        Assert.Equal(OrderStatus.InTransit, order.Status);
+        Assert.Equal("whatsapp", order.ContactChannel);
+        Assert.Equal(transitionedVersion, order.Version);
+        Assert.Equal(version + 1, order.Version);
+        Assert.Throws<InvalidOperationException>(() => order.BeginDelivery(courier, "call"));
+        Assert.Throws<InvalidOperationException>(() => order.BeginDelivery(Guid.NewGuid(), "whatsapp"));
+    }
+
+    [Fact]
+    public void Repeated_external_offer_rejection_does_not_change_version()
+    {
+        var offer = new ExternalDeliveryOffer(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Origen", "Destino",
+            30m, "Frágil", DateTimeOffset.UtcNow.AddMinutes(5));
+
+        Assert.True(offer.Reject(DateTimeOffset.UtcNow));
+        var version = offer.Version;
+        Assert.False(offer.Reject(DateTimeOffset.UtcNow));
+        Assert.Equal(ExternalDeliveryOfferStatus.Rejected, offer.Status);
+        Assert.Equal(version, offer.Version);
     }
 
     private static string Hash(string code) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(code)));

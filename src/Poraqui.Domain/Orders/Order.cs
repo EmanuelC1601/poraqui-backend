@@ -86,31 +86,41 @@ public sealed class Order
         ChangeStatus(OrderStatus.AwaitingPaymentReview, actorUserId ?? CustomerUserId, "Transfer evidence submitted", now);
     }
 
-    public void ReviewTransfer(Guid reviewerUserId, bool approved, string? note = null, DateTimeOffset? reviewedAtUtc = null)
+    public bool ReviewTransfer(Guid reviewerUserId, bool approved, string? note = null, DateTimeOffset? reviewedAtUtc = null)
     {
         if (reviewerUserId == Guid.Empty) throw new ArgumentException("A reviewer is required.", nameof(reviewerUserId));
+        var normalizedNote = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+        var priorReview = _transferReviews.LastOrDefault();
+        if (priorReview?.Decision == (approved ? TransferDecision.Approved : TransferDecision.Rejected) &&
+            priorReview.ReviewerUserId == reviewerUserId && priorReview.Note == normalizedNote) return false;
         if (Status != OrderStatus.AwaitingPaymentReview) throw new InvalidOperationException("Order has no transfer awaiting review.");
         var review = _transferReviews.LastOrDefault(item => item.Decision is null)
             ?? throw new InvalidOperationException("No pending transfer evidence was found.");
         review.RecordDecision(reviewerUserId, approved, note, reviewedAtUtc ?? DateTimeOffset.UtcNow);
         ChangeStatus(approved ? OrderStatus.AwaitingBusinessDecision : OrderStatus.Rejected,
             reviewerUserId, approved ? "Transfer approved; awaiting business decision" : "Transfer rejected", reviewedAtUtc ?? DateTimeOffset.UtcNow);
+        return true;
     }
 
-    public void AcceptByBusiness(Guid businessUserId)
+    public bool AcceptByBusiness(Guid businessUserId)
     {
         EnsureActor(businessUserId);
+        if (HasRecordedChange(OrderStatus.Confirmed, businessUserId, "Business accepted order")) return false;
         EnsureStatus(OrderStatus.AwaitingBusinessDecision);
         ChangeStatus(OrderStatus.Confirmed, businessUserId, "Business accepted order", DateTimeOffset.UtcNow);
+        return true;
     }
 
-    public void RejectByBusiness(Guid businessUserId, string reason)
+    public bool RejectByBusiness(Guid businessUserId, string reason)
     {
         EnsureActor(businessUserId);
-        EnsureStatus(OrderStatus.AwaitingBusinessDecision);
         if (string.IsNullOrWhiteSpace(reason)) throw new ArgumentException("A rejection reason is required.", nameof(reason));
-        ChangeStatus(OrderStatus.Rejected, businessUserId, reason.Trim(), DateTimeOffset.UtcNow);
+        var normalizedReason = reason.Trim();
+        if (HasRecordedChange(OrderStatus.Rejected, businessUserId, normalizedReason)) return false;
+        EnsureStatus(OrderStatus.AwaitingBusinessDecision);
+        ChangeStatus(OrderStatus.Rejected, businessUserId, normalizedReason, DateTimeOffset.UtcNow);
         EnsureRefundFollowUp(businessUserId);
+        return true;
     }
 
     public bool CancelByCustomer(Guid customerUserId, string reason)
@@ -161,18 +171,22 @@ public sealed class Order
         return changed;
     }
 
-    public void BeginPreparation(Guid businessUserId)
+    public bool BeginPreparation(Guid businessUserId)
     {
         EnsureActor(businessUserId);
+        if (HasRecordedChange(OrderStatus.Preparing, businessUserId, "Preparation started")) return false;
         EnsureStatus(OrderStatus.Confirmed);
         ChangeStatus(OrderStatus.Preparing, businessUserId, "Preparation started", DateTimeOffset.UtcNow);
+        return true;
     }
 
-    public void MarkReadyForPickup(Guid businessUserId)
+    public bool MarkReadyForPickup(Guid businessUserId)
     {
         EnsureActor(businessUserId);
+        if (HasRecordedChange(OrderStatus.ReadyForPickup, businessUserId, "Ready for pickup")) return false;
         EnsureStatus(OrderStatus.Preparing);
         ChangeStatus(OrderStatus.ReadyForPickup, businessUserId, "Ready for pickup", DateTimeOffset.UtcNow);
+        return true;
     }
 
     public void AssignCourier(Guid businessUserId, Guid courierUserId, string pickupCodeHash,
@@ -218,15 +232,18 @@ public sealed class Order
         ChangeStatus(OrderStatus.PickedUp, courierUserId, "Courier confirms business paid at pickup", now);
     }
 
-    public void BeginDelivery(Guid courierUserId, string contactChannel)
+    public bool BeginDelivery(Guid courierUserId, string contactChannel)
     {
         EnsureCourier(courierUserId);
-        EnsureStatus(OrderStatus.PickedUp);
         var normalized = contactChannel?.Trim().ToLowerInvariant();
         if (normalized is not ("whatsapp" or "call")) throw new ArgumentException("Contact channel must be whatsapp or call.", nameof(contactChannel));
+        var reason = $"Delivery started; contact via {normalized}";
+        if (HasRecordedChange(OrderStatus.InTransit, courierUserId, reason)) return false;
+        EnsureStatus(OrderStatus.PickedUp);
         ContactChannel = normalized;
         DeliveryStartedAtUtc = DateTimeOffset.UtcNow;
-        ChangeStatus(OrderStatus.InTransit, courierUserId, $"Delivery started; contact via {normalized}", DeliveryStartedAtUtc.Value);
+        ChangeStatus(OrderStatus.InTransit, courierUserId, reason, DeliveryStartedAtUtc.Value);
+        return true;
     }
 
     public void MarkDelivered(Guid courierUserId, string submittedCodeHash)
@@ -243,6 +260,9 @@ public sealed class Order
         if (courierUserId == Guid.Empty || CourierUserId != courierUserId)
             throw new InvalidOperationException("Only the assigned courier can perform this operation.");
     }
+
+    private bool HasRecordedChange(OrderStatus status, Guid actorUserId, string reason) =>
+        _statusHistory.Any(change => change.Status == status && change.ActorUserId == actorUserId && change.Reason == reason);
 
     private bool Cancel(Guid actorUserId, string reason, OrderStatus[] allowedStatuses)
     {
