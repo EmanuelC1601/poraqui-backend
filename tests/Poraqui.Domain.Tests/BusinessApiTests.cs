@@ -5,6 +5,8 @@ using System.Text;
 using System.Text.Json;
 using System.Net.WebSockets;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Http.Connections;
+using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Poraqui.Application.Security;
@@ -241,6 +243,11 @@ public sealed class BusinessApiTests
                    JsonContent.Create(new { commandId = Guid.NewGuid(), businessId, zoneId, deliveryAddress = "Calle de prueba", items = new[] { new { productId, quantity = 2, optionIds = new[] { largeOptionId, cheeseOptionId } } } })))
             Assert.Equal(HttpStatusCode.BadRequest, closedOrderResponse.StatusCode);
         using var realtimeSocket = await ConnectOrdersHubAsync(factory, client, customerToken, orderId);
+        await using var reconnectingHub = CreateSignalRClient(factory, client, customerToken);
+        await reconnectingHub.StartAsync();
+        var initialHubSnapshot = await reconnectingHub.InvokeAsync<OrderRealtimeSnapshot>("SubscribeOrder", orderId);
+        Assert.Equal("PendingPayment", initialHubSnapshot.Status);
+        Assert.Equal(1, initialHubSnapshot.Version);
         Assert.Equal(HttpStatusCode.Unauthorized,
             (await client.PostAsync("hubs/orders/negotiate?negotiateVersion=1", null)).StatusCode);
         using (var scope = factory.Services.CreateScope())
@@ -307,6 +314,11 @@ public sealed class BusinessApiTests
             using var persistedJson = JsonDocument.Parse(await persistedOrder.Content.ReadAsStringAsync());
             Assert.Equal("AwaitingPaymentReview", persistedJson.RootElement.GetProperty("status").GetString());
         }
+        await reconnectingHub.StopAsync();
+        await reconnectingHub.StartAsync();
+        var reconnectedSnapshot = await reconnectingHub.InvokeAsync<OrderRealtimeSnapshot>("SubscribeOrder", orderId);
+        Assert.Equal("AwaitingPaymentReview", reconnectedSnapshot.Status);
+        Assert.Equal(2, reconnectedSnapshot.Version);
         using (var evidence = await SendAsync(client, HttpMethod.Get,
                    $"api/businesses/{businessId}/orders/{orderId}/transfer-evidence", merchantToken))
         {
@@ -732,6 +744,26 @@ public sealed class BusinessApiTests
         Assert.Equal("subscribe-1", subscription.RootElement.GetProperty("invocationId").GetString());
         Assert.Equal("PendingPayment", subscription.RootElement.GetProperty("result").GetProperty("status").GetString());
         return socket;
+    }
+
+    private static HubConnection CreateSignalRClient(ApiTestHost factory, HttpClient client, string accessToken)
+    {
+        var socketClient = factory.Server.CreateWebSocketClient();
+        return new HubConnectionBuilder()
+            .WithUrl(new Uri(client.BaseAddress!, "hubs/orders"), options =>
+            {
+                options.AccessTokenProvider = () => Task.FromResult<string?>(accessToken);
+                options.HttpMessageHandlerFactory = _ => factory.Server.CreateHandler();
+                options.WebSocketFactory = (context, cancellationToken) =>
+                {
+                    var uri = new UriBuilder(context.Uri);
+                    var token = $"access_token={Uri.EscapeDataString(accessToken)}";
+                    uri.Query = string.IsNullOrEmpty(uri.Query) ? token : $"{uri.Query.TrimStart('?')}&{token}";
+                    return new ValueTask<WebSocket>(socketClient.ConnectAsync(uri.Uri, cancellationToken));
+                };
+                options.Transports = HttpTransportType.WebSockets;
+            })
+            .Build();
     }
 
     private static async Task SendSignalRFrameAsync(WebSocket socket, string json)
