@@ -148,6 +148,18 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasIndex(x => x.OrderId).IsUnique();
         });
 
+        builder.Entity<CourierAssignmentCommand>(entity =>
+        {
+            entity.ToTable("CourierAssignmentCommands");
+            entity.HasKey(x => new { x.BusinessUserId, x.CommandId });
+            entity.Property(x => x.RequestHash).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.ProtectedPickupCode).HasMaxLength(2000).IsRequired();
+            entity.Property(x => x.CourierPaymentAmount).HasPrecision(18, 2);
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.BusinessUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Order>().WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.OrderId).IsUnique();
+        });
+
         builder.Entity<OrderLine>(entity =>
         {
             entity.ToTable("OrderLines");

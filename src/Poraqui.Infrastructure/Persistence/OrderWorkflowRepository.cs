@@ -45,6 +45,10 @@ public sealed class OrderWorkflowRepository(AppDbContext db) : IOrderWorkflowRep
         db.Set<TransferReview>().SingleOrDefaultAsync(review => review.SubmittedByUserId == actorUserId &&
             review.CommandId == commandId, cancellationToken);
 
+    public Task<CourierAssignmentCommand?> GetCourierAssignmentCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken) =>
+        db.Set<CourierAssignmentCommand>().SingleOrDefaultAsync(command => command.BusinessUserId == actorUserId &&
+            command.CommandId == commandId, cancellationToken);
+
     public async Task CancelOpenExternalOffersForOrderAsync(Guid orderId, CancellationToken cancellationToken)
     {
         var offers = await db.ExternalDeliveryOffers.Where(offer => offer.OrderId == orderId &&
@@ -69,6 +73,26 @@ public sealed class OrderWorkflowRepository(AppDbContext db) : IOrderWorkflowRep
             if (commandIds.Length > 0 && await db.Set<TransferReview>().AnyAsync(review => review.SubmittedByUserId == order.CustomerUserId &&
                     review.CommandId.HasValue && commandIds.Contains(review.CommandId.Value), cancellationToken))
                 return false;
+            throw;
+        }
+    }
+
+    public async Task<bool> SaveCourierAssignmentCommandAsync(Order order, CourierAssignmentCommand command, CancellationToken cancellationToken)
+    {
+        db.Set<CourierAssignmentCommand>().Add(command);
+        try
+        {
+            await SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateException)
+        {
+            db.ChangeTracker.Clear();
+            if (await db.Set<CourierAssignmentCommand>().AnyAsync(existing => existing.BusinessUserId == command.BusinessUserId &&
+                    existing.CommandId == command.CommandId, cancellationToken))
+                return false;
+            if (await db.Set<CourierAssignmentCommand>().AnyAsync(existing => existing.OrderId == command.OrderId, cancellationToken))
+                throw new CourierAssignmentCommandConflictException();
             throw;
         }
     }
