@@ -6,6 +6,7 @@ API de la plataforma de comida local, construida en .NET 9 con Clean Architectur
 
 ```sh
 dotnet build Poraqui.sln
+dotnet test Poraqui.sln
 ```
 
 Configura `ConnectionStrings__DefaultConnection` para habilitar SQL Server e Identity. No guardes secretos en archivos versionados.

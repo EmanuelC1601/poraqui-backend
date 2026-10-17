@@ -1,19 +1,21 @@
-# Acuerdos de trabajo
+# Flujo de desarrollo
 
-## Responsabilidades
+## Responsable
 
-- **Agente 1 (Codex)**: solución y composición Clean Architecture, contexto/configuración EF e Identity, usuarios/permisos, negocios, catálogo, cobertura y tarifas, flujo de pedidos y revisión manual de transferencias; único responsable de migraciones y de aplicarlas a la BD compartida.
-- **Agente 2 (OpenCode)**: módulo de reparto, usando los contratos de `docs/api-contracts.md`.
+Una persona mantiene todos los módulos: identidad y permisos, comercio, pedidos, pagos manuales, reparto propio y externo, notificaciones, sincronización, métricas, infraestructura y despliegue. Esa persona es también la única responsable de `AppDbContext`, las migraciones y su aplicación a las bases de desarrollo y producción.
 
-## Archivos compartidos
+## Archivos y contratos
 
-- `src/Poraqui.Domain/Orders/OrderStatus.cs`: Agente 1 mantiene el enum; coordinar cambios de estados y transiciones antes de modificar.
-- `src/Poraqui.Application/Delivery/DeliveryOrderContracts.cs`: Agente 1 mantiene los contratos iniciales; el Agente 2 puede proponer extensiones mediante su PR, sin romper métodos o DTO existentes.
-- `src/Poraqui.Infrastructure/Persistence/AppDbContext.cs`, configuración de DI y migraciones: Agente 1 propietario. El Agente 2 no genera migraciones.
-- `docs/api-contracts.md`: ambos agentes coordinan contratos entre módulos vía PR/documentación del repositorio.
+- `src/Poraqui.Domain/Orders/OrderStatus.cs` y `src/Poraqui.Application/Delivery/DeliveryOrderContracts.cs` son contratos provisionales; mantenerlos alineados con la máquina de estados y casos de uso implementados.
+- `src/Poraqui.Infrastructure/Persistence/AppDbContext.cs`, configuración de DI y `src/Poraqui.Infrastructure/Persistence/Migrations/` pertenecen al responsable único del backend.
+- `docs/api-contracts.md` y `docs/project-status.md` son la fuente de estado actual y contratos.
 
-## Flujo y base de datos
+## Ramas y base de datos
 
-Trabajar en ramas `feature/*` y entregar incrementos mediante PR. Antes de actualizar una rama, revisar cambios y resolver conflictos conservando ambos módulos. Tras cada integración, Agente 1 comunica en `docs/handoff-codex.md` los cambios de esquema y los comandos para actualizar la rama.
+Trabajar desde `main`, en incrementos pequeños `feature/*`, con PR revisado, `dotnet build Poraqui.sln`, `dotnet test Poraqui.sln` y los chequeos SQL Server pertinentes antes de integrar. Actualizar `docs/project-status.md` y `docs/handoff-codex.md` tras cada integración.
 
-La base de desarrollo puede recibir registros funcionales de prueba identificables por ambos agentes. No borrar ni recrear datos ni reiniciar la BD compartida. Toda prueba que modifique o limpie datos debe usar una base independiente. Nunca incluir credenciales en Git.
+Las pruebas que creen o limpien datos usan bases aisladas. La BD de desarrollo puede recibir solo registros identificables de prueba. No borrar ni recrear datos ni reiniciar la BD compartida. No incluir credenciales en Git; usar User Secrets localmente y la configuración privada del hosting en despliegue. La API no aplica migraciones al arrancar.
+
+## Antecedentes
+
+El plan inicial contempló dos agentes, con el módulo de reparto en OpenCode. El equipo cambió a un responsable único antes de integrar el PR #1. Los contratos preliminares de reparto se conservan como referencia, pero no hay implementación que dependa de otra persona.
