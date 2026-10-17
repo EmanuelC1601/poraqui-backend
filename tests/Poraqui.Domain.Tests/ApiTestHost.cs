@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Poraqui.Application.Accounts;
 using Poraqui.Infrastructure.Persistence;
 
 namespace Poraqui.Domain.Tests;
@@ -16,6 +17,7 @@ public sealed class ApiTestHost : WebApplicationFactory<Program>
     private readonly string? _previousBootstrapKey = Environment.GetEnvironmentVariable("Bootstrap__AdminKey");
     private readonly string? _previousEvidenceRoot = Environment.GetEnvironmentVariable("PrivateFiles__Root");
     private readonly string _evidenceRoot = Path.Combine(Path.GetTempPath(), "poraqui-tests", Guid.NewGuid().ToString("N"));
+    public TestPhoneVerificationProvider PhoneVerification { get; } = new();
 
     public ApiTestHost()
     {
@@ -30,6 +32,8 @@ public sealed class ApiTestHost : WebApplicationFactory<Program>
         builder.UseEnvironment("Testing");
         builder.ConfigureServices(services =>
         {
+            services.RemoveAll<IPhoneVerificationProvider>();
+            services.AddSingleton<IPhoneVerificationProvider>(PhoneVerification);
             services.RemoveAll<DbContextOptions<AppDbContext>>();
             services.RemoveAll<AppDbContext>();
             services.AddDbContext<AppDbContext>(options => options.UseSqlite(_connection));
@@ -57,4 +61,18 @@ public sealed class ApiTestHost : WebApplicationFactory<Program>
                 Directory.Delete(resolvedEvidenceRoot, recursive: true);
         }
     }
+}
+
+public sealed class TestPhoneVerificationProvider : IPhoneVerificationProvider
+{
+    public string? LastStartedPhoneNumber { get; private set; }
+
+    public Task StartAsync(string phoneNumber, CancellationToken cancellationToken)
+    {
+        LastStartedPhoneNumber = phoneNumber;
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> IsApprovedAsync(string phoneNumber, string code, CancellationToken cancellationToken) =>
+        Task.FromResult(phoneNumber == LastStartedPhoneNumber && code == "123456");
 }
