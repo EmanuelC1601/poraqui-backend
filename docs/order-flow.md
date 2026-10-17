@@ -11,7 +11,7 @@ dotnet user-secrets set "PrivateFiles:Root" "<ruta privada fuera del web root>" 
 dotnet run --project src/Poraqui.Api
 ```
 
-El `UserSecretsId` ya está configurado. Las migraciones revisables incluyen `InitialCommerceAndIdentity`, `BusinessTransferInstructionsSnapshot`, `ExternalCourierOffers`, `OfflineDeliveryCommandSync`, `CatalogProductOptions`, `BusinessOpeningHours`, `OrderCancellationRefundsIncidents` y `OrderCancellationAuditConstraints`. La API no migra al iniciar. Antes de aplicar migraciones, configura la clave privada, revisa que el esquema y los datos actuales coincidan y usa `dotnet tool run dotnet-ef database update --project src/Poraqui.Infrastructure --startup-project src/Poraqui.Api`. Las migraciones tienen scripts revisables en `docs/sql/`. En Development se publica OpenAPI en `/openapi/v1.json`.
+El `UserSecretsId` ya está configurado. Las 12 migraciones revisables se listan en [api-contracts.md](api-contracts.md); EF confirmó aplicadas las 12 en desarrollo y el modelo no tiene cambios pendientes. La API no migra al iniciar. Antes de aplicar migraciones futuras, revisa que el esquema y los datos actuales coincidan y usa `dotnet tool run dotnet-ef database update --project src/Poraqui.Infrastructure --startup-project src/Poraqui.Api` explícitamente. Las migraciones tienen scripts revisables en `docs/sql/`. En Development se publica OpenAPI actualizado en `/openapi/v1.json`.
 
 ## Secuencia
 
@@ -26,14 +26,15 @@ El `UserSecretsId` ya está configurado. Las migraciones revisables incluyen `In
      "businessId": "<guid>",
      "zoneId": "<guid>",
      "deliveryAddress": "Calle y número",
+     "commandId": "<guid estable para reintentos>",
      "items": [{ "productId": "<guid>", "quantity": 2, "optionIds": ["<guid>"] }]
    }
    ```
 
    El servidor valida opciones y calcula importes a partir de precio base más diferencias de precio. La respuesta conserva los nombres/precios seleccionados, snapshot de transferencia y código de recepción para que el cliente lo guarde.
-5. Cliente sube comprobante privado en `POST /api/orders/{orderId}/transfer-evidence` con multipart `file`.
+5. Cliente sube comprobante privado en `POST /api/orders/{orderId}/transfer-evidence` con multipart `file` y `commandId` GUID estable. Un reintento con los mismos datos no crea una segunda revisión.
 6. Negocio revisa transferencia en `POST /api/businesses/{businessId}/orders/{orderId}/payment-review`, acepta/rechaza con `.../decision`, inicia preparación en `.../preparation` y marca listo en `.../ready`.
-7. Para reparto propio, admin asigna rol con `PUT /api/admin/users/{courierId}/delivery-person`; negocio asigna con `POST .../assign-courier`. Para reparto externo, admin usa `PUT /api/admin/users/{courierId}/external-courier`, courier marca disponibilidad y zona, y negocio publica ofertas con remuneración/condiciones en `POST .../external-offers`.
+7. Para reparto propio, admin asigna rol con `PUT /api/admin/users/{courierId}/delivery-person`; negocio asigna con `POST .../assign-courier` y `commandId` GUID estable. Reintentar la asignación devuelve el mismo código de recogida; una segunda asignación distinta se rechaza. Para reparto externo, admin usa `PUT /api/admin/users/{courierId}/external-courier`, courier marca disponibilidad y zona, y negocio publica ofertas con remuneración/condiciones en `POST .../external-offers`.
 8. Courier externo ve origen, destino, zona, condiciones y remuneración en `GET /api/courier/external/offers`; puede rechazar o aceptar. La aceptación asigna pedido y devuelve código de recogida al courier ganador. Si el negocio cancela ofertas abiertas se usa `POST .../external-offers/cancel`; si no hay candidatos la API devuelve `NoCouriersAvailable`.
 9. Courier confirma recogida con `POST /api/orders/{orderId}/pickup` y el código. Esto registra por separado el pago que recibió del negocio.
 10. Courier inicia recorrido con `POST /api/orders/{orderId}/delivery/start`, `contactChannel` `whatsapp` o `call`. El teléfono se devuelve solo al courier asignado para contacto manual.
@@ -45,8 +46,8 @@ El `UserSecretsId` ya está configurado. Las migraciones revisables incluyen `In
 
 ## Verificaciones actuales
 
-La suite suma 21 pruebas: 20 de recorrido o servicio con SQLite en memoria/carpeta temporal y transportes falsos (opciones obligatorias/no disponibles, permisos, importes y snapshots, comprobante, revisión manual, configuración y snapshot de transferencia, oferta/cancelación/ausencia de repartidores/rechazo/aceptación externa, cancelación con reembolso manual, incidencias, métricas, códigos, pago al recoger, sincronización idempotente, entrega y evento SignalR, solicitud y confirmación OTP y límite de solicitudes), más una de traducción de las consultas de métricas con el proveedor SQL Server sin conexión. SQLite y la generación de SQL no sustituyen la prueba de migraciones, restricciones y aceptación simultánea contra SQL Server real.
+La suite actual registra 26 pruebas: 24 aprobadas en SQLite aislado/dominio y dos omitidas. Las omitidas son las carreras SQL Server de aceptar una oferta externa y asignar courier propio; ambas requieren `ConnectionStrings__SqlServerTest` apuntando a una base aislada `PoraquiIntegrationTests`. Build actual .NET 10: cero advertencias y errores. SQLite no sustituye la verificación de restricciones y concurrencia SQL Server.
 
 ## Límites
 
-WhatsApp/llamada se hace fuera de la API; esta registra canal y entrega datos autorizados. Las tarifas se basan en zonas configuradas; no hay GPS ni distancias inventadas. OTP se implementa con Twilio Verify, aunque falta probarlo con credenciales/SMS reales. Siguen pendientes reconexión SignalR en cliente real, idempotencia en otros comandos, despliegue y validación SQL Server. La cancelación del negocio está disponible hasta antes de asignar courier.
+WhatsApp/llamada se hace fuera de la API; esta registra canal y entrega datos autorizados. Las tarifas se basan en zonas configuradas; no hay GPS ni distancias inventadas. OTP está implementado con Twilio Verify; falta envío real. SignalR entrega estado persistido al suscribirse de nuevo, pero no se ha validado reconexión desde cliente real. Falta ejecutar las dos carreras SQL Server aisladas y probar publicación MonsterASP.NET. La cancelación del negocio está disponible hasta antes de asignar courier.
