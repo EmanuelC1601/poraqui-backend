@@ -1,0 +1,46 @@
+using Microsoft.EntityFrameworkCore;
+using Poraqui.Application.Orders;
+using Poraqui.Domain.Orders;
+
+namespace Poraqui.Infrastructure.Persistence;
+
+public sealed class OrderWorkflowRepository(AppDbContext db) : IOrderWorkflowRepository
+{
+    private IQueryable<Order> OrderGraph() => db.Orders
+        .Include(order => order.Items)
+        .Include(order => order.TransferReviews)
+        .Include(order => order.StatusHistory);
+
+    public Task<Order?> GetOrderAsync(Guid orderId, CancellationToken cancellationToken) =>
+        OrderGraph().SingleOrDefaultAsync(order => order.Id == orderId, cancellationToken);
+
+    public async Task<IReadOnlyList<Order>> GetOrdersForBusinessAsync(Guid businessId, CancellationToken cancellationToken) =>
+        await OrderGraph().AsNoTracking().Where(order => order.BusinessId == businessId)
+            .OrderByDescending(order => order.CreatedAtUtc).ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Order>> GetOrdersForCourierAsync(Guid courierId, CancellationToken cancellationToken) =>
+        await OrderGraph().AsNoTracking().Where(order => order.CourierUserId == courierId &&
+            order.Status != OrderStatus.Delivered && order.Status != OrderStatus.Cancelled)
+            .OrderByDescending(order => order.CreatedAtUtc).ToListAsync(cancellationToken);
+
+    public Task<string?> GetBusinessAddressAsync(Guid businessId, CancellationToken cancellationToken) =>
+        db.Businesses.Where(business => business.Id == businessId).Select(business => business.Address).SingleOrDefaultAsync(cancellationToken);
+
+    public Task<bool> BusinessBelongsToAsync(Guid businessId, Guid ownerUserId, CancellationToken cancellationToken) =>
+        db.Businesses.AnyAsync(business => business.Id == businessId && business.OwnerUserId == ownerUserId, cancellationToken);
+
+    public Task<string?> GetCustomerPhoneAsync(Guid customerUserId, CancellationToken cancellationToken) =>
+        db.Users.Where(user => user.Id == customerUserId).Select(user => user.PhoneNumber).SingleOrDefaultAsync(cancellationToken);
+
+    public async Task SaveChangesAsync(CancellationToken cancellationToken)
+    {
+        // Status history is append-only. EF's field-backed read-only collection can
+        // detect the new shadow-FK dependent as Modified; persist it as an insert.
+        foreach (var entry in db.ChangeTracker.Entries<OrderStatusChange>().Where(entry => entry.State == EntityState.Modified))
+            entry.State = EntityState.Added;
+        foreach (var entry in db.ChangeTracker.Entries<TransferReview>()
+                     .Where(entry => entry.State == EntityState.Modified && entry.Entity.Decision is null && entry.Entity.ReviewerUserId is null))
+            entry.State = EntityState.Added;
+        await db.SaveChangesAsync(cancellationToken);
+    }
+}

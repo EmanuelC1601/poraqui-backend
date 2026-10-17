@@ -3,6 +3,7 @@ namespace Poraqui.Domain.Orders;
 public sealed class Order
 {
     private readonly List<OrderLine> _items = [];
+    private readonly List<OrderStatusChange> _statusHistory = [];
     private Order() { }
 
     public Order(Guid customerUserId, Guid businessId, Guid zoneId, string deliveryAddress, decimal deliveryFee,
@@ -28,7 +29,9 @@ public sealed class Order
             _items.Add(new OrderLine(line.ProductId, line.ProductName, line.UnitPrice, line.Quantity));
         Total = decimal.Round(_items.Sum(item => item.LineTotal) + DeliveryFee, 2, MidpointRounding.AwayFromZero);
         Status = OrderStatus.PendingPayment;
+        Version = 1;
         CreatedAtUtc = DateTimeOffset.UtcNow;
+        _statusHistory.Add(new OrderStatusChange(Guid.NewGuid(), customerUserId, Status, CreatedAtUtc, "Order created"));
     }
 
     public Guid Id { get; private set; }
@@ -40,17 +43,29 @@ public sealed class Order
     public decimal DeliveryFee { get; private set; }
     public decimal Total { get; private set; }
     public OrderStatus Status { get; private set; }
+    public long Version { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
+    public Guid? CourierUserId { get; private set; }
+    public string? PickupCodeHash { get; private set; }
+    public string? DeliveryCodeHash { get; private set; }
+    public decimal? CourierPaymentAmount { get; private set; }
+    public DateTimeOffset? CourierPaymentReceivedAtUtc { get; private set; }
+    public Guid? CourierPaymentReceivedByUserId { get; private set; }
+    public string? ContactChannel { get; private set; }
+    public DateTimeOffset? DeliveryStartedAtUtc { get; private set; }
+    public DateTimeOffset? DeliveredAtUtc { get; private set; }
     public IReadOnlyCollection<OrderLine> Items => _items.AsReadOnly();
     public IReadOnlyCollection<TransferReview> TransferReviews => _transferReviews.AsReadOnly();
+    public IReadOnlyCollection<OrderStatusChange> StatusHistory => _statusHistory.AsReadOnly();
     private readonly List<TransferReview> _transferReviews = [];
 
-    public void SubmitTransferEvidence(string evidenceReference)
+    public void SubmitTransferEvidence(string evidenceReference, Guid? actorUserId = null)
     {
         if (Status != OrderStatus.PendingPayment) throw new InvalidOperationException("Order is not awaiting payment evidence.");
         if (string.IsNullOrWhiteSpace(evidenceReference)) throw new ArgumentException("Evidence reference is required.", nameof(evidenceReference));
-        Status = OrderStatus.AwaitingPaymentReview;
-        _transferReviews.Add(TransferReview.Submitted(evidenceReference.Trim(), DateTimeOffset.UtcNow));
+        var now = DateTimeOffset.UtcNow;
+        _transferReviews.Add(TransferReview.Submitted(evidenceReference.Trim(), now));
+        ChangeStatus(OrderStatus.AwaitingPaymentReview, actorUserId ?? CustomerUserId, "Transfer evidence submitted", now);
     }
 
     public void ReviewTransfer(Guid reviewerUserId, bool approved, string? note = null, DateTimeOffset? reviewedAtUtc = null)
@@ -60,20 +75,133 @@ public sealed class Order
         var review = _transferReviews.LastOrDefault(item => item.Decision is null)
             ?? throw new InvalidOperationException("No pending transfer evidence was found.");
         review.RecordDecision(reviewerUserId, approved, note, reviewedAtUtc ?? DateTimeOffset.UtcNow);
-        Status = approved ? OrderStatus.Confirmed : OrderStatus.Rejected;
+        ChangeStatus(approved ? OrderStatus.AwaitingBusinessDecision : OrderStatus.Rejected,
+            reviewerUserId, approved ? "Transfer approved; awaiting business decision" : "Transfer rejected", reviewedAtUtc ?? DateTimeOffset.UtcNow);
     }
 
-    public void BeginPreparation()
+    public void AcceptByBusiness(Guid businessUserId)
     {
-        if (Status != OrderStatus.Confirmed) throw new InvalidOperationException("Only a confirmed order can be prepared.");
-        Status = OrderStatus.Preparing;
+        EnsureActor(businessUserId);
+        EnsureStatus(OrderStatus.AwaitingBusinessDecision);
+        ChangeStatus(OrderStatus.Confirmed, businessUserId, "Business accepted order", DateTimeOffset.UtcNow);
     }
 
-    public void MarkReadyForPickup()
+    public void RejectByBusiness(Guid businessUserId, string reason)
     {
-        if (Status != OrderStatus.Preparing) throw new InvalidOperationException("Only a preparing order can be marked ready.");
-        Status = OrderStatus.ReadyForPickup;
+        EnsureActor(businessUserId);
+        EnsureStatus(OrderStatus.AwaitingBusinessDecision);
+        if (string.IsNullOrWhiteSpace(reason)) throw new ArgumentException("A rejection reason is required.", nameof(reason));
+        ChangeStatus(OrderStatus.Rejected, businessUserId, reason.Trim(), DateTimeOffset.UtcNow);
     }
+
+    public void BeginPreparation(Guid businessUserId)
+    {
+        EnsureActor(businessUserId);
+        EnsureStatus(OrderStatus.Confirmed);
+        ChangeStatus(OrderStatus.Preparing, businessUserId, "Preparation started", DateTimeOffset.UtcNow);
+    }
+
+    public void MarkReadyForPickup(Guid businessUserId)
+    {
+        EnsureActor(businessUserId);
+        EnsureStatus(OrderStatus.Preparing);
+        ChangeStatus(OrderStatus.ReadyForPickup, businessUserId, "Ready for pickup", DateTimeOffset.UtcNow);
+    }
+
+    public void AssignCourier(Guid businessUserId, Guid courierUserId, string pickupCodeHash,
+        decimal courierPaymentAmount)
+    {
+        EnsureActor(businessUserId);
+        EnsureStatus(OrderStatus.ReadyForPickup);
+        if (courierUserId == Guid.Empty) throw new ArgumentException("A courier is required.", nameof(courierUserId));
+        if (string.IsNullOrWhiteSpace(pickupCodeHash) || string.IsNullOrWhiteSpace(DeliveryCodeHash))
+            throw new ArgumentException("Pickup and delivery codes are required.");
+        if (courierPaymentAmount < 0) throw new ArgumentOutOfRangeException(nameof(courierPaymentAmount));
+        CourierUserId = courierUserId;
+        PickupCodeHash = pickupCodeHash;
+        CourierPaymentAmount = decimal.Round(courierPaymentAmount, 2, MidpointRounding.AwayFromZero);
+        ChangeStatus(OrderStatus.AssignedToDelivery, businessUserId, "Courier assigned", DateTimeOffset.UtcNow);
+    }
+
+    public void SetDeliveryCodeHash(string deliveryCodeHash)
+    {
+        EnsureStatus(OrderStatus.PendingPayment);
+        if (!string.IsNullOrWhiteSpace(DeliveryCodeHash)) throw new InvalidOperationException("Delivery code has already been assigned.");
+        if (string.IsNullOrWhiteSpace(deliveryCodeHash)) throw new ArgumentException("Delivery code is required.", nameof(deliveryCodeHash));
+        DeliveryCodeHash = deliveryCodeHash;
+    }
+
+    public void MarkPickedUp(Guid courierUserId, string submittedCodeHash)
+    {
+        EnsureCourier(courierUserId);
+        EnsureStatus(OrderStatus.AssignedToDelivery);
+        EnsureCode(PickupCodeHash, submittedCodeHash, "Pickup code is invalid.");
+        var now = DateTimeOffset.UtcNow;
+        CourierPaymentReceivedAtUtc = now;
+        CourierPaymentReceivedByUserId = courierUserId;
+        ChangeStatus(OrderStatus.PickedUp, courierUserId, "Courier confirms business paid at pickup", now);
+    }
+
+    public void BeginDelivery(Guid courierUserId, string contactChannel)
+    {
+        EnsureCourier(courierUserId);
+        EnsureStatus(OrderStatus.PickedUp);
+        var normalized = contactChannel?.Trim().ToLowerInvariant();
+        if (normalized is not ("whatsapp" or "call")) throw new ArgumentException("Contact channel must be whatsapp or call.", nameof(contactChannel));
+        ContactChannel = normalized;
+        DeliveryStartedAtUtc = DateTimeOffset.UtcNow;
+        ChangeStatus(OrderStatus.InTransit, courierUserId, $"Delivery started; contact via {normalized}", DeliveryStartedAtUtc.Value);
+    }
+
+    public void MarkDelivered(Guid courierUserId, string submittedCodeHash)
+    {
+        EnsureCourier(courierUserId);
+        EnsureStatus(OrderStatus.InTransit);
+        EnsureCode(DeliveryCodeHash, submittedCodeHash, "Delivery code is invalid.");
+        DeliveredAtUtc = DateTimeOffset.UtcNow;
+        ChangeStatus(OrderStatus.Delivered, courierUserId, "Customer confirmed receipt", DeliveredAtUtc.Value);
+    }
+
+    private void EnsureCourier(Guid courierUserId)
+    {
+        if (courierUserId == Guid.Empty || CourierUserId != courierUserId)
+            throw new InvalidOperationException("Only the assigned courier can perform this operation.");
+    }
+
+    private void EnsureActor(Guid actorUserId)
+    {
+        if (actorUserId == Guid.Empty) throw new ArgumentException("An actor is required.", nameof(actorUserId));
+    }
+
+    private void EnsureStatus(OrderStatus expected)
+    {
+        if (Status != expected) throw new InvalidOperationException($"Order must be in {expected} state.");
+    }
+
+    private static void EnsureCode(string? storedHash, string? submittedHash, string message)
+    {
+        if (string.IsNullOrEmpty(storedHash) || string.IsNullOrEmpty(submittedHash) ||
+            !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                System.Text.Encoding.UTF8.GetBytes(storedHash), System.Text.Encoding.UTF8.GetBytes(submittedHash)))
+            throw new InvalidOperationException(message);
+    }
+
+    private void ChangeStatus(OrderStatus status, Guid actorUserId, string reason, DateTimeOffset changedAtUtc)
+    {
+        Status = status;
+        Version++;
+        _statusHistory.Add(new OrderStatusChange(Guid.NewGuid(), actorUserId, status, changedAtUtc, reason));
+    }
+}
+
+public sealed class OrderStatusChange(Guid id, Guid actorUserId, OrderStatus status, DateTimeOffset changedAtUtc, string reason)
+{
+    private OrderStatusChange() : this(Guid.Empty, Guid.Empty, default, default, string.Empty) { }
+    public Guid Id { get; private set; } = id;
+    public Guid ActorUserId { get; private set; } = actorUserId;
+    public OrderStatus Status { get; private set; } = status;
+    public DateTimeOffset ChangedAtUtc { get; private set; } = changedAtUtc;
+    public string Reason { get; private set; } = reason;
 }
 
 public sealed class OrderLine

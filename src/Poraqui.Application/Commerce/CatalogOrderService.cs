@@ -27,7 +27,7 @@ public sealed record RateView(Guid Id, Guid BusinessId, Guid ZoneId, decimal Fee
 public sealed record OrderItemRequest(Guid ProductId, int Quantity);
 public sealed record CreatedOrderView(Guid Id, string OrderNumber, Guid BusinessId, Guid ZoneId,
     string DeliveryAddress, decimal Subtotal, decimal DeliveryFee, decimal Total, OrderStatus Status,
-    IReadOnlyList<CreatedOrderLineView> Items);
+    IReadOnlyList<CreatedOrderLineView> Items, string CustomerDeliveryCode);
 public sealed record CreatedOrderLineView(Guid ProductId, string ProductName, decimal UnitPrice, int Quantity, decimal LineTotal);
 
 public sealed class CatalogOrderService(ICatalogOrderRepository repository)
@@ -168,13 +168,21 @@ public sealed class CatalogOrderService(ICatalogOrderRepository repository)
         var byId = products.ToDictionary(product => product.Id);
         var lines = requestedItems.Select(item => (item.ProductId, byId[item.ProductId].Name, byId[item.ProductId].Price, item.Quantity)).ToArray();
         var order = new Order(customerId, businessId, zoneId, deliveryAddress, rate.Fee, lines);
+        var deliveryCode = OrderAccessCode.Generate();
+        order.SetDeliveryCodeHash(OrderAccessCode.Hash(deliveryCode));
         await repository.AddOrderAsync(order, cancellationToken);
         await repository.SaveChangesAsync(cancellationToken);
-        return ToView(order);
+        return ToView(order, deliveryCode);
     }
 
     private static ProductView ToView(CatalogProduct product) => new(product.Id, product.BusinessId, product.Name, product.Price, product.IsAvailable);
-    private static CreatedOrderView ToView(Order order) => new(order.Id, order.OrderNumber, order.BusinessId, order.ZoneId,
+    private static CreatedOrderView ToView(Order order, string deliveryCode) => new(order.Id, order.OrderNumber, order.BusinessId, order.ZoneId,
         order.DeliveryAddress, order.Items.Sum(item => item.LineTotal), order.DeliveryFee, order.Total, order.Status,
-        order.Items.Select(item => new CreatedOrderLineView(item.ProductId, item.ProductName, item.UnitPrice, item.Quantity, item.LineTotal)).ToArray());
+        order.Items.Select(item => new CreatedOrderLineView(item.ProductId, item.ProductName, item.UnitPrice, item.Quantity, item.LineTotal)).ToArray(), deliveryCode);
+}
+
+public static class OrderAccessCode
+{
+    public static string Generate() => System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+    public static string Hash(string value) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(value ?? string.Empty)));
 }

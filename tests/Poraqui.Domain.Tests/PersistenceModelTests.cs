@@ -38,12 +38,52 @@ public sealed class PersistenceModelTests
             var loaded = await db.Orders
                 .Include(x => x.Items)
                 .Include(x => x.TransferReviews)
+                .Include(x => x.StatusHistory)
                 .SingleAsync(x => x.Id == order.Id);
 
-            Assert.Equal(OrderStatus.Confirmed, loaded.Status);
+            Assert.Equal(OrderStatus.AwaitingBusinessDecision, loaded.Status);
             Assert.Equal(29m, loaded.Total);
             Assert.Equal("Producto de prueba", loaded.Items.Single().ProductName);
             Assert.Equal(reviewer.Id, loaded.TransferReviews.Single().ReviewerUserId);
+            Assert.Equal(new[] { OrderStatus.PendingPayment, OrderStatus.AwaitingPaymentReview, OrderStatus.AwaitingBusinessDecision },
+                loaded.StatusHistory.OrderBy(change => change.ChangedAtUtc).Select(change => change.Status).ToArray());
         }
+    }
+
+    [Fact]
+    public async Task Competing_business_decisions_use_optimistic_concurrency_and_only_one_wins()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
+        var owner = new ApplicationUser { Id = Guid.NewGuid(), UserName = "concurrency-owner" };
+        var customer = new ApplicationUser { Id = Guid.NewGuid(), UserName = "concurrency-customer" };
+        var reviewer = new ApplicationUser { Id = Guid.NewGuid(), UserName = "concurrency-reviewer" };
+        var business = new Business(owner.Id, "Negocio concurrencia", "Centro");
+        var zone = new DeliveryZone("Zona concurrencia");
+        var product = new CatalogProduct(business.Id, "Producto concurrencia", 10m);
+        var order = new Order(customer.Id, business.Id, zone.Id, "Domicilio", 2m,
+            [(product.Id, product.Name, product.Price, 1)]);
+        order.SubmitTransferEvidence("fixture/concurrency-proof");
+        order.ReviewTransfer(reviewer.Id, approved: true);
+
+        await using (var setup = new AppDbContext(options))
+        {
+            await setup.Database.EnsureCreatedAsync();
+            setup.Users.AddRange(owner, customer, reviewer);
+            setup.AddRange(business, zone, product, order);
+            await setup.SaveChangesAsync();
+        }
+
+        await using var left = new AppDbContext(options);
+        await using var right = new AppDbContext(options);
+        var leftOrder = await left.Orders.Include(item => item.StatusHistory).SingleAsync(item => item.Id == order.Id);
+        var rightOrder = await right.Orders.Include(item => item.StatusHistory).SingleAsync(item => item.Id == order.Id);
+        leftOrder.AcceptByBusiness(owner.Id);
+        rightOrder.RejectByBusiness(owner.Id, "Conflicto de concurrencia");
+
+        await new Poraqui.Infrastructure.Persistence.OrderWorkflowRepository(left).SaveChangesAsync(default);
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() =>
+            new Poraqui.Infrastructure.Persistence.OrderWorkflowRepository(right).SaveChangesAsync(default));
     }
 }

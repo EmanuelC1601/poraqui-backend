@@ -4,6 +4,8 @@ using Poraqui.Infrastructure.Identity;
 using Poraqui.Infrastructure.Persistence;
 using Poraqui.Api.Security;
 using Poraqui.Application.Commerce;
+using Poraqui.Application.Orders;
+using Poraqui.Infrastructure.Storage;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,6 +24,9 @@ if (!string.IsNullOrWhiteSpace(connectionString))
     builder.Services.AddScoped<BusinessService>();
     builder.Services.AddScoped<ICatalogOrderRepository, CatalogOrderRepository>();
     builder.Services.AddScoped<CatalogOrderService>();
+    builder.Services.AddScoped<IOrderWorkflowRepository, OrderWorkflowRepository>();
+    builder.Services.AddScoped<OrderWorkflowService>();
+    builder.Services.AddSingleton<ITransferEvidenceStorage, FileTransferEvidenceStorage>();
 }
 builder.Services.AddPoraquiAuthorization();
 

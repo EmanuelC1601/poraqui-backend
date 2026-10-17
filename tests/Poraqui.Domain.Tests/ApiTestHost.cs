@@ -14,12 +14,15 @@ public sealed class ApiTestHost : WebApplicationFactory<Program>
     private readonly SqliteConnection _connection = new("Data Source=:memory:");
     private readonly string? _previousConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection");
     private readonly string? _previousBootstrapKey = Environment.GetEnvironmentVariable("Bootstrap__AdminKey");
+    private readonly string? _previousEvidenceRoot = Environment.GetEnvironmentVariable("PrivateFiles__Root");
+    private readonly string _evidenceRoot = Path.Combine(Path.GetTempPath(), "poraqui-tests", Guid.NewGuid().ToString("N"));
 
     public ApiTestHost()
     {
         _connection.Open();
         Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", "Server=localhost;Database=unit;Integrated Security=true");
         Environment.SetEnvironmentVariable("Bootstrap__AdminKey", "integration-test-bootstrap-key-with-sufficient-length");
+        Environment.SetEnvironmentVariable("PrivateFiles__Root", _evidenceRoot);
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -47,6 +50,11 @@ public sealed class ApiTestHost : WebApplicationFactory<Program>
             _connection.Dispose();
             Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", _previousConnectionString);
             Environment.SetEnvironmentVariable("Bootstrap__AdminKey", _previousBootstrapKey);
+            Environment.SetEnvironmentVariable("PrivateFiles__Root", _previousEvidenceRoot);
+            var tempEvidenceParent = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "poraqui-tests")) + Path.DirectorySeparatorChar;
+            var resolvedEvidenceRoot = Path.GetFullPath(_evidenceRoot);
+            if (Directory.Exists(resolvedEvidenceRoot) && resolvedEvidenceRoot.StartsWith(tempEvidenceParent, StringComparison.OrdinalIgnoreCase))
+                Directory.Delete(resolvedEvidenceRoot, recursive: true);
         }
     }
 }

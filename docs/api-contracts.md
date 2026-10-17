@@ -23,11 +23,29 @@ La prueba integrada registra dos usuarios, crea sus negocios, verifica acceso al
 
 La prueba de recorrido de creación de pedido confirma subtotal, envío y total calculados con catálogo/tarifa del servidor incluso si el JSON incluye un campo de precio engañoso adicional. Este recorrido solo se probó sobre SQLite aislado; catálogo, tarifas y pedido aún no están verificados en SQL Server. Opciones de producto siguen pendientes.
 
-## Contratos preliminares pendientes de implementación
+## Implementado localmente en `feature/order-lifecycle` (sin PR todavía)
 
-`IDeliveryOrderQueries` y `IDeliveryOrderOperations` son interfaces provisionales. No hay endpoints o servicios operativos de reparto que las implementen. Sus operaciones propuestas (`GetAvailableOrdersAsync`, `GetOrderAsync`, `AcceptAsync`, `MarkPickedUpAsync`, `MarkDeliveredAsync`) deberán sustituirse/ajustarse junto con el flujo comprobado, incluyendo pago al repartidor al recoger, códigos e historial.
+- `PUT /api/account/phone`: usuario autenticado registra su teléfono; requiere validación/confirmación del canal en una fase posterior.
+- `POST /api/orders/{id}/transfer-evidence` recibe multipart `file`; solo cliente propietario. Admite PDF/JPEG/PNG con firma básica validada y máximo de 8 MB. Archivos fuera del web root; no hay acceso público directo.
+- `GET /api/businesses/{businessId}/orders/{orderId}/transfer-evidence`: propietario del negocio/admin descarga como attachment.
+- `POST /api/businesses/{businessId}/orders/{orderId}/payment-review`: propietario o admin registra la revisión manual. Aprobación deja el pedido en `AwaitingBusinessDecision`; no confirma aceptación del negocio.
+- `POST .../decision`: negocio acepta o rechaza. Solo un pedido aceptado llega a `Confirmed`.
+- `POST .../preparation` y `POST .../ready`: inicio explícito de preparación y disponibilidad de recogida.
+- `PUT /api/admin/users/{id}/delivery-person`: administrador habilita/deshabilita rol de repartidor propio.
+- `POST .../assign-courier`: negocio asigna repartidor propio y fija remuneración a pagar al recoger; genera código de recogida de seis dígitos, mostrado una vez en esa respuesta. El código de recepción se genera al crear el pedido, se devuelve solo al cliente en esa respuesta y se persiste como hash.
+- `GET /api/courier/orders` y `GET /api/courier/orders/{orderId}`: repartidor propio consulta solo los pedidos asignados, con origen, destino, condiciones y remuneración.
+- `POST /api/orders/{id}/pickup`: solo el repartidor asignado, exige código correcto y registra de forma separada que confirma haber recibido el pago del negocio.
+- `POST /api/orders/{id}/delivery/start`: repartidor asignado inicia recorrido y selecciona `whatsapp` o `call`; devuelve teléfono de cliente y teléfono normalizado a ese repartidor.
+- `POST /api/orders/{id}/delivery/confirm`: solo repartidor asignado, exige código del cliente.
+- `GET /api/orders/{id}` (cliente propietario), `GET /api/businesses/{businessId}/orders` y `GET .../orders/{orderId}` (negocio autorizado) devuelven estado e historial persistidos.
 
-El enum de estado inicial no representa todavía una máquina de estados validada. No usarlo como promesa de API estable hasta cubrir aceptación/rechazo, revisión del pago, preparación, asignación, recogida, trayecto, entrega y cancelación.
+Cada transición incrementa `Order.Version` como token de concurrencia; una decisión simultánea obsoleta produce conflicto en lugar de sobrescribir el resultado. Hay prueba de carrera secuencial con dos contextos aislados verificando que solo una decisión prevalece. El recorrido completo también está probado de extremo a extremo con SQLite en memoria aislado. `InitialCommerceAndIdentity` incluye el modelo actual. Aún falta verificar restricciones/concurrencia con SQL Server y aplicar esa migración.
+
+El recorrido reproducible del API y sus límites están en `docs/order-flow.md`.
+
+## Antecedentes y pendientes
+
+El archivo provisional `src/Poraqui.Application/Delivery/DeliveryOrderContracts.cs` se eliminó en `feature/order-lifecycle` tras implementar endpoints y casos de uso persistidos. El estado inicial se amplió, pero faltan cancelaciones/reembolsos y los estados/ofertas del reparto externo. La revisión manual del comprobante no confirma por sí sola la aceptación del negocio: son pasos separados y ambos aparecen en historial.
 
 ## Contratos por definir al implementar
 
