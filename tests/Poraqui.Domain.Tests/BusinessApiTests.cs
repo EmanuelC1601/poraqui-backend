@@ -7,6 +7,7 @@ using System.Net.WebSockets;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Poraqui.Application.Security;
@@ -248,6 +249,7 @@ public sealed class BusinessApiTests
         var initialHubSnapshot = await reconnectingHub.InvokeAsync<OrderRealtimeSnapshot>("SubscribeOrder", orderId);
         Assert.Equal("PendingPayment", initialHubSnapshot.Status);
         Assert.Equal(1, initialHubSnapshot.Version);
+        await Assert.ThrowsAsync<HubException>(() => reconnectingHub.InvokeAsync<IReadOnlyList<ExternalOfferView>>("SubscribeCourierOffers"));
         Assert.Equal(HttpStatusCode.Unauthorized,
             (await client.PostAsync("hubs/orders/negotiate?negotiateVersion=1", null)).StatusCode);
         using (var scope = factory.Services.CreateScope())
@@ -527,6 +529,16 @@ public sealed class BusinessApiTests
             JsonContent.Create(new { isExternalCourier = true }))).StatusCode);
         var courierToken = await LoginAsync(client, "courier@example.test");
         var courierTwoToken = await LoginAsync(client, "courier-two@example.test");
+        await using var courierOfferHub = CreateSignalRClient(factory, client, courierToken);
+        var offerNotice = new TaskCompletionSource<ExternalOfferNotice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        courierOfferHub.On<ExternalOfferNotice>("ExternalOfferAvailable", notice => offerNotice.TrySetResult(notice));
+        await courierOfferHub.StartAsync();
+        Assert.Empty(await courierOfferHub.InvokeAsync<IReadOnlyList<ExternalOfferView>>("SubscribeCourierOffers"));
+        await using var courierTwoOfferHub = CreateSignalRClient(factory, client, courierTwoToken);
+        var offerNoticeTwo = new TaskCompletionSource<ExternalOfferNotice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        courierTwoOfferHub.On<ExternalOfferNotice>("ExternalOfferAvailable", notice => offerNoticeTwo.TrySetResult(notice));
+        await courierTwoOfferHub.StartAsync();
+        Assert.Empty(await courierTwoOfferHub.InvokeAsync<IReadOnlyList<ExternalOfferView>>("SubscribeCourierOffers"));
         Assert.Equal(HttpStatusCode.BadRequest, (await SendAsync(client, HttpMethod.Put, "api/courier/external/availability", courierToken,
             JsonContent.Create(new { isAvailable = true, zoneId = Guid.NewGuid() }))).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put, "api/courier/external/availability", courierToken,
@@ -542,6 +554,19 @@ public sealed class BusinessApiTests
             using var dispatchJson = JsonDocument.Parse(await dispatch.Content.ReadAsStringAsync());
             Assert.Equal(2, dispatchJson.RootElement.GetProperty("offerCount").GetInt32());
         }
+        var receivedOfferNotice = await offerNotice.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var receivedOfferNoticeTwo = await offerNoticeTwo.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(orderId, receivedOfferNotice.OrderId);
+        Assert.Equal(orderId, receivedOfferNoticeTwo.OrderId);
+        Assert.NotEqual(receivedOfferNotice.OfferId, receivedOfferNoticeTwo.OfferId);
+        using (var persistedOffer = await SendAsync(client, HttpMethod.Get, "api/courier/external/offers", courierToken))
+        using (var persistedOffers = JsonDocument.Parse(await persistedOffer.Content.ReadAsStringAsync()))
+            Assert.Contains(persistedOffers.RootElement.EnumerateArray(), offer => offer.GetProperty("id").GetGuid() == receivedOfferNotice.OfferId);
+        using (var persistedOffer = await SendAsync(client, HttpMethod.Get, "api/courier/external/offers", courierTwoToken))
+        using (var persistedOffers = JsonDocument.Parse(await persistedOffer.Content.ReadAsStringAsync()))
+            Assert.Contains(persistedOffers.RootElement.EnumerateArray(), offer => offer.GetProperty("id").GetGuid() == receivedOfferNoticeTwo.OfferId);
+        await courierOfferHub.StopAsync();
+        await courierTwoOfferHub.StopAsync();
         using (var dispatchRetry = await SendAsync(client, HttpMethod.Post,
                    $"api/businesses/{businessId}/orders/{orderId}/external-offers", merchantToken,
                    JsonContent.Create(new { remuneration = 37.50m, conditions = "Pago en efectivo al recoger", expiresInMinutes = 15 })))

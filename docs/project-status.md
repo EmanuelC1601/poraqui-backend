@@ -28,7 +28,9 @@ Actualizado: 2026-10-17. `main` es la base de integración y tiene un único res
 
 PR #43 (`6063058`) valida que courier externo active disponibilidad solo en zona existente y activa; prueba API SQLite cubre zona inexistente.
 
-En curso en `feature/external-offer-expiration-worker`: un proceso hospedado barre ofertas vencidas cada minuto y persiste el estado `Expired`. Una prueba SQLite comprueba que solo las ofertas debidas se actualicen. La rama no está integrada todavía; ejecutar build y pruebas antes del PR.
+PR #44 (`099c3ad`) añade un proceso hospedado que barre ofertas vencidas cada minuto y persiste el estado `Expired`; prueba SQLite confirma que solo se actualizan las ofertas debidas.
+
+En curso en `feature/external-offer-signalr`: suscripción SignalR privada por usuario para ofertas externas; nuevos avisos se publican después de persistir y la suscripción devuelve snapshot actual. Prueba API con cliente SignalR y rechazo para usuario sin rol; rama aún no integrada.
 
 ## SQL Server privado
 

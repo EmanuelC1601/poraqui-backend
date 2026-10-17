@@ -25,7 +25,7 @@ Estado: `main` es la base única de integración. Este documento describe los co
 
 ## SignalR
 
-Hub autenticado `/hubs/orders`; `SubscribeOrder(orderId)` valida cliente, negocio, courier asignado o admin y devuelve snapshot de estado/versión. Publica `OrderChanged` después de persistir, con datos mínimos. Al reconectar, el cliente vuelve a invocar `SubscribeOrder` para obtener el snapshot actual.
+Hub autenticado `/hubs/orders`; `SubscribeOrder(orderId)` valida cliente, negocio, courier asignado o admin y devuelve snapshot de estado/versión. Publica `OrderChanged` después de persistir, con datos mínimos. Courier externo puede invocar `SubscribeCourierOffers()` con rol `ExternalCourier`; se une a un grupo privado por usuario y recibe el snapshot actual de ofertas. Nuevas ofertas envían `ExternalOfferAvailable` al destinatario solo después de guardar; al reconectar se vuelve a invocar la suscripción para sincronizar. Otros roles reciben error de autorización.
 
 ## Operación y límites
 
