@@ -1,12 +1,12 @@
 # Handoff de desarrollo
 
-## Estado actual (2026-10-17): comprobantes idempotentes
+## Incremento PR #20: comprobantes idempotentes
 
 Desarrollo de un solo responsable: OpenCode ya no participa; la asignación histórica de reparto se conserva como antecedente. `main` es la base de integración y PR #18/#19 siguen apilados fuera de ella. La rama de trabajo actual `feature/transfer-proof-idempotency` parte de la cabeza de PR #19. Añade `commandId` obligatorio a `POST /api/orders/{id}/transfer-evidence`; repetir mismo actor/clave/orden/hash devuelve la operación guardada, mientras una colisión de contenido responde 409. El incremento todavía está sin commit/PR.
 
 Migración `20261017212343_TransferEvidenceCommandIdempotency`: columnas nullable e índice único filtrado; no cambia la nulabilidad preexistente de `OrderId` ni elimina datos. Script revisable: `docs/sql/20261017212343_TransferEvidenceCommandIdempotency.sql`. Aplicada explícitamente en SQL Server de desarrollo. La conexión privada `ConnectionStrings:DefaultConnection` está en User Secrets. No se migrará al iniciar la API.
 
-Verificación previa de código: build limpio; 24 pruebas aprobadas y una optativa omitida por ausencia de `ConnectionStrings__SqlServerTest`; pruebas funcionales en SQLite aislado. La prueba de concurrencia SQL Server aún no se ejecuta. La asignación propia con reintento durable es pendiente. Antes de publicar este incremento, repetir build, pruebas y `git diff --check`.
+Verificación antes de publicar: build limpio; 24 pruebas aprobadas y una optativa omitida por ausencia de `ConnectionStrings__SqlServerTest`; pruebas funcionales en SQLite aislado. `git diff --check` limpio. La prueba de concurrencia SQL Server aún no se ejecuta. El commit `60c0bbc` está publicado y PR #20 abierto contra PR #19.
 
 ## Incremento en curso: asignación propia idempotente
 
