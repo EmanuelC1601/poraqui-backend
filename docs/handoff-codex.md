@@ -2,7 +2,7 @@
 
 ## Base publicada
 
-`main` y `origin/main` apuntan a `a5d9dd8`, conservando `origin/feature/clean-architecture-foundation`. `main` es la base compartida de integración. Codex trabaja en `feature/comercio-pedidos`, creada desde `main`.
+`main` y `origin/main` apuntan a `a5d9dd8`, conservando `origin/feature/clean-architecture-foundation`. `main` es la base compartida de integración. Codex trabaja en `feature/comercio-pedidos`, creada desde `main`; incremento publicado en `6ea7f8a`. Crear el PR contra `main`: [abrir PR de comercio/pedidos](https://github.com/EmanuelC1601/poraqui-backend/pull/new/feature/comercio-pedidos).
 
 ## Incluido
 
@@ -20,6 +20,8 @@ La solución .NET 9 con proyectos Domain, Application, Infrastructure y Api comp
 
 La rama de trabajo agrega al contexto EF los modelos de negocio, catálogo, cobertura, tarifas, pedidos y revisión de transferencia. Aún no se generaron migraciones. La conexión no se pudo probar porque no está configurada la clave privada `ConnectionStrings:DefaultConnection` (variable `ConnectionStrings__DefaultConnection`) en entorno, User Secrets ni `appsettings.Development.json` de la copia de Codex. No se ha modificado la BD compartida. La API no aplica migraciones al iniciar. Agente 1 conserva la responsabilidad exclusiva de generarlas y aplicarlas después de integrar ambos cambios de esquema.
 
-Para iniciar desde la base: `git fetch origin` y `git switch -c feature/reparto --track origin/main`. Para actualizar una rama existente compartida: `git fetch origin` y `git merge origin/main` (o rebase antes de publicar cambios propios). No hay actualización de esquema pendiente en la base. Las firmas del contrato de reparto permanecen estables en este incremento; coordinar cambios de DTO, estado o método con Codex antes de implementarlos.
+Para iniciar desde la base: `git fetch origin` y `git switch -c feature/reparto --track origin/main`. Para actualizar una rama existente compartida: `git fetch origin` y `git merge origin/main` (o rebase antes de publicar cambios propios). Para probar el incremento de Codex antes de que se integre: `git fetch origin` y `git merge origin/feature/comercio-pedidos`. No hay actualización de esquema pendiente: todavía no hay migraciones. Las firmas del contrato de reparto permanecen estables en este incremento; coordinar cambios de DTO, estado o método con Codex antes de implementarlos.
+
+Para configurar la conexión localmente, crea User Secrets con `dotnet user-secrets init --project src/Poraqui.Api` y agrega `ConnectionStrings:DefaultConnection` con `dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<cadena privada>" --project src/Poraqui.Api`. La clave no debe guardarse en Git.
 
 `main` ya está publicada, pero no se pudo cambiar la rama predeterminada desde este entorno. En GitHub, abre **Settings → General → Default branch → Edit**, selecciona `main` y guarda.
