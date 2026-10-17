@@ -7,7 +7,7 @@ namespace Poraqui.Infrastructure.Persistence;
 public sealed class OrderWorkflowRepository(AppDbContext db) : IOrderWorkflowRepository
 {
     private IQueryable<Order> OrderGraph() => db.Orders
-        .Include(order => order.Items)
+        .Include(order => order.Items).ThenInclude(item => item.Options)
         .Include(order => order.TransferReviews)
         .Include(order => order.StatusHistory);
 

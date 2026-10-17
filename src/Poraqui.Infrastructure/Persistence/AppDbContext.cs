@@ -45,6 +45,27 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(x => x.Price).HasPrecision(18, 2);
             entity.HasOne<Business>().WithMany().HasForeignKey(x => x.BusinessId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(x => new { x.BusinessId, x.IsAvailable });
+            entity.HasMany(x => x.OptionGroups).WithOne().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Cascade);
+            entity.Navigation(x => x.OptionGroups).HasField("_optionGroups").UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        builder.Entity<ProductOptionGroup>(entity =>
+        {
+            entity.ToTable("ProductOptionGroups");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).HasMaxLength(120).IsRequired();
+            entity.HasMany(x => x.Options).WithOne().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Cascade);
+            entity.Navigation(x => x.Options).HasField("_options").UsePropertyAccessMode(PropertyAccessMode.Field);
+            entity.HasIndex(x => new { x.ProductId, x.Name }).IsUnique();
+        });
+
+        builder.Entity<ProductOption>(entity =>
+        {
+            entity.ToTable("ProductOptions");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.PriceDelta).HasPrecision(18, 2);
+            entity.HasIndex(x => new { x.GroupId, x.Name }).IsUnique();
         });
 
         builder.Entity<DeliveryZone>(entity =>
@@ -106,6 +127,16 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(x => x.ProductName).HasMaxLength(160).IsRequired();
             entity.Property(x => x.UnitPrice).HasPrecision(18, 2);
             entity.Property(x => x.LineTotal).HasPrecision(18, 2);
+            entity.HasMany(x => x.Options).WithOne().HasForeignKey("OrderLineId").IsRequired().OnDelete(DeleteBehavior.Cascade);
+            entity.Navigation(x => x.Options).HasField("_options").UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        builder.Entity<OrderLineOption>(entity =>
+        {
+            entity.ToTable("OrderLineOptions");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.PriceDelta).HasPrecision(18, 2);
         });
 
         builder.Entity<TransferReview>(entity =>

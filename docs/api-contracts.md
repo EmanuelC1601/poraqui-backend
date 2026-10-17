@@ -1,6 +1,6 @@
 # Contratos API y entre módulos
 
-## Integrado en `main` (PR #1–#5)
+## Integrado en `main` (PR #1–#6)
 
 ### Identidad, permisos y negocio
 
@@ -34,7 +34,7 @@
 
 Cada transición de pedido incrementa `Order.Version`; la persistencia detecta escrituras obsoletas. Los códigos son de seis dígitos y se guardan hasheados; el código de recepción se entrega al cliente al crear el pedido y el código de recogida se entrega una vez al asignar.
 
-## En desarrollo: reparto externo (`feature/external-courier-offers`)
+## Integrado en `main`: reparto externo (PR #6)
 
 - Admin habilita/deshabilita perfil externo con `PUT /api/admin/users/{id}/external-courier` (`isExternalCourier`).
 - Courier establece disponibilidad y zona con `PUT /api/courier/external/availability` (`isAvailable`, `zoneId`).
@@ -43,28 +43,34 @@ Cada transición de pedido incrementa `Order.Version`; la persistencia detecta e
 - Courier rechaza o acepta con `POST /api/courier/external/offers/{offerId}/reject` y `/accept`. Aceptar guarda oferta y asignación del pedido en una transacción y devuelve una vez el código de recogida. Al recoger se conserva el registro existente de pago del negocio.
 - Negocio cancela ofertas abiertas con `POST /api/businesses/{businessId}/orders/{orderId}/external-offers/cancel`. Al listar o aceptar, las ofertas vencidas se marcan como expiradas.
 - `ExternalDeliveryOffer.Version`, `Order.Version` y un índice único filtrado por pedido aceptado protegen frente a respuestas concurrentes. Falta ejecutar la carrera en SQL Server.
-- Migración `ExternalCourierOffers` y script SQL revisables en `src/Poraqui.Infrastructure/Persistence/Migrations/` y `docs/sql/20261017191548_ExternalCourierOffers.sql`; no aplicados.
+- Migración `ExternalCourierOffers` y script SQL están en `src/Poraqui.Infrastructure/Persistence/Migrations/` y `docs/sql/20261017191548_ExternalCourierOffers.sql`; EF reporta la migración aplicada en desarrollo. La prueba de aceptación simultánea sobre SQL Server aislado sigue pendiente.
 
-## En desarrollo: sincronización de entrega (`feature/offline-delivery-sync`, basada en PR #6)
+## Implementado en rama apilada: sincronización de entrega (PR #7)
 
 - Courier asignado sube una confirmación capturada sin conexión con `POST /api/orders/{orderId}/sync/delivery-confirmation`, con `commandId`, `code` y `clientCapturedAtUtc`.
 - El servidor no confía en el resultado local: valida autorización del courier, asignación vigente, estado y código antes de persistir la entrega. La hora local se conserva solo como dato de auditoría; el servidor registra la hora de aceptación.
 - Repetir el mismo ID, orden y payload devuelve el resultado previamente persistido con `replayed: true` y no agrega otra transición al historial. Reutilizar ID para otro payload/orden responde 409. Código incorrecto no registra el comando y puede reintentarse con el mismo ID.
-- El cambio de estado y el registro idempotente se guardan en la misma transacción EF. Migración `OfflineDeliveryCommandSync` crea tabla de claves de comando; script revisable `docs/sql/20261017192726_OfflineDeliveryCommandSync.sql`. No aplicado ni validado en SQL Server.
+- El cambio de estado y el registro idempotente se guardan en la misma transacción EF. Migración `OfflineDeliveryCommandSync` crea tabla de claves de comando; script revisable `docs/sql/20261017192726_OfflineDeliveryCommandSync.sql`. PR #7 está integrado en `feature/external-courier-offers`, aún no en `main`; EF reporta la migración aplicada en desarrollo.
 
-## En desarrollo: actualizaciones en tiempo real (`feature/realtime-order-updates`, basada en PR #7)
+## Implementado en rama apilada: actualizaciones en tiempo real (PR #8)
 
 - Hub autenticado en `/hubs/orders`. Los clientes SignalR envían el bearer de Identity en `access_token` al negociar/conectar; el servidor acepta ese parámetro solo en esta ruta.
 - Tras conectar, invocar `SubscribeOrder(orderId)`. El servidor valida la relación con el pedido: cliente propietario, negocio propio, courier asignado o administrador. Devuelve una instantánea actual `{ orderId, status, version, changedAtUtc }` y agrega la conexión al grupo de ese pedido autorizado.
 - Los cambios se notifican como `OrderChanged` después de guardar la transición. Payload: `{ orderId, status, version, changedAtUtc }`; no incluye dirección, teléfono, comprobante ni códigos.
 - Invocar `UnsubscribeOrder(orderId)` al salir de la pantalla. Después de una reconexión, volver a invocar `SubscribeOrder` para recuperar la versión/estado persistidos y recibir eventos futuros.
 - Un fallo de SignalR no revierte la transición guardada; se registra y el cliente puede consultar `GET /api/orders/{id}`, `GET /api/businesses/{businessId}/orders/{orderId}` o `GET /api/courier/orders/{orderId}` con su permiso. Las notificaciones no son una cola durable.
-- Pruebas: conexión WebSocket SignalR real en TestServer/SQLite temporal; el cliente recibe `OrderChanged` después del envío del comprobante y la consulta confirma el estado persistido. También se verifica negociación anónima rechazada y acceso cruzado de otro negocio denegado. SQL Server sigue sin comprobar.
+- Pruebas: conexión WebSocket SignalR real en TestServer/SQLite temporal; el cliente recibe `OrderChanged` después del envío del comprobante y la consulta confirma el estado persistido. También se verifica negociación anónima rechazada y acceso cruzado de otro negocio denegado. PR #8 está integrado en `feature/offline-delivery-sync`, aún no en `main`; el cliente real debe volver a invocar `SubscribeOrder` tras reconectar.
+
+## En PR abierto: opciones de catálogo (PR #9 sobre PR #8)
+
+- Grupos con selección mínima/máxima y variantes con diferencia de precio no negativa. Grupo/variante se puede poner no disponible; la lectura pública oculta los no disponibles y el servidor rechaza su selección.
+- El precio unitario de línea refleja las opciones y el pedido guarda una copia de nombre/importe para conservar el recibo si el negocio cambia el catálogo después.
+- Migración `CatalogProductOptions` y `docs/sql/CatalogProductOptions.sql` crean tres tablas e índices aditivos. EF reporta aplicada esta migración en desarrollo. El cambio de API y reglas sigue en PR #9; no está integrado en `main`.
 
 ## Validación, antecedentes y pendientes
 
-`dotnet test Poraqui.sln` ejercita un recorrido aislado SQLite con importes, permisos, transferencia, comprobante, oferta externa, cancelación, ausencia de repartidores, rechazo, aceptación, códigos, pago al recoger y entrega. SQLite no verifica por sí solo los bloqueos, índices y concurrencia de SQL Server.
+`dotnet test Poraqui.sln` ejercita un recorrido aislado SQLite con importes, permisos, transferencia, comprobante, oferta externa, cancelación, ausencia de repartidores, rechazo, aceptación, códigos, pago al recoger, sincronización offline y SignalR. SQLite no verifica por sí solo los bloqueos, índices y concurrencia de SQL Server. `ConnectionStrings:DefaultConnection` está presente en User Secrets y una consulta EF de solo lectura confirmó las migraciones base hasta `CatalogProductOptions`; la conexión aislada `ConnectionStrings:SqlServerTest` sigue ausente.
 
 El contrato provisional `src/Poraqui.Application/Delivery/DeliveryOrderContracts.cs` se eliminó en PR #4 al implementar reparto propio. La asignación previa a OpenCode se conserva como antecedente; hay un solo responsable.
 
-Pendiente: opciones de producto, horarios, OTP, cancelación de pedido, incidencias/reembolsos completos, idempotencia general para otros comandos, métricas, despliegue y verificación SQL Server incluyendo carreras simultáneas. No hay GPS, distancias inferidas ni transferencias bancarias automáticas.
+PR #18–#21 implementan idempotencia durable para incidencias, creación de pedidos, comprobantes y asignación de courier propio; están integrados en la pila `feature/phone-verification`, aún fuera de `main`. Pendiente: integrar PR #7–#21 en orden, horarios, OTP configurado con proveedor real, cancelaciones/incidencias/reembolsos completos, métricas, despliegue y pruebas de concurrencia SQL Server. No hay GPS, distancias inferidas ni transferencias bancarias automáticas.

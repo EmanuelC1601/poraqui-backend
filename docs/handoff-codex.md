@@ -1,29 +1,41 @@
 # Handoff de desarrollo
 
-## Base, ramas y responsabilidad
+## Base y responsabilidad
 
-`main` contiene PR #1–#5 hasta `d677167`. PR #6 agrega reparto externo y PR #7 sincronización offline; #7 está apilado sobre #6. La rama activa `feature/realtime-order-updates` continúa sobre PR #7. Un solo responsable mantiene todos los módulos, contratos, `AppDbContext` y migraciones. OpenCode ya no participa; su anterior asignación de reparto se conserva como antecedente.
+`main` es la base de integración y está en `d39d265` (PR #1–#6). Un responsable mantiene todos los módulos, contratos, `AppDbContext`, migraciones, pruebas y despliegue. OpenCode ya no participa; la asignación inicial de reparto queda como antecedente. Los incrementos se trabajan en `feature/*` y se integran mediante PR; una integración a otra rama apilada no equivale a integración en `main`.
 
-## Incremento actual
+## Estado de las ramas y PRs
 
-Agrega `POST /api/orders/{orderId}/sync/delivery-confirmation` para confirmaciones capturadas offline. El servidor valida courier y código con el estado actual del pedido; el dato de hora del dispositivo se guarda como auditoría y no determina una transición. Guarda transición e ID/payload idempotente en una transacción. Un reintento idéntico devuelve la aceptación guardada; misma clave para datos distintos responde 409.
+- PR #7 (sincronización offline) está integrado en `feature/external-courier-offers` mediante `fe566db`; aún no está en `main`.
+- PR #8 (SignalR) está integrado en `feature/offline-delivery-sync` mediante `f7b4c20`; aún no está en `main`.
+- PR #9 (opciones de catálogo y precio) está abierto desde `feature/catalog-options`, basado en `feature/realtime-order-updates`.
+- PR #10 (horarios) y #11 (cancelaciones/incidencias/reembolsos) siguen abiertos en ramas apiladas. PR #12 (métricas) está integrado solo en la rama de #11.
+- PR #13 (reintentos de reparto), #14 (OTP) y la pila #18–#21 (idempotencia durable) están publicados; #18–#21 se integraron en `feature/phone-verification`, aún fuera de `main`.
 
-Migración nueva `OfflineDeliveryCommandSync` crea tabla e índice por pedido. Script desde la migración externa anterior: `docs/sql/20261017192726_OfflineDeliveryCommandSync.sql`. No altera ni elimina tablas existentes. Aún no aplicada.
+## Estado SQL Server
 
-## Verificación
+La clave privada `ConnectionStrings:DefaultConnection` existe localmente. EF Core pudo consultar el historial sin revelar la cadena y reportó aplicadas `InitialCommerceAndIdentity`, `BusinessTransferInstructionsSnapshot`, `ExternalCourierOffers`, `OfflineDeliveryCommandSync` y `CatalogProductOptions`. La conexión aislada `ConnectionStrings:SqlServerTest` no existe; las pruebas de concurrencia que requieren limpieza de datos no se ejecutaron. No usar la BD compartida para esas pruebas.
 
-Verificado antes de publicar PR #7: `dotnet build Poraqui.sln` (0 advertencias, 0 errores), `dotnet test Poraqui.sln` (14/14; SQLite en memoria y archivos temporales), `git diff --check` y `dotnet tool run dotnet-ef migrations has-pending-model-changes --project src/Poraqui.Infrastructure --startup-project src/Poraqui.Api` (sin cambios pendientes en el modelo). La suite cubre código inválido, acceso del courier asignado, sync aceptado, repetición sin duplicado y colisión de clave.
+Todas las migraciones deben revisarse antes de aplicación y solo el responsable único las genera/aplica. La API no migra al iniciar. No usar datos bancarios ni contraseñas del chat. No borrar ni recrear la BD, ni reiniciar datos compartidos.
 
-PR #7 está publicado y apilado sobre PR #6; PR #8 agrega SignalR encima de #7. La base compartida se inspeccionó desde el portal de solo lectura: `dbo` sin tablas. Falta `ConnectionStrings:DefaultConnection` en la configuración privada de la API, así que no se verificó EF contra SQL Server, migraciones vivas ni aceptación simultánea real. Mantener PR #6/#7 abiertos hasta hacer esas verificaciones. No ejecutar migraciones hasta configurar la clave y revisar estado actual. La API no aplica migraciones automáticamente al iniciar.
+## Verificación y ejecución
+
+En los incrementos #6–#8: `dotnet build Poraqui.sln` terminó con 0 advertencias y errores; `dotnet test Poraqui.sln` pasó 14/14 con SQLite y archivos temporales. La herramienta SDK net10 está disponible localmente mientras la solución apunta a net9; el test host net9 se ejecutó con `DOTNET_ROLL_FORWARD=Major`. PR #8 tiene prueba real de WebSocket SignalR en TestServer; el estado se vuelve a consultar por snapshot.
+
+Para ejecutar localmente, restaura la herramienta EF y configura la conexión privada solo en User Secrets o entorno:
 
 ```powershell
+dotnet tool restore
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<cadena privada>" --project src/Poraqui.Api
+dotnet run --project src/Poraqui.Api
 ```
 
-## Incremento SignalR
+No pegues ni registres el valor de conexión. Para migraciones locales revisables usa `dotnet ef migrations list` y scripts SQL en `docs/sql`; no ejecutes `database update` hasta revisar el destino y confirmar el cambio.
 
-`/hubs/orders` acepta solo conexiones autenticadas. `SubscribeOrder(orderId)` valida cliente, propietario, courier asignado o administrador y devuelve `{ orderId, status, version, changedAtUtc }`. Los eventos `OrderChanged` se publican tras persistir y contienen solo estado/version. Al reconectar, volver a invocar `SubscribeOrder` para recuperar la instantánea actual. La suite completa 14/14 pasa en SQLite; una conexión WebSocket SignalR en TestServer recibe el evento y luego lee la transición persistida. Falta verificar reconexión de un cliente real.
+## Siguiente revisión
 
-## Siguiente trabajo
+Revisar PR #9 (`feature/catalog-options`) y ejecutar build/tests sobre su HEAD actualizado. Confirmar en su PR que la migración solo añade tablas/índices, sin registrar como integrada la función hasta que entre en `main`. Después revisar PR #10–#14 y continuar por la pila de idempotencia. Consultar `docs/project-status.md`, `docs/api-contracts.md` y `docs/order-flow.md` para el ledger y los contratos actuales.
 
-Probar entrega SignalR a una conexión real y aislamiento de grupos; después, idempotencia general de otras operaciones, cancelaciones de pedidos, incidencias y reembolsos; opciones/horarios de catálogo; métricas y despliegue. Ver contratos y ledger en `docs/api-contracts.md` y `docs/project-status.md`.
+## Antecedentes conservados
+
+El plan inicial dividía comercio y reparto entre Codex y OpenCode. La organización cambió a una sola persona responsable antes de integrar PR #1. Los contratos iniciales de reparto se reemplazaron por el flujo propio y externo actual; la autoría anterior no representa una dependencia operativa.

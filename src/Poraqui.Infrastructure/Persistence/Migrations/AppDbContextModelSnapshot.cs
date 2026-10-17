@@ -277,6 +277,66 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                     b.ToTable("DeliveryZones", (string)null);
                 });
 
+            modelBuilder.Entity("Poraqui.Domain.Commerce.ProductOption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsAvailable")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<decimal>("PriceDelta")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("ProductOptions", (string)null);
+                });
+
+            modelBuilder.Entity("Poraqui.Domain.Commerce.ProductOptionGroup", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsAvailable")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("MaxSelections")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MinSelections")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("ProductOptionGroups", (string)null);
+                });
+
             modelBuilder.Entity("Poraqui.Domain.Orders.CourierAvailability", b =>
                 {
                     b.Property<Guid>("CourierUserId")
@@ -536,6 +596,34 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                     b.ToTable("OrderLines", (string)null);
                 });
 
+            modelBuilder.Entity("Poraqui.Domain.Orders.OrderLineOption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<Guid>("OrderLineId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("PriceDelta")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("ProductOptionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderLineId");
+
+                    b.ToTable("OrderLineOptions", (string)null);
+                });
+
             modelBuilder.Entity("Poraqui.Domain.Orders.OrderStatusChange", b =>
                 {
                     b.Property<Guid>("Id")
@@ -764,6 +852,24 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Poraqui.Domain.Commerce.ProductOption", b =>
+                {
+                    b.HasOne("Poraqui.Domain.Commerce.ProductOptionGroup", null)
+                        .WithMany("Options")
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Poraqui.Domain.Commerce.ProductOptionGroup", b =>
+                {
+                    b.HasOne("Poraqui.Domain.Commerce.CatalogProduct", null)
+                        .WithMany("OptionGroups")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Poraqui.Domain.Orders.CourierAvailability", b =>
                 {
                     b.HasOne("Poraqui.Infrastructure.Identity.ApplicationUser", null)
@@ -853,6 +959,15 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade);
                 });
 
+            modelBuilder.Entity("Poraqui.Domain.Orders.OrderLineOption", b =>
+                {
+                    b.HasOne("Poraqui.Domain.Orders.OrderLine", null)
+                        .WithMany("Options")
+                        .HasForeignKey("OrderLineId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Poraqui.Domain.Orders.OrderStatusChange", b =>
                 {
                     b.HasOne("Poraqui.Infrastructure.Identity.ApplicationUser", null)
@@ -880,6 +995,16 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("Poraqui.Domain.Commerce.CatalogProduct", b =>
+                {
+                    b.Navigation("OptionGroups");
+                });
+
+            modelBuilder.Entity("Poraqui.Domain.Commerce.ProductOptionGroup", b =>
+                {
+                    b.Navigation("Options");
+                });
+
             modelBuilder.Entity("Poraqui.Domain.Orders.Order", b =>
                 {
                     b.Navigation("Items");
@@ -887,6 +1012,11 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                     b.Navigation("StatusHistory");
 
                     b.Navigation("TransferReviews");
+                });
+
+            modelBuilder.Entity("Poraqui.Domain.Orders.OrderLine", b =>
+                {
+                    b.Navigation("Options");
                 });
 #pragma warning restore 612, 618
         }
