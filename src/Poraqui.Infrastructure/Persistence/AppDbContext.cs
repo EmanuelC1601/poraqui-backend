@@ -33,8 +33,20 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(x => x.TransferInstitution).HasMaxLength(120);
             entity.Property(x => x.TransferAccountReference).HasMaxLength(120);
             entity.Property(x => x.TransferInstructions).HasMaxLength(500);
+            entity.Property(x => x.TimeZoneId).HasMaxLength(100).IsRequired();
             entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.OwnerUserId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(x => x.OwnerUserId);
+            entity.HasMany(x => x.OpeningHours).WithOne().HasForeignKey(x => x.BusinessId).OnDelete(DeleteBehavior.Cascade);
+            entity.Navigation(x => x.OpeningHours).HasField("_openingHours").UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        builder.Entity<BusinessOpeningHours>(entity =>
+        {
+            entity.ToTable("BusinessOpeningHours");
+            entity.HasKey(x => new { x.BusinessId, x.Day });
+            entity.Property(x => x.Day).HasConversion<int>();
+            entity.Property(x => x.OpensAt).HasColumnType("time");
+            entity.Property(x => x.ClosesAt).HasColumnType("time");
         });
 
         builder.Entity<CatalogProduct>(entity =>

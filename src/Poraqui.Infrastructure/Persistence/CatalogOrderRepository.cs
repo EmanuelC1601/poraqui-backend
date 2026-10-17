@@ -8,10 +8,11 @@ namespace Poraqui.Infrastructure.Persistence;
 public sealed class CatalogOrderRepository(AppDbContext db) : ICatalogOrderRepository
 {
     public Task<Business?> GetBusinessAsync(Guid businessId, CancellationToken cancellationToken) =>
-        db.Businesses.SingleOrDefaultAsync(item => item.Id == businessId, cancellationToken);
+        db.Businesses.Include(item => item.OpeningHours).SingleOrDefaultAsync(item => item.Id == businessId, cancellationToken);
 
     public Task<Business?> GetBusinessOwnedByAsync(Guid businessId, Guid ownerId, CancellationToken cancellationToken) =>
-        db.Businesses.SingleOrDefaultAsync(item => item.Id == businessId && item.OwnerUserId == ownerId, cancellationToken);
+        db.Businesses.Include(item => item.OpeningHours)
+            .SingleOrDefaultAsync(item => item.Id == businessId && item.OwnerUserId == ownerId, cancellationToken);
 
     public Task<CatalogProduct?> GetProductAsync(Guid productId, CancellationToken cancellationToken) =>
         db.CatalogProducts.Include(item => item.OptionGroups).ThenInclude(group => group.Options)

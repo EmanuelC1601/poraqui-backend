@@ -11,13 +11,14 @@ dotnet user-secrets set "PrivateFiles:Root" "<ruta privada fuera del web root>" 
 dotnet run --project src/Poraqui.Api
 ```
 
-El `UserSecretsId` ya está configurado. Las migraciones revisables incluyen `InitialCommerceAndIdentity`, `BusinessTransferInstructionsSnapshot`, `ExternalCourierOffers`, `OfflineDeliveryCommandSync` y `CatalogProductOptions`. La API no migra al iniciar. Antes de aplicar migraciones, configura la clave privada, revisa que el esquema y los datos actuales coincidan y usa `dotnet tool run dotnet-ef database update --project src/Poraqui.Infrastructure --startup-project src/Poraqui.Api`. Las migraciones tienen scripts revisables en `docs/sql/`. En Development se publica OpenAPI en `/openapi/v1.json`.
+El `UserSecretsId` ya está configurado. Las migraciones revisables incluyen `InitialCommerceAndIdentity`, `BusinessTransferInstructionsSnapshot`, `ExternalCourierOffers`, `OfflineDeliveryCommandSync`, `CatalogProductOptions` y `BusinessOpeningHours`. La API no migra al iniciar. Antes de aplicar migraciones, configura la clave privada, revisa que el esquema y los datos actuales coincidan y usa `dotnet tool run dotnet-ef database update --project src/Poraqui.Infrastructure --startup-project src/Poraqui.Api`. Las migraciones tienen scripts revisables en `docs/sql/`. En Development se publica OpenAPI en `/openapi/v1.json`.
 
 ## Secuencia
 
 1. Crea el primer administrador con `POST /api/auth/bootstrap-admin` y luego inicia sesión en `POST /api/auth/login?useCookies=false`.
 2. Registra una cuenta de negocio, inicia sesión, crea negocio con `POST /api/businesses`, actívalo como admin con `PUT /api/businesses/{id}/active` y configura transferencia con `PUT /api/businesses/{id}/transfer-details`.
 3. El admin crea una zona con `POST /api/delivery-zones`. El negocio registra productos con `POST /api/businesses/{id}/products`, configura grupos de variantes con `POST /api/products/{productId}/option-groups` y tarifa con `POST /api/businesses/{id}/delivery-rates`. El negocio puede cambiar la disponibilidad de grupos/opciones con sus rutas `.../availability`.
+   Antes de aceptar pedidos con horario, el propietario configura su zona y semana en `PUT /api/businesses/{id}/opening-hours`; la consulta pública `GET` muestra horario y disponibilidad actual.
 4. Cliente registra teléfono con `PUT /api/account/phone` y crea pedido con `POST /api/orders`:
 
    ```json
@@ -45,4 +46,4 @@ La suite de API usa SQLite en memoria y carpeta temporal para comprobantes. Cubr
 
 ## Límites
 
-WhatsApp/llamada se hace fuera de la API; esta registra canal y entrega datos autorizados. Las tarifas se basan en zonas configuradas; no hay GPS ni distancias inventadas. Falta OTP, horarios de catálogo, cancelación del pedido e incidencias/reembolsos completos, reconexión SignalR en cliente real, idempotencia en otros comandos, métricas, despliegue y validación SQL Server.
+WhatsApp/llamada se hace fuera de la API; esta registra canal y entrega datos autorizados. Las tarifas se basan en zonas configuradas; no hay GPS ni distancias inventadas. Horarios comerciales están implementados en `feature/business-hours-main`, pendiente de integración. Falta OTP, cancelación del pedido e incidencias/reembolsos completos, reconexión SignalR en cliente real, idempotencia en otros comandos, métricas, despliegue y validación SQL Server.
