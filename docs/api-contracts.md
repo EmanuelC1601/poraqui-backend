@@ -1,6 +1,6 @@
 # Contratos API y entre módulos
 
-Este documento describe contratos implementados. `main` integra PR #1–#6; PR #7–#12 ya están integrados entre ramas apiladas y esperan que la pila llegue a `main`. PR #10 se integró en `feature/catalog-options`; PR #11, con PR #12 de métricas, se integró en `feature/business-hours`.
+Este documento describe contratos implementados. `main` integra PR #1–#6; PR #7–#12 ya están integrados entre ramas apiladas y esperan que la pila llegue a `main`. PR #10 se integró en `feature/catalog-options`; PR #11, con PR #12 de métricas, se integró en `feature/business-hours`. PR #13 añade reintentos seguros y está abierto en `feature/delivery-command-retries`.
 
 ## Identidad y comercio — `main`
 
@@ -40,6 +40,10 @@ Propietario/admin configura `PUT /api/businesses/{id}/opening-hours` con zona ho
 - Participantes autorizados informan y consultan incidencias en `/api/orders/{id}/incidents`; propietario/admin resuelve mediante `/api/businesses/{businessId}/orders/{orderId}/incidents/{incidentId}/resolve`.
 - Negocio/admin consulta el caso de reembolso en `GET .../refund` y registra resultado manual mediante `POST .../refund-review`. Cliente ve solo `refundStatus` en su pedido.
 - `GET /api/admin/metrics/pilot?fromUtc={ISO-8601}&toUtc={ISO-8601}` solo para PlatformAdmin. Devuelve totales agregados de pedidos/estados, valor, entregas, cancelaciones, incidencias abiertas, reembolsos pendientes y minutos promedio a entrega. Rango UTC semiabierto máximo 366 días; sin parámetros, 30 días. No expone datos personales.
+
+### PR #13 — Reintento de comandos de reparto
+
+`POST /api/orders/{id}/pickup` y `POST /api/orders/{id}/delivery/confirm` aceptan el mismo comando tras una respuesta perdida cuando conserva el código correcto, courier asignado y el pedido ya está en `PickedUp`, `InTransit` o `Delivered`, según aplique. La repetición devuelve éxito sin cambiar versión, historial ni volver a publicar un cambio. Un código incorrecto, actor distinto o estado incompatible sigue en conflicto/prohibido.
 
 ## Migraciones y estado
 

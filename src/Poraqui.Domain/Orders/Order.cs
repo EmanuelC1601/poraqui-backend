@@ -207,15 +207,21 @@ public sealed class Order
         Total = decimal.Round(_items.Sum(item => item.LineTotal) + DeliveryFee, 2, MidpointRounding.AwayFromZero);
     }
 
-    public void MarkPickedUp(Guid courierUserId, string submittedCodeHash)
+    public bool MarkPickedUp(Guid courierUserId, string submittedCodeHash)
     {
         EnsureCourier(courierUserId);
+        if (Status is OrderStatus.PickedUp or OrderStatus.InTransit or OrderStatus.Delivered)
+        {
+            EnsureCode(PickupCodeHash, submittedCodeHash, "Pickup code is invalid.");
+            return false;
+        }
         EnsureStatus(OrderStatus.AssignedToDelivery);
         EnsureCode(PickupCodeHash, submittedCodeHash, "Pickup code is invalid.");
         var now = DateTimeOffset.UtcNow;
         CourierPaymentReceivedAtUtc = now;
         CourierPaymentReceivedByUserId = courierUserId;
         ChangeStatus(OrderStatus.PickedUp, courierUserId, "Courier confirms business paid at pickup", now);
+        return true;
     }
 
     public void BeginDelivery(Guid courierUserId, string contactChannel)
@@ -229,13 +235,19 @@ public sealed class Order
         ChangeStatus(OrderStatus.InTransit, courierUserId, $"Delivery started; contact via {normalized}", DeliveryStartedAtUtc.Value);
     }
 
-    public void MarkDelivered(Guid courierUserId, string submittedCodeHash)
+    public bool MarkDelivered(Guid courierUserId, string submittedCodeHash)
     {
         EnsureCourier(courierUserId);
+        if (Status == OrderStatus.Delivered)
+        {
+            EnsureCode(DeliveryCodeHash, submittedCodeHash, "Delivery code is invalid.");
+            return false;
+        }
         EnsureStatus(OrderStatus.InTransit);
         EnsureCode(DeliveryCodeHash, submittedCodeHash, "Delivery code is invalid.");
         DeliveredAtUtc = DateTimeOffset.UtcNow;
         ChangeStatus(OrderStatus.Delivered, courierUserId, "Customer confirmed receipt", DeliveredAtUtc.Value);
+        return true;
     }
 
     private void EnsureCourier(Guid courierUserId)

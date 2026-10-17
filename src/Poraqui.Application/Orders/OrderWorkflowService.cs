@@ -276,7 +276,7 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IO
     {
         var order = await RequiredOrder(orderId, cancellationToken);
         EnsureCourier(order, courierId);
-        order.MarkPickedUp(courierId, OrderAccessCode.Hash(pickupCode));
+        if (!order.MarkPickedUp(courierId, OrderAccessCode.Hash(pickupCode))) return;
         await repository.SaveChangesAsync(cancellationToken);
         await PublishChange(order, cancellationToken);
     }
@@ -298,7 +298,7 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IO
     {
         var order = await RequiredOrder(orderId, cancellationToken);
         EnsureCourier(order, courierId);
-        order.MarkDelivered(courierId, OrderAccessCode.Hash(deliveryCode));
+        if (!order.MarkDelivered(courierId, OrderAccessCode.Hash(deliveryCode))) return;
         await repository.SaveChangesAsync(cancellationToken);
         await PublishChange(order, cancellationToken);
     }
