@@ -35,11 +35,12 @@ public sealed class PilotMetricsController(AppDbContext db) : ControllerBase
         }
 
         var orders = db.Orders.Where(order => order.CreatedAtUtc >= start && order.CreatedAtUtc < end);
-        var statusCounts = await orders
+        var statusRows = await orders
             .GroupBy(order => order.Status)
-            .Select(group => new PilotOrderStatusCount(group.Key.ToString(), group.Count()))
-            .OrderBy(item => item.Status)
+            .Select(group => new { Status = group.Key, Count = group.Count() })
             .ToArrayAsync(cancellationToken);
+        var statusCounts = statusRows.Select(item => new PilotOrderStatusCount(item.Status.ToString(), item.Count))
+            .OrderBy(item => item.Status).ToArray();
 
         var totals = await orders
             .GroupBy(_ => 1)

@@ -45,7 +45,7 @@ El `UserSecretsId` ya está configurado. Las migraciones revisables incluyen `In
 
 ## Verificaciones actuales
 
-La suite de API usa SQLite en memoria y carpeta temporal para comprobantes. Cubre opciones obligatorias/no disponibles, permisos, importes y snapshots, comprobante, revisión manual, configuración y snapshot de transferencia, oferta/cancelación/ausencia de repartidores/rechazo/aceptación externa, cancelación de pedido con reembolso manual, incidencias, códigos, pago al recoger, sincronización idempotente, entrega y evento SignalR. SQLite no sustituye la prueba de migraciones, índices y aceptación simultánea en SQL Server.
+La suite suma 19 pruebas: 18 de API con SQLite en memoria/carpeta temporal (opciones obligatorias/no disponibles, permisos, importes y snapshots, comprobante, revisión manual, configuración y snapshot de transferencia, oferta/cancelación/ausencia de repartidores/rechazo/aceptación externa, cancelación con reembolso manual, incidencias, métricas, códigos, pago al recoger, sincronización idempotente, entrega y evento SignalR) y una de traducción de las consultas de métricas con el proveedor SQL Server sin conexión. SQLite y la generación de SQL no sustituyen la prueba de migraciones, restricciones y aceptación simultánea contra SQL Server real.
 
 ## Límites
 

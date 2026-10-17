@@ -59,7 +59,7 @@ Rama `feature/order-cancellations-refunds-incidents`, commit `1347648`, PR https
 ## Verificaciones actuales
 
 - Build: `dotnet build Poraqui.sln`, 0 advertencias y 0 errores.
-- Pruebas: `dotnet test Poraqui.sln`, 18/18 con SQLite en memoria y archivos temporales. El recorrido verifica horarios, opciones, permisos entre negocios, importes, cancelación/refund manual, incidencias, snapshots, SignalR y entrega persistida.
+- Pruebas: `dotnet test Poraqui.sln`, 19/19: 18 de recorrido API con SQLite en memoria/archivos temporales y una prueba de traducción SQL Server que no abre conexión. El recorrido verifica horarios, opciones, permisos entre negocios, importes, cancelación/refund manual, incidencias, métricas, snapshots, SignalR y entrega persistida.
 - Scripts `ExternalCourierOffers`, `OfflineDeliveryCommandSync`, `CatalogProductOptions`, `BusinessOpeningHours` y `OrderCancellationRefundsIncidents` están disponibles para revisión; la última migración agrega `OrderCancellationAuditConstraints`. No hay cambios pendientes del modelo.
 - `BusinessOpeningHours` y cancelaciones/incidencias se generaron desde el modelo; los scripts no eliminan tablas ni filas. El segundo script estrecha `CancellationReason`, una columna nueva y todavía sin datos; falta validarlo en SQL Server.
 - Portal MonsterASP, solo lectura: `dbo` aparece sin tablas. Esto informa el esquema actual; no verifica conexión EF ni restricciones/carreras SQL Server.

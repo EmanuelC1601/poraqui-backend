@@ -87,7 +87,7 @@ Cada transición de pedido incrementa `Order.Version`; la persistencia detecta e
 
 - `GET /api/admin/metrics/pilot?fromUtc={ISO-8601}&toUtc={ISO-8601}` devuelve conteo de pedidos por estado, suma de totales de todos los pedidos creados en el periodo (incluye cancelados/rechazados), entregas, cancelaciones, incidencias abiertas, reembolsos que esperan revisión y tiempo medio hasta entrega. Solo admin de plataforma puede consultarlo.
 - El periodo es UTC, inclusivo al inicio y exclusivo al final, máximo 366 días. Sin parámetros usa los últimos 30 días. La respuesta es agregada y no incluye identificadores, direcciones, teléfonos ni datos de pago.
-- Consulta de solo lectura; no requiere migración ni cambia el esquema. Prueba de permisos y agregados en el recorrido API aislado con SQLite.
+- Consulta de solo lectura; no requiere migración ni cambia el esquema. La prueba de ruta/permisos/agregados usa SQLite aislado; una prueba adicional confirma la traducción de las consultas con el proveedor EF Core SQL Server sin abrir conexión. Aún falta ejecutar contra SQL Server real.
 
 ## Validación, antecedentes y pendientes
 
