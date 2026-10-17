@@ -2,7 +2,7 @@
 
 ## Responsable y ramas
 
-Un solo responsable mantiene todos los módulos, contratos, `AppDbContext`, migraciones, pruebas y despliegue. `main` es la base de integración y contiene PR #1–#8 hasta PR #23 (`6993610`), incluido sync offline y SignalR. Crear incrementos desde el `main` actualizado, usar ramas `feature/*` y abrir PRs pequeños. OpenCode ya no participa; su asignación previa queda como antecedente.
+Un solo responsable mantiene todos los módulos, contratos, `AppDbContext`, migraciones, pruebas y despliegue. `main` es la base de integración; contiene la base inicial y PR #22–#24 hasta `59bcde2`, incluido sync offline, SignalR y opciones del catálogo. Crear incrementos desde el `main` actualizado, usar ramas `feature/*` y abrir PRs pequeños. OpenCode ya no participa; su asignación previa queda como antecedente.
 
 Los cambios posteriores permanecen en ramas apiladas. No asumir que están integrados ni que sus pruebas corresponden al `main`; revisar cada cambio y revalidarlo contra la rama actual antes de presentar PR.
 
@@ -12,9 +12,13 @@ Rama `feature/comercio-pedidos-next`, commit inicial `b2d015e` sobre el `main` i
 
 Verificado al integrar PR #23: `dotnet restore Poraqui.sln`, build (0 warnings/errores) y 14/14 pruebas SQLite. Las pruebas ejercitan WebSocket SignalR en TestServer, autenticación y acceso cruzado. `dotnet ef migrations has-pending-model-changes` no reportó cambios de modelo. La reconexión de un cliente real sigue pendiente.
 
-## Incremento activo: opciones de catálogo
+## Incremento integrado: opciones de catálogo
 
-Rama `feature/catalog-options-main`, commit `819bd20` sobre `main`. Negocio crea grupos de opciones y cambia su disponibilidad; el servidor valida límites y disponibilidad al crear pedido y guarda snapshots de nombre/precio. Restore/build pasan (0 warnings/errores), 15/15 pruebas en SQLite. `CatalogProductOptions` agrega tablas e índices; script en `docs/sql/CatalogProductOptions.sql`, aún no aplicado.
+PR #24 integra `CatalogProductOptions`: negocio crea grupos de opciones y cambia su disponibilidad; el servidor valida límites y disponibilidad al crear pedido y guarda snapshots de nombre/precio. Restore/build pasaron (0 warnings/errores), 15/15 pruebas SQLite. La migración agrega tablas e índices; script en `docs/sql/CatalogProductOptions.sql`, aún no aplicada.
+
+## Incremento activo: horarios comerciales
+
+Rama `feature/business-hours-main`, commit `0bd8ba3` sobre `main`. Configura siete días y zona horaria, publica consulta del horario y rechaza pedidos cuando el negocio está cerrado. Restore/build pasan (0 warnings/errores), 15/15 pruebas SQLite. `BusinessOpeningHours` agrega dos columnas con defaults y tabla semanal; `docs/sql/BusinessOpeningHours.sql`, aún no aplicada.
 
 ## SQL Server y datos compartidos
 
@@ -31,7 +35,7 @@ El recorrido automatizado de API está en `tests/Poraqui.Domain.Tests/BusinessAp
 ## Pendientes verificables
 
 - Confirmar reconexión SignalR desde cliente real y el comportamiento en el hosting de producción.
-- Opciones/horarios, OTP real, cancelación de pedido, seguimiento de reembolsos manuales, idempotencia restante, métricas y despliegue MonsterASP.NET.
+- OTP real, cancelación de pedido, seguimiento de reembolsos manuales, idempotencia restante, métricas y despliegue MonsterASP.NET.
 - Completar pruebas de concurrencia con `ConnectionStrings:SqlServerTest` aislada y prueba de reconexión SignalR desde cliente real.
 - Revisar el ledger de `docs/project-status.md` y los contratos de `docs/api-contracts.md` antes de cada PR.
 

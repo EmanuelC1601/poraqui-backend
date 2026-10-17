@@ -1,8 +1,8 @@
 # Contratos API y entre módulos
 
-Estado: `main` integra PR #1–#8 (`6993610`; PR #23 añadió SignalR). Opciones de catálogo están en desarrollo en `feature/catalog-options-main`; horarios aún no están integrados. Un solo responsable mantiene contratos y migraciones. OpenAPI en Development: `/openapi/v1.json`.
+Estado: `main` integra la base inicial y PR #22–#24 hasta `59bcde2`: sincronización offline, SignalR y opciones de catálogo. Horarios comerciales están en desarrollo en `feature/business-hours-main`. Un solo responsable mantiene contratos y migraciones. OpenAPI en Development: `/openapi/v1.json`.
 
-## Integrado en `main` (PR #1–#6)
+## Integrado en `main` (base inicial y PR #22–#24)
 
 ### Identidad, permisos y negocio
 
@@ -72,11 +72,18 @@ La cadena privada `ConnectionStrings:DefaultConnection` existe y EF verificó SQ
 - La suscripción vuelve a consultar el snapshot después de entrar al grupo para cubrir cambios que ocurran mientras se autoriza/conecta. Al reconectar, invocar `SubscribeOrder` otra vez para recuperar el estado actual.
 - Pruebas de acceso cruzado, negociación anónima y entrega WebSocket en TestServer existen en la rama; esta rama requiere volver a compilar y ejecutarlas tras el ajuste de snapshot.
 
-## En desarrollo: opciones del catálogo (`feature/catalog-options-main`)
+## Integrado en `main`: opciones del catálogo (PR #24)
 
 - `POST /api/products/{productId}/option-groups` recibe `name`, `minSelections`, `maxSelections` y `options[]` (`name`, `priceDelta`). Cada opción parte disponible.
 - Grupo y opción pueden habilitarse/deshabilitarse solo por propietario del negocio o admin.
 - El pedido envía `optionIds` por renglón; selecciones repetidas/no disponibles o límites inválidos se rechazan. Se conservan opciones, nombres e importes en el pedido.
-- Migración aditiva `CatalogProductOptions`; script revisable en `docs/sql/CatalogProductOptions.sql`. No aplicada en este incremento.
+- Migración aditiva `CatalogProductOptions`; script revisable en `docs/sql/CatalogProductOptions.sql`. Aún no aplicada a SQL Server.
+
+## En desarrollo: horarios del negocio (`feature/business-hours-main`)
+
+- `PUT /api/businesses/{businessId}/opening-hours` configura zona horaria y exactamente un registro por cada día. Días cerrados no aceptan horas; los días abiertos requieren hora de apertura anterior al cierre.
+- `GET /api/businesses/{businessId}/opening-hours` es público y devuelve zona horaria, los siete días configurados y `isAcceptingOrders` calculado con el reloj UTC del servidor convertido a la zona del negocio.
+- Solo el dueño del negocio o un administrador puede modificar el horario. El servidor rechaza pedidos cuando la empresa está cerrada. Un negocio sin horario configurado conserva el comportamiento anterior y acepta pedidos cuando está activo.
+- Migración aditiva `BusinessOpeningHours`: agrega dos columnas a `Businesses` con defaults y una tabla semanal con FK. Script revisable: `docs/sql/BusinessOpeningHours.sql`. No se aplicó.
 
 Pendiente: opciones/horarios, OTP real, cancelaciones/incidencias/reembolsos, idempotencia adicional, métricas, reconexión SignalR en cliente real y despliegue. No hay GPS, distancias inferidas ni transferencias bancarias automáticas.
