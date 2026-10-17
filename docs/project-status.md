@@ -100,20 +100,15 @@ Verificado localmente: `dotnet build Poraqui.sln` (0 advertencias/errores), `dot
 
 ## Pendiente
 
-- Verificar migraciones, restricciones y aceptación simultánea en SQL Server antes de integrar PR #6/#7.
-- Ejecutar la prueba de aceptación simultánea y revisar/aplicar las migraciones en SQL Server.
-- Probar reconexión SignalR en cliente real; la suscripción ya devuelve instantánea persistida al reconectar.
-- PR #9: `feature/catalog-options` en commit `084acb3`, publicado en https://github.com/EmanuelC1601/poraqui-backend/pull/9.
-- Validar SMS OTP contra cuenta real tras configurar `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid` y `TwilioVerify:ApiKeySecret`; falta idempotencia durable para subida/reintento de comprobantes y asignación de courier con código. La creación de pedidos y el reporte de incidencias ya guardan claves durables; recogida y entrega toleran reintentos con el mismo courier y código. Falta validar aceptación concurrente sobre SQL Server aislado.
-- PR #10: `feature/business-hours`, commit `d25e64f`, publicado en https://github.com/EmanuelC1601/poraqui-backend/pull/10. Requiere validación SQL Server antes de integrar.
-- PR #11 implementa cancelaciones/incidencias/reembolsos; falta verificar migraciones en SQL Server antes de integrar.
-- PR #12 agrega métricas del piloto; está integrado en la rama de PR #11, pero aún no en `main`; falta validar sobre SQL Server.
-- PR #13 hace idempotentes reintentos de recogida/entrega; está abierto para revisión/integración en la rama anterior. No necesita migración.
-- Instrucciones finales de despliegue en MonsterASP.NET y recorrido SQL Server reproducible.
+- Integrar en `main` la pila de PR #18–#21 cuando cada PR pueda pasar las comprobaciones disponibles; por ahora no hay checks configurados en GitHub y la UI deja la capacidad de merge en `Loading`.
+- Ejecutar aceptación simultánea de ofertas y restricciones del proveedor SQL Server con `ConnectionStrings__SqlServerTest` apuntando a una BD aislada `PoraquiIntegrationTests`.
+- Probar reconexión SignalR desde un cliente real; el hub ya devuelve instantánea persistida al suscribirse de nuevo.
+- Validar Twilio Verify con `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid` y `TwilioVerify:ApiKeySecret` privados.
+- Preparar y comprobar despliegue MonsterASP.NET con `DataProtection:KeysPath` persistente y almacenamiento de comprobantes privado.
 
 ## Pendiente: base SQL Server aislada para pruebas de concurrencia
 
-`ConnectionStrings:DefaultConnection` está configurada localmente en User Secrets y EF comprobó la conexión. La prueba optativa de concurrencia permanece omitida hasta configurar `ConnectionStrings__SqlServerTest` con una base de pruebas separada llamada exactamente `PoraquiIntegrationTests`. No apuntar esa prueba a la BD compartida. Los endpoints y migraciones aún no se han desplegado a un sitio MonsterASP.
+`ConnectionStrings:DefaultConnection` está configurada localmente en User Secrets y EF comprobó la conexión/aplicó explícitamente doce migraciones aditivas. La prueba optativa de concurrencia permanece omitida hasta configurar `ConnectionStrings__SqlServerTest` con una base de pruebas separada llamada exactamente `PoraquiIntegrationTests`. No apuntar esa prueba a la BD compartida. Los endpoints y migraciones aún no se han desplegado a un sitio MonsterASP.
 
 ## Fuera de alcance
 
