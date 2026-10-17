@@ -30,9 +30,9 @@
 - `POST .../decision`, `POST .../preparation` y `POST .../ready` gestionan decisión e inicio explícito de preparación.
 - Admin asigna rol de courier propio con `PUT /api/admin/users/{id}/delivery-person`; negocio asigna con `POST .../assign-courier` y fija el importe que paga al recoger.
 - Courier propio consulta asignaciones con `GET /api/courier/orders` y `GET /api/courier/orders/{orderId}`.
-- `POST /api/orders/{id}/pickup` valida código y registra por separado que el courier recibió el pago del negocio.
+- `POST /api/orders/{id}/pickup` valida código y registra por separado que el courier recibió el pago del negocio. Repetirlo con el mismo courier y código después de una recogida ya guardada responde correctamente sin volver a modificar historial ni publicar evento; código incorrecto sigue en conflicto.
 - `POST /api/orders/{id}/delivery/start` permite `whatsapp` o `call`; solo el courier asignado recibe teléfono.
-- `POST /api/orders/{id}/delivery/confirm` exige código de recepción del cliente.
+- `POST /api/orders/{id}/delivery/confirm` exige código de recepción del cliente. Un reintento con el mismo courier y código tras una entrega ya guardada es idempotente; no se agrega otra transición ni evento.
 - Cliente consulta `GET /api/orders/{id}`; negocio consulta `GET /api/businesses/{businessId}/orders` y `GET .../orders/{orderId}`. Incluyen estado e historial.
 
 Cada transición de pedido incrementa `Order.Version`; la persistencia detecta escrituras obsoletas. Los códigos son de seis dígitos y se guardan hasheados; el código de recepción se entrega al cliente al crear el pedido y el código de recogida se entrega una vez al asignar.
@@ -83,11 +83,11 @@ Cada transición de pedido incrementa `Order.Version`; la persistencia detecta e
 - Cliente, negocio propietario o courier asignado registra/consulta incidencias con `POST/GET /api/orders/{id}/incidents`; negocio/admin resuelve con `POST /api/businesses/{businessId}/orders/{orderId}/incidents/{incidentId}/resolve`. Cambios de pedido, incidente y reembolso incrementan versión y notifican después de persistir.
 - Migraciones `OrderCancellationRefundsIncidents` y `OrderCancellationAuditConstraints`; script `docs/sql/OrderCancellationRefundsIncidents.sql`. Añaden campos, tablas e índices; no aplicadas. Pruebas locales con SQLite; SQL Server sigue pendiente.
 
-## PR #12 abierto: métricas del piloto (`feature/pilot-metrics`, basada en PR #11)
+## PR #12 integrado en rama de PR #11: métricas del piloto (`feature/pilot-metrics`)
 
 - `GET /api/admin/metrics/pilot?fromUtc={ISO-8601}&toUtc={ISO-8601}` devuelve conteo de pedidos por estado, suma de totales de todos los pedidos creados en el periodo (incluye cancelados/rechazados), entregas, cancelaciones, incidencias abiertas, reembolsos que esperan revisión y tiempo medio hasta entrega. Solo admin de plataforma puede consultarlo.
 - El periodo es UTC, inclusivo al inicio y exclusivo al final, máximo 366 días. Sin parámetros usa los últimos 30 días. La respuesta es agregada y no incluye identificadores, direcciones, teléfonos ni datos de pago.
-- Consulta de solo lectura; no requiere migración ni cambia el esquema. La prueba de ruta/permisos/agregados usa SQLite aislado; una prueba adicional confirma la traducción de las consultas con el proveedor EF Core SQL Server sin abrir conexión. Aún falta ejecutar contra SQL Server real.
+- Consulta de solo lectura; no requiere migración ni cambia el esquema. PR #12 está integrado en `feature/order-cancellations-refunds-incidents` (`d04882a`), aún no en `main`. La prueba de ruta/permisos/agregados usa SQLite aislado; una prueba adicional confirma la traducción de las consultas con el proveedor EF Core SQL Server sin abrir conexión. Aún falta ejecutar contra SQL Server real.
 
 ## Validación, antecedentes y pendientes
 

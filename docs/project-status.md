@@ -1,6 +1,6 @@
 # Estado verificable del proyecto
 
-Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167` y es la base de integración. PR #6 (reparto externo), #7 (sincronización offline), #8 (SignalR), #9 (opciones de catálogo), #10 (horarios) y #11 (cancelaciones/incidencias/reembolsos) están abiertos y apilados en ese orden. El desarrollo tiene un único responsable; las asignaciones previas a OpenCode se conservan como antecedente, sin dependencia operativa.
+Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167` y es la base de integración. PR #6 (reparto externo), #7 (sincronización offline), #8 (SignalR), #9 (opciones de catálogo), #10 (horarios) y #11 (cancelaciones/incidencias/reembolsos) están abiertos y apilados en ese orden. PR #12 (métricas) fue integrado en la rama de PR #11 mediante `d04882a`; no está todavía en `main`. El desarrollo tiene un único responsable; las asignaciones previas a OpenCode se conservan como antecedente, sin dependencia operativa.
 
 ## Implementado en `main`
 
@@ -51,9 +51,9 @@ Rama `feature/order-cancellations-refunds-incidents`, commit `1347648`, PR https
 - Participantes autorizados informan y consultan incidencias; negocio/admin las resuelve. Incidencias y reembolsos quedan en historial/versionado del pedido y notifican después de persistir.
 - Migraciones `OrderCancellationRefundsIncidents` y `OrderCancellationAuditConstraints`, script `docs/sql/OrderCancellationRefundsIncidents.sql`; no aplicadas. La alteración de `CancellationReason` solo afecta a una columna nullable que esta misma pila acaba de añadir, y el dominio limita el texto a 500 caracteres.
 
-## PR #12 abierto: métricas del piloto
+## PR #12 integrado en la rama de PR #11: métricas del piloto
 
-- Rama `feature/pilot-metrics`, commit `c8df529`, PR https://github.com/EmanuelC1601/poraqui-backend/pull/12, basada en PR #11. Añade `GET /api/admin/metrics/pilot`, con permiso exclusivo de admin, filtro UTC de hasta 366 días y datos agregados sin información personal. Resume pedidos por estado, valor total, entregas, cancelaciones, incidencias abiertas, reembolsos pendientes y tiempo medio de entrega.
+- Rama `feature/pilot-metrics`, PR https://github.com/EmanuelC1601/poraqui-backend/pull/12, integrada en `feature/order-cancellations-refunds-incidents` mediante `d04882a`. Añade `GET /api/admin/metrics/pilot`, con permiso exclusivo de admin, filtro UTC de hasta 366 días y datos agregados sin información personal. Resume pedidos por estado, valor total, entregas, cancelaciones, incidencias abiertas, reembolsos pendientes y tiempo medio de entrega. Sigue pendiente de integración en `main` junto con la cadena anterior.
 - No requiere migración. El endpoint se prueba en SQLite; queda pendiente revisar el SQL generado y el comportamiento en SQL Server cuando exista una conexión remota accesible para la aplicación.
 
 ## Verificaciones actuales
@@ -64,16 +64,23 @@ Rama `feature/order-cancellations-refunds-incidents`, commit `1347648`, PR https
 - `BusinessOpeningHours` y cancelaciones/incidencias se generaron desde el modelo; los scripts no eliminan tablas ni filas. El segundo script estrecha `CancellationReason`, una columna nueva y todavía sin datos; falta validarlo en SQL Server.
 - Portal MonsterASP, solo lectura: `dbo` aparece sin tablas. Esto informa el esquema actual; no verifica conexión EF ni restricciones/carreras SQL Server.
 
+## Incremento local: reintentos de recogida y entrega
+
+La rama local `feature/otp-phone-verification` parte de `d04882a` (PR #12 ya integrado en la rama de PR #11, aún no en `main`). `POST /api/orders/{id}/pickup` y `POST /api/orders/{id}/delivery/confirm` aceptan el reintento con el mismo courier asignado y el código correcto después de una confirmación persistida. Reintentos no aumentan `Order.Version`, no duplican historial ni emiten otra notificación. Un código incorrecto se rechaza. Es una extensión del comportamiento en el servidor; no altera el esquema.
+
+Verificado en este incremento: `dotnet build Poraqui.sln` (0 advertencias, 0 errores) y `dotnet test Poraqui.sln --no-build` (19/19; 18 recorridos API usan SQLite temporal/en memoria y 1 comprueba traducción del proveedor SQL Server sin conectarse). La prueba de dominio comprueba los dos reintentos y códigos erróneos. No se probó contra la BD compartida.
+
 ## Pendiente
 
 - Verificar migraciones, restricciones y aceptación simultánea en SQL Server antes de integrar PR #6/#7.
 - Prueba de aceptación simultánea de ofertas y ejecución/revisión de migraciones en SQL Server.
 - Probar reconexión SignalR en cliente real; la suscripción ya devuelve instantánea persistida al reconectar.
 - PR #9: `feature/catalog-options` en commit `084acb3`, publicado en https://github.com/EmanuelC1601/poraqui-backend/pull/9.
-- OTP e idempotencia general de operaciones que aún no la tienen.
+- OTP con proveedor real de SMS y configuración privada; idempotencia para operaciones mutables restantes. Recogida y entrega ahora toleran reintentos con el mismo courier y código, sin cambios repetidos.
 - PR #10: `feature/business-hours`, commit `d25e64f`, publicado en https://github.com/EmanuelC1601/poraqui-backend/pull/10. Requiere validación SQL Server antes de integrar.
 - PR #11 implementa cancelaciones/incidencias/reembolsos; falta verificar migraciones en SQL Server antes de integrar.
-- PR #12 agrega métricas del piloto; falta verificar SQL Server.
+- PR #12 agrega métricas del piloto; está integrado en la rama de PR #11, pero aún no en `main`; falta validar sobre SQL Server.
+- Incremento local de idempotencia de recogida/entrega pendiente de commit/PR.
 - Instrucciones finales de despliegue en MonsterASP.NET y recorrido SQL Server reproducible.
 
 ## Bloqueado por configuración privada

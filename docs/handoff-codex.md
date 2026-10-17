@@ -4,6 +4,8 @@
 
 `main` contiene PR #1–#5 hasta `d677167` y es la base de integración. PR #6 agrega reparto externo; PR #7 sincronización offline está apilado sobre #6; PR #8 SignalR está apilado sobre #7; PR #9 opciones de catálogo se apila sobre #8; PR #10 horarios se apila sobre #9; PR #11 cancelaciones/incidencias/reembolsos continúa desde #10. Un solo responsable mantiene todos los módulos, contratos, `AppDbContext` y migraciones. OpenCode ya no participa; su anterior asignación de reparto se conserva como antecedente.
 
+PR #12 de métricas está integrado en la rama de PR #11 (`d04882a`), no en `main`. Rama local del siguiente incremento: `feature/otp-phone-verification`, basada en ese commit. El trabajo inmediato hace idempotentes los reintentos de recogida/entrega con courier y código válidos. Build y 19 pruebas pasan; se ejecutaron 18 pruebas API sobre SQLite aislado y una traducción de proveedor SQL Server sin conexión. Sin cambios de esquema.
+
 ## Incremento previo: sincronización offline (PR #7)
 
 Agrega `POST /api/orders/{orderId}/sync/delivery-confirmation` para confirmaciones capturadas offline. El servidor valida courier y código con el estado actual del pedido; el dato de hora del dispositivo se guarda como auditoría y no determina una transición. Guarda transición e ID/payload idempotente en una transacción. Un reintento idéntico devuelve la aceptación guardada; misma clave para datos distintos responde 409.

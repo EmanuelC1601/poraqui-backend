@@ -207,6 +207,10 @@ public sealed class CommerceRulesTests
         Assert.Equal(42.75m, order.CourierPaymentAmount);
         Assert.Equal(courier, order.CourierPaymentReceivedByUserId);
         Assert.NotNull(order.CourierPaymentReceivedAtUtc);
+        var pickupVersion = order.Version;
+        Assert.False(order.MarkPickedUp(courier, Hash("123456")));
+        Assert.Equal(pickupVersion, order.Version);
+        Assert.Throws<InvalidOperationException>(() => order.MarkPickedUp(courier, Hash("000000")));
 
         order.BeginDelivery(courier, "call");
         Assert.Equal("call", order.ContactChannel);
@@ -215,6 +219,10 @@ public sealed class CommerceRulesTests
         Assert.Equal(OrderStatus.Delivered, order.Status);
         Assert.NotNull(order.DeliveredAtUtc);
         Assert.Equal(OrderStatus.Delivered, order.StatusHistory.Last().Status);
+        var deliveryVersion = order.Version;
+        Assert.False(order.MarkDelivered(courier, Hash("654321")));
+        Assert.Equal(deliveryVersion, order.Version);
+        Assert.Throws<InvalidOperationException>(() => order.MarkDelivered(courier, Hash("000000")));
     }
 
     private static string Hash(string code) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(code)));
