@@ -2,6 +2,8 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Poraqui.Domain.Commerce;
 using Poraqui.Domain.Orders;
+using Poraqui.Application.Orders;
+using Poraqui.Application.Commerce;
 using Poraqui.Infrastructure.Identity;
 using Poraqui.Infrastructure.Persistence;
 
@@ -117,7 +119,7 @@ public sealed class PersistenceModelTests
         await using (var db = new AppDbContext(options))
         {
             var repository = new ExternalCourierRepository(db);
-            Assert.Equal(1, await repository.ExpireDueOffersAsync(now.AddMinutes(6), default));
+            Assert.Single(await repository.ExpireDueOffersAsync(now.AddMinutes(6), default));
         }
 
         await using var verify = new AppDbContext(options);
@@ -125,5 +127,54 @@ public sealed class PersistenceModelTests
             (await verify.ExternalDeliveryOffers.SingleAsync(x => x.Id == due.Id)).Status);
         Assert.Equal(ExternalDeliveryOfferStatus.Offered,
             (await verify.ExternalDeliveryOffers.SingleAsync(x => x.Id == future.Id)).Status);
+    }
+
+    [Fact]
+    public async Task Accepting_external_offer_cancels_other_open_offers_for_the_order()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
+        var owner = new ApplicationUser { Id = Guid.NewGuid(), UserName = "offer-accept-owner" };
+        var customer = new ApplicationUser { Id = Guid.NewGuid(), UserName = "offer-accept-customer" };
+        var firstCourier = new ApplicationUser { Id = Guid.NewGuid(), UserName = "offer-accept-first" };
+        var secondCourier = new ApplicationUser { Id = Guid.NewGuid(), UserName = "offer-accept-second" };
+        var reviewer = new ApplicationUser { Id = Guid.NewGuid(), UserName = "offer-accept-reviewer" };
+        var zone = new DeliveryZone("Zona oferta aceptada");
+        var business = new Business(owner.Id, "Negocio aceptación externa", "Origen");
+        var order = new Order(customer.Id, business.Id, zone.Id, "Destino", 3m,
+            [(Guid.NewGuid(), "Producto", 10m, 1)]);
+        order.SetDeliveryCodeHash(OrderAccessCode.Hash("123456"));
+        order.SubmitTransferEvidence("fixture/offer-accept-proof");
+        order.ReviewTransfer(reviewer.Id, approved: true);
+        order.AcceptByBusiness(owner.Id);
+        order.BeginPreparation(owner.Id);
+        order.MarkReadyForPickup(owner.Id);
+        var firstOffer = new ExternalDeliveryOffer(order.Id, firstCourier.Id, zone.Id, "Origen", "Destino", 20m, null,
+            DateTimeOffset.UtcNow.AddMinutes(10));
+        var secondOffer = new ExternalDeliveryOffer(order.Id, secondCourier.Id, zone.Id, "Origen", "Destino", 20m, null,
+            DateTimeOffset.UtcNow.AddMinutes(10));
+
+        await using (var setup = new AppDbContext(options))
+        {
+            await setup.Database.EnsureCreatedAsync();
+            setup.Users.AddRange(owner, customer, firstCourier, secondCourier, reviewer);
+            setup.AddRange(zone, business, order, firstOffer, secondOffer);
+            await setup.SaveChangesAsync();
+        }
+
+        await using (var db = new AppDbContext(options))
+        {
+            var service = new ExternalCourierService(new ExternalCourierRepository(db), new NullOrderChangePublisher(),
+                new NullExternalOfferPublisher());
+            await service.AcceptAsync(firstOffer.Id, firstCourier.Id, default);
+        }
+
+        await using var verify = new AppDbContext(options);
+        Assert.Equal(ExternalDeliveryOfferStatus.Accepted,
+            (await verify.ExternalDeliveryOffers.SingleAsync(x => x.Id == firstOffer.Id)).Status);
+        Assert.Equal(ExternalDeliveryOfferStatus.Cancelled,
+            (await verify.ExternalDeliveryOffers.SingleAsync(x => x.Id == secondOffer.Id)).Status);
+        Assert.Equal(firstCourier.Id, (await verify.Orders.SingleAsync(x => x.Id == order.Id)).CourierUserId);
     }
 }

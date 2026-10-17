@@ -16,7 +16,7 @@ public interface IExternalCourierRepository
     Task<IReadOnlyList<ExternalDeliveryOffer>> GetOffersForOrderAsync(Guid orderId, CancellationToken cancellationToken);
     Task<ExternalDeliveryOffer?> GetOfferAsync(Guid offerId, CancellationToken cancellationToken);
     Task<bool> HasAcceptedOfferAsync(Guid orderId, CancellationToken cancellationToken);
-    Task<int> ExpireDueOffersAsync(DateTimeOffset now, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ExternalDeliveryOffer>> ExpireDueOffersAsync(DateTimeOffset now, CancellationToken cancellationToken);
     void AddOffer(ExternalDeliveryOffer offer);
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }
@@ -39,7 +39,12 @@ public sealed class ExternalCourierService(IExternalCourierRepository repository
         await repository.SaveChangesAsync(ct);
     }
 
-    public Task<int> ExpireDueOffersAsync(CancellationToken ct) => repository.ExpireDueOffersAsync(DateTimeOffset.UtcNow, ct);
+    public async Task<int> ExpireDueOffersAsync(CancellationToken ct)
+    {
+        var expired = await repository.ExpireDueOffersAsync(DateTimeOffset.UtcNow, ct);
+        await PublishChangesAsync(expired, ct);
+        return expired.Count;
+    }
 
     public async Task<ExternalOfferDispatchResult> CreateOffersAsync(Guid orderId, Guid businessOwnerId, bool isAdmin, decimal remuneration,
         string? conditions, TimeSpan offerDuration, CancellationToken ct)
@@ -76,8 +81,13 @@ public sealed class ExternalCourierService(IExternalCourierRepository repository
         if (!isAdmin && !await repository.BusinessBelongsToAsync(order.BusinessId, businessOwnerId, ct)) throw new OrderResourceForbiddenException();
         var offers = await repository.GetOffersForOrderAsync(orderId, ct);
         var now = DateTimeOffset.UtcNow;
-        foreach (var offer in offers) offer.Cancel(now);
+        foreach (var offer in offers)
+        {
+            offer.Expire(now);
+            if (offer.Status == ExternalDeliveryOfferStatus.Offered) offer.Cancel(now);
+        }
         await repository.SaveChangesAsync(ct);
+        await PublishChangesAsync(offers, ct);
         return offers.Count(offer => offer.Status == ExternalDeliveryOfferStatus.Cancelled);
     }
 
@@ -85,15 +95,37 @@ public sealed class ExternalCourierService(IExternalCourierRepository repository
     {
         var offers = await repository.GetOffersAsync(courierId, ct);
         var now = DateTimeOffset.UtcNow;
-        foreach (var offer in offers) offer.Expire(now);
-        if (offers.Any(offer => offer.Status == ExternalDeliveryOfferStatus.Expired)) await repository.SaveChangesAsync(ct);
+        var due = offers.Where(offer => offer.ExpiresAtUtc <= now).ToArray();
+        foreach (var offer in due) offer.Expire(now);
+        if (due.Length > 0)
+        {
+            await repository.SaveChangesAsync(ct);
+            await PublishChangesAsync(due, ct);
+        }
         return offers.Where(offer => offer.Status == ExternalDeliveryOfferStatus.Offered).Select(ToView).ToArray();
     }
 
     public async Task RejectAsync(Guid offerId, Guid courierId, CancellationToken ct)
     {
         var offer = await RequiredOffer(offerId, courierId, ct);
-        if (offer.Reject(DateTimeOffset.UtcNow)) await repository.SaveChangesAsync(ct);
+        var version = offer.Version;
+        try
+        {
+            if (offer.Reject(DateTimeOffset.UtcNow))
+            {
+                await repository.SaveChangesAsync(ct);
+                await PublishChangesAsync([offer], ct);
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            if (offer.Status == ExternalDeliveryOfferStatus.Expired && offer.Version != version)
+            {
+                await repository.SaveChangesAsync(ct);
+                await PublishChangesAsync([offer], ct);
+            }
+            throw;
+        }
     }
 
     public async Task<ExternalOfferAcceptance> AcceptAsync(Guid offerId, Guid courierId, CancellationToken ct)
@@ -102,11 +134,34 @@ public sealed class ExternalCourierService(IExternalCourierRepository repository
         if (await repository.HasAcceptedOfferAsync(offer.OrderId, ct)) throw new InvalidOperationException("Order already has an accepted external offer.");
         var order = await repository.GetOrderAsync(offer.OrderId, ct) ?? throw new KeyNotFoundException("Order was not found.");
         var pickupCode = OrderAccessCode.Generate();
-        offer.Accept(DateTimeOffset.UtcNow);
+        var offerVersion = offer.Version;
+        try
+        {
+            offer.Accept(DateTimeOffset.UtcNow);
+        }
+        catch (InvalidOperationException)
+        {
+            if (offer.Status == ExternalDeliveryOfferStatus.Expired && offer.Version != offerVersion)
+            {
+                await repository.SaveChangesAsync(ct);
+                await PublishChangesAsync([offer], ct);
+            }
+            throw;
+        }
         order.AssignCourier(courierId, courierId, OrderAccessCode.Hash(pickupCode), offer.Remuneration);
+        var openOffers = await repository.GetOffersForOrderAsync(offer.OrderId, ct);
+        var changedOffers = new List<ExternalDeliveryOffer> { offer };
+        var now = DateTimeOffset.UtcNow;
+        foreach (var otherOffer in openOffers)
+        {
+            otherOffer.Expire(now);
+            if (otherOffer.Status == ExternalDeliveryOfferStatus.Offered) otherOffer.Cancel(now);
+            changedOffers.Add(otherOffer);
+        }
         var profile = await repository.GetAvailabilityAsync(courierId, ct);
         profile?.SetAvailable(false);
         await repository.SaveChangesAsync(ct);
+        await PublishChangesAsync(changedOffers, ct);
         var change = order.StatusHistory.OrderByDescending(entry => entry.ChangedAtUtc).First();
         await publisher.PublishAsync(new OrderChangeNotice(order.Id, order.BusinessId, order.CustomerUserId,
             order.CourierUserId, order.Status.ToString(), order.Version, change.ChangedAtUtc), ct);
@@ -119,6 +174,13 @@ public sealed class ExternalCourierService(IExternalCourierRepository repository
         if (offer is null) throw new KeyNotFoundException("Offer was not found.");
         if (offer.CourierUserId != courierId) throw new OrderResourceForbiddenException();
         return offer;
+    }
+
+    public async Task PublishChangesAsync(IEnumerable<ExternalDeliveryOffer> offers, CancellationToken ct)
+    {
+        foreach (var offer in offers)
+            await offerPublisher.PublishChangedAsync(offer.CourierUserId,
+                new ExternalOfferChangedNotice(offer.Id, offer.OrderId, offer.Status.ToString()), ct);
     }
 
     private static ExternalOfferView ToView(ExternalDeliveryOffer offer) => new(offer.Id, offer.OrderId, offer.ZoneId,

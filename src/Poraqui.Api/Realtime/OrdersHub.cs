@@ -128,4 +128,18 @@ public sealed class SignalRExternalOfferPublisher(IHubContext<OrdersHub> hub, IL
                 notice.OfferId, courierUserId);
         }
     }
+
+    public async Task PublishChangedAsync(Guid courierUserId, ExternalOfferChangedNotice notice, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await hub.Clients.Group(ExternalOfferChangeGroups.For(courierUserId))
+                .SendAsync("ExternalOfferChanged", notice, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "Could not publish external offer {OfferId} status {Status} to courier {CourierUserId}; the courier can reload offers.",
+                notice.OfferId, notice.Status, courierUserId);
+        }
+    }
 }
