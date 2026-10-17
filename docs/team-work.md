@@ -12,7 +12,7 @@ Una persona mantiene todos los módulos: identidad y permisos, comercio, pedidos
 
 ## Ramas y base de datos
 
-`main` es la base de integración. Un solo responsable trabaja en incrementos pequeños `feature/*`, con PR revisado, build, pruebas y chequeos SQL Server pertinentes antes de integrar. Actualiza `docs/project-status.md`, `docs/handoff-codex.md` y `docs/api-contracts.md` por incremento. PR #1–#6 están en `main`; PR #7 se prepara en `feature/offline-sync-main`; PR #8–#21 siguen en ramas apiladas.
+`main` es la base de integración. Un solo responsable trabaja en incrementos `feature/*`, con PR, build, pruebas y chequeos SQL Server pertinentes antes de integrar. Actualiza `docs/project-status.md`, `docs/handoff-codex.md` y `docs/api-contracts.md` por incremento. PR #22–#25 están integrados en `main`. El siguiente PR de cancelaciones/incidencias/reembolsos manuales se prepara desde `feature/order-incidents-refunds`. Algunas ramas #11–#21 contienen incrementos que el historial de la BD compartida ya registra; audítalas y reincorpóralas gradualmente antes de migrar.
 
 Las pruebas que creen o limpien datos usan bases aisladas. La BD de desarrollo puede recibir solo registros identificables de prueba. No borrar ni recrear datos ni reiniciar la BD compartida. No incluir credenciales en Git; usar User Secrets localmente y la configuración privada del hosting en despliegue. La API no aplica migraciones al arrancar.
 

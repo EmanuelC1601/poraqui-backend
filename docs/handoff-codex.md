@@ -16,13 +16,17 @@ Verificado al integrar PR #23: `dotnet restore Poraqui.sln`, build (0 warnings/e
 
 PR #24 integra `CatalogProductOptions`: negocio crea grupos de opciones y cambia su disponibilidad; el servidor valida límites y disponibilidad al crear pedido y guarda snapshots de nombre/precio. Restore/build pasaron (0 warnings/errores), 15/15 pruebas SQLite. La migración agrega tablas e índices; script en `docs/sql/CatalogProductOptions.sql`, aún no aplicada.
 
-## Incremento activo: horarios comerciales
+## Incremento integrado: horarios comerciales
 
-Rama `feature/business-hours-main`, commit `0bd8ba3` sobre `main`. Configura siete días y zona horaria, publica consulta del horario y rechaza pedidos cuando el negocio está cerrado. Restore/build pasan (0 warnings/errores), 15/15 pruebas SQLite. `BusinessOpeningHours` agrega dos columnas con defaults y tabla semanal; `docs/sql/BusinessOpeningHours.sql`, aún no aplicada.
+PR #25, merge `c372018` a `main`. Configura siete días y zona horaria, publica consulta del horario y rechaza pedidos cuando el negocio está cerrado. Restore/build pasaron (0 warnings/errores), 15/15 pruebas SQLite. `BusinessOpeningHours` agrega dos columnas con defaults y tabla semanal; script en `docs/sql/BusinessOpeningHours.sql`.
+
+## Incremento activo: cancelaciones, incidencias y reembolsos manuales
+
+Rama `feature/order-incidents-refunds`, commit `912c0eb`, basada en `main` `c372018`. Implementa cancelación por cliente/negocio, auditoría de cancelación, cierre de ofertas externas abiertas, incidencias y revisión de reembolso manual. Restore/build pasan (0 warnings/errores) y 18/18 pruebas SQLite. Migraciones aditivas `OrderCancellationRefundsIncidents` y `OrderCancellationAuditConstraints`; PR pendiente.
 
 ## SQL Server y datos compartidos
 
-`ConnectionStrings:DefaultConnection` está en User Secrets y se conectó desde la rama integrada acumulada. EF confirmó 12 migraciones aplicadas y ningún cambio de modelo pendiente en esa revisión; no se aplicaron migraciones durante este incremento. Falta `ConnectionStrings:SqlServerTest`, que debe apuntar a la base aislada `PoraquiIntegrationTests` para pruebas concurrentes. Nunca configurar las pruebas que limpian datos con la BD compartida.
+`ConnectionStrings:DefaultConnection` está en User Secrets; la conexión SQL Server y lectura de tablas/historial se verificó sin exponer la cadena. `dbo.__EFMigrationsHistory` contiene 12 IDs hasta `CourierAssignmentCommandIdempotency`, mientras el checkout `main` solo incluye seis migraciones y la rama activa incluye ocho. Varios IDs aplicados aún no tienen sus migraciones/implementaciones en `main`; reconciliar el historial completo desde las ramas existentes antes de crear o aplicar nuevas migraciones. No se ejecutó ninguna migración en esta revisión. `ConnectionStrings:SqlServerTest` falta; configurar una base aislada `PoraquiIntegrationTests` para pruebas concurrentes. Nunca usar la BD compartida en pruebas que limpian datos.
 
 Para desarrollo local, guardar la conexión privada con `dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<cadena privada>" --project src/Poraqui.Api`. No guardar ni imprimir el valor. Revisar todo SQL de migración por operaciones destructivas y aplicar migraciones explícitamente cuando el destino esté validado. La API no migra al arrancar.
 
@@ -35,7 +39,7 @@ El recorrido automatizado de API está en `tests/Poraqui.Domain.Tests/BusinessAp
 ## Pendientes verificables
 
 - Confirmar reconexión SignalR desde cliente real y el comportamiento en el hosting de producción.
-- OTP real, cancelación de pedido, seguimiento de reembolsos manuales, idempotencia restante, métricas y despliegue MonsterASP.NET.
+- OTP real, idempotencia restante, métricas y despliegue MonsterASP.NET.
 - Completar pruebas de concurrencia con `ConnectionStrings:SqlServerTest` aislada y prueba de reconexión SignalR desde cliente real.
 - Revisar el ledger de `docs/project-status.md` y los contratos de `docs/api-contracts.md` antes de cada PR.
 
