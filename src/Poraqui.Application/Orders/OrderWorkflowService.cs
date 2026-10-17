@@ -1,5 +1,7 @@
-using Poraqui.Application.Commerce;
 using Poraqui.Domain.Orders;
+using Poraqui.Application.Commerce;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Poraqui.Application.Orders;
 
@@ -14,9 +16,11 @@ public interface IOrderWorkflowRepository
     Task<OfflineDeliverySyncRecord?> GetOfflineDeliveryCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken);
     Task<OrderIncident?> GetIncidentCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken);
     Task<TransferReview?> GetTransferEvidenceCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken);
+    Task<CourierAssignmentCommand?> GetCourierAssignmentCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken);
     Task CancelOpenExternalOffersForOrderAsync(Guid orderId, CancellationToken cancellationToken);
     void AddOfflineDeliveryCommand(OfflineDeliverySyncRecord command);
     Task<bool> SaveTransferEvidenceCommandAsync(Order order, CancellationToken cancellationToken);
+    Task<bool> SaveCourierAssignmentCommandAsync(Order order, CourierAssignmentCommand command, CancellationToken cancellationToken);
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }
 
@@ -46,7 +50,8 @@ public sealed record ManualRefundView(Guid Id, Guid OrderId, decimal RequestedAm
 public sealed record OrderRealtimeSnapshot(Guid OrderId, string Status, long Version, DateTimeOffset ChangedAtUtc);
 public sealed record OrderRealtimeSubscription(OrderRealtimeSnapshot Snapshot, string Audience);
 
-public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IOrderChangePublisher publisher)
+public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IOrderChangePublisher publisher,
+    IOrderCommandSecretProtector secretProtector)
 {
     public async Task<bool> HasTransferEvidenceReplayAsync(Guid orderId, Guid customerId, Guid commandId,
         string contentHash, CancellationToken cancellationToken)
@@ -307,16 +312,51 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IO
     }
 
     public async Task<CourierAssignment> AssignCourierAsync(Guid orderId, Guid businessUserId, Guid courierId,
-        decimal courierPaymentAmount, CancellationToken cancellationToken)
+        decimal courierPaymentAmount, Guid commandId, CancellationToken cancellationToken)
     {
+        if (commandId == Guid.Empty) throw new ArgumentException("A command ID is required.", nameof(commandId));
+        if (courierPaymentAmount < 0) throw new ArgumentOutOfRangeException(nameof(courierPaymentAmount));
+        courierPaymentAmount = decimal.Round(courierPaymentAmount, 2, MidpointRounding.AwayFromZero);
         var order = await RequiredOrder(orderId, cancellationToken);
         await EnsureBusinessAccess(order.BusinessId, businessUserId, false, cancellationToken);
+        var requestHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
+            $"{orderId:D}|{courierId:D}|{courierPaymentAmount.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)}")));
+        var existing = await repository.GetCourierAssignmentCommandAsync(businessUserId, commandId, cancellationToken);
+        if (existing is not null)
+        {
+            EnsureMatchingAssignment(existing, orderId, requestHash);
+            return await ReplayCourierAssignment(existing, cancellationToken);
+        }
         var pickupCode = OrderAccessCode.Generate();
         order.AssignCourier(businessUserId, courierId, OrderAccessCode.Hash(pickupCode), courierPaymentAmount);
-        await repository.SaveChangesAsync(cancellationToken);
+        var command = new CourierAssignmentCommand(businessUserId, commandId, orderId, courierId, courierPaymentAmount,
+            requestHash, secretProtector.Protect(pickupCode), DateTimeOffset.UtcNow);
+        if (!await repository.SaveCourierAssignmentCommandAsync(order, command, cancellationToken))
+        {
+            existing = await repository.GetCourierAssignmentCommandAsync(businessUserId, commandId, cancellationToken)
+                ?? throw new InvalidOperationException("Courier assignment retry could not be recovered.");
+            EnsureMatchingAssignment(existing, orderId, requestHash);
+            return await ReplayCourierAssignment(existing, cancellationToken);
+        }
         await PublishChange(order, cancellationToken);
         var address = await repository.GetBusinessAddressAsync(order.BusinessId, cancellationToken) ?? string.Empty;
         return new CourierAssignment(pickupCode, order.CourierPaymentAmount!.Value, ToView(order, address));
+    }
+
+    private static void EnsureMatchingAssignment(CourierAssignmentCommand command, Guid orderId, string requestHash)
+    {
+        if (command.OrderId != orderId || !string.Equals(command.RequestHash, requestHash, StringComparison.Ordinal))
+            throw new CourierAssignmentCommandConflictException();
+    }
+
+    private async Task<CourierAssignment> ReplayCourierAssignment(CourierAssignmentCommand command, CancellationToken cancellationToken)
+    {
+        var order = await RequiredOrder(command.OrderId, cancellationToken);
+        if (order.CourierUserId != command.CourierUserId || order.CourierPaymentAmount != command.CourierPaymentAmount)
+            throw new CourierAssignmentCommandConflictException();
+        var address = await repository.GetBusinessAddressAsync(order.BusinessId, cancellationToken) ?? string.Empty;
+        return new CourierAssignment(secretProtector.Unprotect(command.ProtectedPickupCode), command.CourierPaymentAmount,
+            ToView(order, address));
     }
 
     public async Task MarkPickedUpAsync(Guid orderId, Guid courierId, string pickupCode, CancellationToken cancellationToken)
@@ -424,3 +464,4 @@ public sealed class OrderResourceForbiddenException : Exception { }
 public sealed class OfflineDeliveryCommandConflictException : Exception { }
 public sealed class IncidentCommandConflictException : Exception { }
 public sealed class TransferEvidenceCommandConflictException : Exception { }
+public sealed class CourierAssignmentCommandConflictException : Exception { }

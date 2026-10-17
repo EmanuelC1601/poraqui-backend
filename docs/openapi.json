@@ -6,7 +6,7 @@
   },
   "servers": [
     {
-      "url": "http://127.0.0.1:5190/"
+      "url": "http://127.0.0.1:5191/"
     }
   ],
   "paths": {
@@ -2385,7 +2385,8 @@
       "AssignCourierRequest": {
         "required": [
           "courierUserId",
-          "courierPaymentAmount"
+          "courierPaymentAmount",
+          "commandId"
         ],
         "type": "object",
         "properties": {
@@ -2396,6 +2397,10 @@
           "courierPaymentAmount": {
             "type": "number",
             "format": "double"
+          },
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
