@@ -161,8 +161,23 @@ public sealed class BusinessApiTests
 
         await RegisterAsync(client, "customer@example.test");
         var customerToken = await LoginAsync(client, "customer@example.test");
-        Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put, "api/account/phone", customerToken,
-            JsonContent.Create(new { phoneNumber = "+52 55 1234 5678" }))).StatusCode);
+        const string customerPhone = "+525512345678";
+        using (var startPhoneVerification = await SendAsync(client, HttpMethod.Post, "api/account/phone/verification", customerToken,
+                   JsonContent.Create(new { phoneNumber = customerPhone })))
+            Assert.Equal(HttpStatusCode.Accepted, startPhoneVerification.StatusCode);
+        using (var rejectedPhoneCode = await SendAsync(client, HttpMethod.Post, "api/account/phone/verification/confirm", customerToken,
+                   JsonContent.Create(new { phoneNumber = customerPhone, code = "000000" })))
+            Assert.Equal(HttpStatusCode.BadRequest, rejectedPhoneCode.StatusCode);
+        using (var confirmPhoneVerification = await SendAsync(client, HttpMethod.Post, "api/account/phone/verification/confirm", customerToken,
+                   JsonContent.Create(new { phoneNumber = customerPhone, code = "123456" })))
+            Assert.Equal(HttpStatusCode.NoContent, confirmPhoneVerification.StatusCode);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var customer = await users.FindByEmailAsync("customer@example.test");
+            Assert.Equal(customerPhone, customer!.PhoneNumber);
+            Assert.True(customer.PhoneNumberConfirmed);
+        }
         var requestJson = $$"""{"businessId":"{{businessId}}","zoneId":"{{zoneId}}","deliveryAddress":"Calle de prueba","items":[{"productId":"{{productId}}","quantity":2,"unitPrice":0.01}]}""";
         Assert.Equal(HttpStatusCode.BadRequest, (await SendAsync(client, HttpMethod.Post, "api/orders", customerToken,
             new StringContent(requestJson, Encoding.UTF8, "application/json"))).StatusCode);

@@ -24,7 +24,8 @@
 
 ### Pago manual y reparto propio
 
-- `PUT /api/account/phone`: cliente guarda su teléfono; falta validación OTP.
+- `POST /api/account/phone/verification` inicia un SMS OTP para un número E.164. `POST /api/account/phone/verification/confirm` recibe el mismo número y código; solo si Twilio Verify responde `approved`, Identity guarda el teléfono como confirmado. Código inválido/vencido devuelve 400; proveedor sin configurar o indisponible devuelve 503. No se guardan códigos OTP en la BD.
+- Configuración privada requerida: `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid` y `TwilioVerify:ApiKeySecret`. El adaptador usa HTTPS y el recurso Verify de Twilio; no existe un modo simulado en producción.
 - Cliente sube comprobante privado con `POST /api/orders/{id}/transfer-evidence` (`multipart/form-data`, `file`, PDF/JPEG/PNG, máximo 8 MB). Solo negocio propietario/admin puede descargarlo.
 - Negocio/admin revisa pago con `POST /api/businesses/{businessId}/orders/{orderId}/payment-review`; aprobación deja `AwaitingBusinessDecision`.
 - `POST .../decision`, `POST .../preparation` y `POST .../ready` gestionan decisión e inicio explícito de preparación.

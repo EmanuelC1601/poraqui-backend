@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Poraqui.Infrastructure.Identity;
+using Poraqui.Application.Accounts;
 using Poraqui.Infrastructure.Persistence;
 using Poraqui.Api.Security;
 using Poraqui.Application.Commerce;
@@ -14,6 +15,7 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IOrderChangePublisher, SignalROrderChangePublisher>();
+builder.Services.AddHttpClient<IPhoneVerificationProvider, TwilioVerifyPhoneVerificationProvider>();
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 var identityConfigured = !string.IsNullOrWhiteSpace(connectionString);
 if (!string.IsNullOrWhiteSpace(connectionString))

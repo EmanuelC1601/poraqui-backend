@@ -6,6 +6,8 @@
 
 PR #12 de métricas está integrado en la rama de PR #11 (`d04882a`), no en `main`. PR #13 (`feature/delivery-command-retries`, commit inicial `0b9f2a5`) agrega reintentos idempotentes de recogida/entrega con courier y código válidos. Build y 19 pruebas pasan; se ejecutaron 18 pruebas API sobre SQLite aislado y una traducción de proveedor SQL Server sin conexión. Sin cambios de esquema. PR #13 está abierto contra la rama de PR #11.
 
+Siguiente rama: `feature/phone-verification`, basada en PR #13. Integra Twilio Verify vía HTTPS para iniciar y validar SMS OTP antes de establecer `PhoneNumberConfirmed`; no persiste códigos ni requiere migración. Configuración privada requerida para uso real: `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid`, `TwilioVerify:ApiKeySecret`. Suite 21/21 y build limpio. Las pruebas API usan un proveedor falso y las pruebas del adaptador usan un transporte HTTP falso; el envío con credenciales reales aún no se ha ejecutado.
+
 ## Incremento previo: sincronización offline (PR #7)
 
 Agrega `POST /api/orders/{orderId}/sync/delivery-confirmation` para confirmaciones capturadas offline. El servidor valida courier y código con el estado actual del pedido; el dato de hora del dispositivo se guarda como auditoría y no determina una transición. Guarda transición e ID/payload idempotente en una transacción. Un reintento idéntico devuelve la aceptación guardada; misma clave para datos distintos responde 409.
