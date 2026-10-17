@@ -2,7 +2,7 @@
 
 ## Estado del contrato
 
-`main` contiene PR #1–#5 y es la base de integración. La rama `feature/phone-verification` incorpora la pila funcional PR #6–#17. PR #18 agrega idempotencia durable a incidencias; la rama local `feature/order-create-idempotency` continúa sobre PR #18 e implementa idempotencia de creación de pedidos. Ambos cambios siguen fuera de `main`. En Development la API expone `/openapi/v1.json`. La API no migra al arrancar.
+`main` contiene PR #1–#5 y es la base de integración. La rama `feature/phone-verification` incorpora la pila funcional PR #6–#17. PR #18 agrega idempotencia durable a incidencias; PR #19 agrega idempotencia a creación de pedidos. Ambos incrementos siguen fuera de `main` y la pila ya está publicada en GitHub. En Development la API expone `/openapi/v1.json`. La API no migra al arrancar.
 
 La BD de desarrollo SQL Server recibió diez migraciones, incluida `IncidentCommandIdempotency` y `OrderCreationCommandIdempotency`. EF las aplicó explícitamente y confirmó que no quedan pendientes ni cambios de modelo. Las pruebas funcionales API usan SQLite; la prueba real de aceptación concurrente requiere una BD aislada `PoraquiIntegrationTests` y sigue pendiente.
 
