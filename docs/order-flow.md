@@ -25,7 +25,9 @@ La prueba recorre estos pasos y valida sus respuestas:
 
 La prueba es un recorrido de integración amplio y reproducible, no demuestra concurrencia real de SQL Server ni sustituye pruebas con el proveedor externo de SMS. Las pruebas de aceptación simultánea sobre SQL Server requieren `ConnectionStrings:SqlServerTest` apuntando a una base aislada.
 
-Este recorrido requiere `ConnectionStrings:DefaultConnection`, `Bootstrap:AdminKey` y `PrivateFiles:Root` privados. Para despliegue con más de una instancia, configura `DataProtection:KeysPath` a almacenamiento privado persistente y compartido entre instancias. No uses credenciales publicadas en conversaciones.
+## Ejecución manual de la API
+
+Este modo de ejecución requiere `ConnectionStrings:DefaultConnection`, `Bootstrap:AdminKey` y `PrivateFiles:Root` privados. La prueba automatizada anterior no requiere estos valores. Para despliegue con más de una instancia, configura `DataProtection:KeysPath` a almacenamiento privado persistente y compartido entre instancias. No uses credenciales publicadas en conversaciones.
 
 ## Ejecutar
 
