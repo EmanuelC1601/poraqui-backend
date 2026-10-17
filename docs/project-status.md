@@ -1,16 +1,16 @@
 # Estado verificable del proyecto
 
-PR #17 (https://github.com/EmanuelC1601/poraqui-backend/pull/17) se integró en `feature/phone-verification` mediante `0f31ed4`; actualizó la pila a .NET 10 / EF Core 10.0.13. PR #18 (https://github.com/EmanuelC1601/poraqui-backend/pull/18) agrega reintento durable para reportes de incidencias y su migración. PR #19 (https://github.com/EmanuelC1601/poraqui-backend/pull/19) hace idempotente `POST /api/orders` y añade `20261017211445_OrderCreationCommandIdempotency`. La rama actual `feature/transfer-proof-idempotency` está apilada sobre PR #19 y agrega `commandId` durable a la carga de comprobantes; su migración aditiva `20261017212343_TransferEvidenceCommandIdempotency` fue aplicada explícitamente a desarrollo. Once migraciones aplicadas. Build: 0 advertencias/errores; suite: 24 aprobadas y 1 optativa omitida porque falta la base aislada `ConnectionStrings__SqlServerTest`; las pruebas funcionales usan SQLite aislado. No se probó aceptación concurrente contra SQL Server. No se subió configuración privada.
+PR #17 (https://github.com/EmanuelC1601/poraqui-backend/pull/17) se integró en `feature/phone-verification` mediante `0f31ed4`; actualizó la pila a .NET 10 / EF Core 10.0.13. PR #18 se integró en `feature/phone-verification` (`a170529`), PR #19 en `feature/command-idempotency-increment` (`fd1e804`) y PR #20 en `feature/order-create-idempotency` (`0a964ea`); ninguno se integra aún en `main`. PR #21 está abierto desde `feature/courier-assignment-idempotency` sobre PR #20. La rama actual agrega `commandId` y recuperación protegida del código al asignar courier propio; la migración `20261017212850_CourierAssignmentCommandIdempotency` fue aplicada explícitamente a desarrollo. Doce migraciones aplicadas. Build: 0 advertencias/errores; suite: 24 aprobadas y 2 pruebas optativas omitidas porque falta la base aislada `ConnectionStrings__SqlServerTest`; las pruebas funcionales usan SQLite aislado. Se añadieron pruebas SQL Server optativas para carreras de aceptación externa y asignación propia; ambas siguen sin ejecutarse. No se subió configuración privada.
 
 Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167` y es la base de integración. PR #6 (reparto externo), #7 (sincronización offline), #8 (SignalR), #9 (opciones de catálogo), #10 (horarios) y #11 (cancelaciones/incidencias/reembolsos) están abiertos y apilados en ese orden. PR #12 (métricas) fue integrado en la rama de PR #11 mediante `d04882a`; no está todavía en `main`. PR #17 (.NET 10) se integró en `feature/phone-verification`, rama que contiene la pila funcional y sigue fuera de `main`. La BD SQL Server de desarrollo tiene diez migraciones aplicadas hasta `OrderCreationCommandIdempotency`. El desarrollo tiene un único responsable; las asignaciones previas a OpenCode se conservan como antecedente, sin dependencia operativa.
 
 ## Ledger de funciones
 
-Estado verificable de la pila local `feature/transfer-proof-idempotency` (apilada sobre PR #19); no confundir con lo integrado en `main`:
+Estado verificable de la pila local `feature/courier-assignment-idempotency` (PR #18–#20 integrados únicamente en sus ramas base); no confundir con lo integrado en `main`:
 
-- **Implementado en código y suite local:** autenticación Identity, roles y autorización por recurso; negocio, catálogo, opciones, disponibilidad, zonas y tarifas; precios calculados en servidor; transferencia y comprobantes privados con revisión manual; decisiones, preparación explícita, reparto propio con códigos, pago al courier al recoger, contacto autorizado, estados e historial; reparto externo con ofertas/cancelación/vencimiento; SignalR con autorización y estado persistido al suscribirse; confirmación offline validada por el servidor; incidencias, cancelación y seguimiento manual de reembolso; métricas; reintentos idempotentes de transiciones, incidencias, creación de pedidos y carga de comprobantes.
-- **Pendiente:** asignación propia de courier con replay seguro del código; carrera de aceptación de oferta y restricciones sobre SQL Server aislado; OTP/SMS real; reconexión SignalR desde cliente real; integrar la pila funcional en `main`; comprobar publicación MonsterASP con persistencia de Data Protection y almacenamiento privado.
-- **Bloqueado por configuración:** prueba SQL Server de concurrencia, porque falta `ConnectionStrings__SqlServerTest` hacia la BD aislada `PoraquiIntegrationTests`. No se usa la BD compartida para tests que limpian datos. Para despliegue, falta una ruta persistente privada `DataProtection__KeysPath`.
+- **Implementado en código y suite local:** autenticación Identity, roles y autorización por recurso; negocio, catálogo, opciones, disponibilidad, zonas y tarifas; precios calculados en servidor; transferencia y comprobantes privados con revisión manual; decisiones, preparación explícita, reparto propio con códigos, pago al courier al recoger, contacto autorizado, estados e historial; reparto externo con ofertas/cancelación/vencimiento; SignalR con autorización y estado persistido al suscribirse; confirmación offline validada por el servidor; incidencias, cancelación y seguimiento manual de reembolso; métricas; reintentos idempotentes de transiciones, incidencias, creación de pedidos, carga de comprobantes y asignación propia con recuperación protegida del código.
+- **Pendiente:** carrera de aceptación de oferta y restricciones sobre SQL Server aislado; OTP/SMS real; reconexión SignalR desde cliente real; integrar la pila funcional en `main`; comprobar publicación MonsterASP con persistencia de Data Protection y almacenamiento privado.
+- **Bloqueado por configuración:** pruebas SQL Server de concurrencia, porque falta `ConnectionStrings__SqlServerTest` hacia la BD aislada `PoraquiIntegrationTests`. No se usa la BD compartida para tests que limpian datos. Para despliegue, falta una ruta persistente privada `DataProtection__KeysPath`.
 
 ## Implementado en `main`
 
@@ -100,20 +100,15 @@ Verificado localmente: `dotnet build Poraqui.sln` (0 advertencias/errores), `dot
 
 ## Pendiente
 
-- Verificar migraciones, restricciones y aceptación simultánea en SQL Server antes de integrar PR #6/#7.
-- Ejecutar la prueba de aceptación simultánea y revisar/aplicar las migraciones en SQL Server.
-- Probar reconexión SignalR en cliente real; la suscripción ya devuelve instantánea persistida al reconectar.
-- PR #9: `feature/catalog-options` en commit `084acb3`, publicado en https://github.com/EmanuelC1601/poraqui-backend/pull/9.
-- Validar SMS OTP contra cuenta real tras configurar `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid` y `TwilioVerify:ApiKeySecret`; falta idempotencia durable para subida/reintento de comprobantes y asignación de courier con código. La creación de pedidos y el reporte de incidencias ya guardan claves durables; recogida y entrega toleran reintentos con el mismo courier y código. Falta validar aceptación concurrente sobre SQL Server aislado.
-- PR #10: `feature/business-hours`, commit `d25e64f`, publicado en https://github.com/EmanuelC1601/poraqui-backend/pull/10. Requiere validación SQL Server antes de integrar.
-- PR #11 implementa cancelaciones/incidencias/reembolsos; falta verificar migraciones en SQL Server antes de integrar.
-- PR #12 agrega métricas del piloto; está integrado en la rama de PR #11, pero aún no en `main`; falta validar sobre SQL Server.
-- PR #13 hace idempotentes reintentos de recogida/entrega; está abierto para revisión/integración en la rama anterior. No necesita migración.
-- Instrucciones finales de despliegue en MonsterASP.NET y recorrido SQL Server reproducible.
+- Integrar en `main` la pila de PR #18–#21 cuando cada PR pueda pasar las comprobaciones disponibles; por ahora no hay checks configurados en GitHub y la UI deja la capacidad de merge en `Loading`.
+- Ejecutar aceptación simultánea de ofertas y restricciones del proveedor SQL Server con `ConnectionStrings__SqlServerTest` apuntando a una BD aislada `PoraquiIntegrationTests`.
+- Probar reconexión SignalR desde un cliente real; el hub ya devuelve instantánea persistida al suscribirse de nuevo.
+- Validar Twilio Verify con `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid` y `TwilioVerify:ApiKeySecret` privados.
+- Preparar y comprobar despliegue MonsterASP.NET con `DataProtection:KeysPath` persistente y almacenamiento de comprobantes privado.
 
 ## Pendiente: base SQL Server aislada para pruebas de concurrencia
 
-`ConnectionStrings:DefaultConnection` está configurada localmente en User Secrets y EF comprobó la conexión. La prueba optativa de concurrencia permanece omitida hasta configurar `ConnectionStrings__SqlServerTest` con una base de pruebas separada llamada exactamente `PoraquiIntegrationTests`. No apuntar esa prueba a la BD compartida. Los endpoints y migraciones aún no se han desplegado a un sitio MonsterASP.
+`ConnectionStrings:DefaultConnection` está configurada localmente en User Secrets y EF comprobó la conexión/aplicó explícitamente doce migraciones aditivas. La prueba optativa de concurrencia permanece omitida hasta configurar `ConnectionStrings__SqlServerTest` con una base de pruebas separada llamada exactamente `PoraquiIntegrationTests`. No apuntar esa prueba a la BD compartida. Los endpoints y migraciones aún no se han desplegado a un sitio MonsterASP.
 
 ## Fuera de alcance
 

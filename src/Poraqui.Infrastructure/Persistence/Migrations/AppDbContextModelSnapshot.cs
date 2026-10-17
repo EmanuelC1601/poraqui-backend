@@ -367,6 +367,45 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                     b.ToTable("ProductOptionGroups", (string)null);
                 });
 
+            modelBuilder.Entity("Poraqui.Domain.Orders.CourierAssignmentCommand", b =>
+                {
+                    b.Property<Guid>("BusinessUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CommandId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("CourierPaymentAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("CourierUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ProtectedPickupCode")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.HasKey("BusinessUserId", "CommandId");
+
+                    b.HasIndex("OrderId")
+                        .IsUnique();
+
+                    b.ToTable("CourierAssignmentCommands", (string)null);
+                });
+
             modelBuilder.Entity("Poraqui.Domain.Orders.CourierAvailability", b =>
                 {
                     b.Property<Guid>("CourierUserId")
@@ -1076,6 +1115,21 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                         .WithMany("OptionGroups")
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Poraqui.Domain.Orders.CourierAssignmentCommand", b =>
+                {
+                    b.HasOne("Poraqui.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("BusinessUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Poraqui.Domain.Orders.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 
