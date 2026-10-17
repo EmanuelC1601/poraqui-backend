@@ -86,4 +86,44 @@ public sealed class PersistenceModelTests
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() =>
             new Poraqui.Infrastructure.Persistence.OrderWorkflowRepository(right).SaveChangesAsync(default));
     }
+
+    [Fact]
+    public async Task Expiration_sweep_persists_due_external_offers_without_changing_unexpired_offers()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
+        var owner = new ApplicationUser { Id = Guid.NewGuid(), UserName = "offer-expiry-owner" };
+        var customer = new ApplicationUser { Id = Guid.NewGuid(), UserName = "offer-expiry-customer" };
+        var courier = new ApplicationUser { Id = Guid.NewGuid(), UserName = "offer-expiry-courier" };
+        var zone = new DeliveryZone("Zona oferta expirada");
+        var business = new Business(owner.Id, "Negocio expiración", "Origen");
+        var order = new Order(customer.Id, business.Id, zone.Id, "Destino", 3m,
+            [(Guid.NewGuid(), "Producto", 10m, 1)]);
+        var now = DateTimeOffset.UtcNow;
+        var due = new ExternalDeliveryOffer(order.Id, courier.Id, zone.Id, "Origen", "Destino", 20m, null,
+            now.AddMinutes(5));
+        var future = new ExternalDeliveryOffer(order.Id, Guid.NewGuid(), zone.Id, "Origen", "Destino", 20m, null,
+            now.AddHours(1));
+
+        await using (var setup = new AppDbContext(options))
+        {
+            await setup.Database.EnsureCreatedAsync();
+            setup.Users.AddRange(owner, customer, courier, new ApplicationUser { Id = future.CourierUserId, UserName = "other-courier" });
+            setup.AddRange(zone, business, order, due, future);
+            await setup.SaveChangesAsync();
+        }
+
+        await using (var db = new AppDbContext(options))
+        {
+            var repository = new ExternalCourierRepository(db);
+            Assert.Equal(1, await repository.ExpireDueOffersAsync(now.AddMinutes(6), default));
+        }
+
+        await using var verify = new AppDbContext(options);
+        Assert.Equal(ExternalDeliveryOfferStatus.Expired,
+            (await verify.ExternalDeliveryOffers.SingleAsync(x => x.Id == due.Id)).Status);
+        Assert.Equal(ExternalDeliveryOfferStatus.Offered,
+            (await verify.ExternalDeliveryOffers.SingleAsync(x => x.Id == future.Id)).Status);
+    }
 }

@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
 using Poraqui.Application.Accounts;
 using System.Threading.RateLimiting;
+using Poraqui.Api.HostedServices;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -57,6 +58,8 @@ if (!string.IsNullOrWhiteSpace(connectionString))
     builder.Services.AddScoped<OrderWorkflowService>();
     builder.Services.AddScoped<IExternalCourierRepository, ExternalCourierRepository>();
     builder.Services.AddScoped<ExternalCourierService>();
+    if (!builder.Environment.IsEnvironment("Testing"))
+        builder.Services.AddHostedService<ExternalOfferExpirationWorker>();
     builder.Services.AddSingleton<ITransferEvidenceStorage, FileTransferEvidenceStorage>();
 }
 builder.Services.AddPoraquiAuthorization();

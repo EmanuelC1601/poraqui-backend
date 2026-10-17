@@ -35,8 +35,10 @@ PR #33 integra `GET /api/admin/metrics/pilot`, restringido a PlatformAdmin, con 
 3. Seguir `docs/deployment-monsterasp.md` para preparar el sitio, secretos, almacenamiento y publicación; verificar health, SignalR y comprobantes en el hosting. La guía está integrada, pero el sitio aún no se ha publicado.
 4. Configurar privadamente `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid` y `TwilioVerify:ApiKeySecret`, y verificar un SMS de extremo a extremo con un número autorizado.
 
-## Incremento local actual
+## Incrementos recientes
 
-La rama `feature/external-courier-active-zone` valida que un courier solo pueda activar disponibilidad en una zona existente y activa. Añade cobertura API con SQLite para zona inexistente y documenta el `400`. Todavía requiere compilación, ejecución de pruebas, commit y PR; no contiene cambios de esquema ni migraciones.
+PR #43 se integró en `main` como `6063058`: la disponibilidad de courier externo valida zona existente y activa; una prueba API con SQLite confirma `400` para una zona inexistente.
+
+En `feature/external-offer-expiration-worker` se añadió un proceso hospedado que persiste ofertas expiradas cada minuto y una prueba de persistencia SQLite del barrido. Verificado con `dotnet test Poraqui.sln` (30 aprobadas, 2 pruebas SQL Server omitidas), `dotnet build Poraqui.sln --no-restore` (0 advertencias/errores) y `git diff --check`. Pendiente commit y PR; no cambia el esquema.
 
 El ledger vigente de implementado, pendiente y bloqueado está en `docs/project-status.md`; ejecución reproducible del recorrido está en `docs/order-flow.md`.

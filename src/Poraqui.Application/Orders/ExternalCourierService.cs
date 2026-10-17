@@ -16,6 +16,7 @@ public interface IExternalCourierRepository
     Task<IReadOnlyList<ExternalDeliveryOffer>> GetOffersForOrderAsync(Guid orderId, CancellationToken cancellationToken);
     Task<ExternalDeliveryOffer?> GetOfferAsync(Guid offerId, CancellationToken cancellationToken);
     Task<bool> HasAcceptedOfferAsync(Guid orderId, CancellationToken cancellationToken);
+    Task<int> ExpireDueOffersAsync(DateTimeOffset now, CancellationToken cancellationToken);
     void AddOffer(ExternalDeliveryOffer offer);
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }
@@ -36,6 +37,8 @@ public sealed class ExternalCourierService(IExternalCourierRepository repository
         profile.SetAvailable(available, zoneId);
         await repository.SaveChangesAsync(ct);
     }
+
+    public Task<int> ExpireDueOffersAsync(CancellationToken ct) => repository.ExpireDueOffersAsync(DateTimeOffset.UtcNow, ct);
 
     public async Task<ExternalOfferDispatchResult> CreateOffersAsync(Guid orderId, Guid businessOwnerId, bool isAdmin, decimal remuneration,
         string? conditions, TimeSpan offerDuration, CancellationToken ct)
