@@ -6,7 +6,8 @@ public sealed class OrderIncident
 {
     private OrderIncident() { }
 
-    internal OrderIncident(Guid orderId, Guid reporterUserId, string category, string description, DateTimeOffset reportedAtUtc)
+    internal OrderIncident(Guid orderId, Guid reporterUserId, string category, string description, DateTimeOffset reportedAtUtc,
+        Guid? commandId = null)
     {
         if (orderId == Guid.Empty) throw new ArgumentException("An order is required.", nameof(orderId));
         if (reporterUserId == Guid.Empty) throw new ArgumentException("A reporter is required.", nameof(reporterUserId));
@@ -15,6 +16,7 @@ public sealed class OrderIncident
         Id = Guid.NewGuid();
         OrderId = orderId;
         ReporterUserId = reporterUserId;
+        CommandId = commandId;
         ReportedAtUtc = reportedAtUtc;
         Status = OrderIncidentStatus.Open;
     }
@@ -22,6 +24,7 @@ public sealed class OrderIncident
     public Guid Id { get; private set; }
     public Guid OrderId { get; private set; }
     public Guid ReporterUserId { get; private set; }
+    public Guid? CommandId { get; private set; }
     public string Category { get; private set; } = string.Empty;
     public string Description { get; private set; } = string.Empty;
     public DateTimeOffset ReportedAtUtc { get; private set; }
