@@ -12,6 +12,7 @@ public interface IOrderWorkflowRepository
     Task<bool> BusinessBelongsToAsync(Guid businessId, Guid ownerUserId, CancellationToken cancellationToken);
     Task<string?> GetCustomerPhoneAsync(Guid customerUserId, CancellationToken cancellationToken);
     Task<OfflineDeliverySyncRecord?> GetOfflineDeliveryCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken);
+    Task<OrderIncident?> GetIncidentCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken);
     Task CancelOpenExternalOffersForOrderAsync(Guid orderId, CancellationToken cancellationToken);
     void AddOfflineDeliveryCommand(OfflineDeliverySyncRecord command);
     Task SaveChangesAsync(CancellationToken cancellationToken);
@@ -136,11 +137,19 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IO
     }
 
     public async Task<OrderIncidentView> ReportIncidentAsync(Guid orderId, Guid actorId, bool isAdmin,
-        string category, string description, CancellationToken cancellationToken)
+        Guid commandId, string category, string description, CancellationToken cancellationToken)
     {
+        if (commandId == Guid.Empty) throw new ArgumentException("A command ID is required.", nameof(commandId));
         var order = await RequiredOrder(orderId, cancellationToken);
         await EnsureOrderParticipant(order, actorId, isAdmin, cancellationToken);
-        var incident = order.AddIncident(actorId, category, description);
+        var existing = await repository.GetIncidentCommandAsync(actorId, commandId, cancellationToken);
+        if (existing is not null)
+        {
+            if (existing.OrderId != orderId || existing.Category != category.Trim() || existing.Description != description.Trim())
+                throw new IncidentCommandConflictException();
+            return ToView(existing);
+        }
+        var incident = order.AddIncident(actorId, category, description, commandId);
         await repository.SaveChangesAsync(cancellationToken);
         await PublishChange(order, cancellationToken);
         return ToView(incident);
@@ -377,3 +386,4 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IO
 
 public sealed class OrderResourceForbiddenException : Exception { }
 public sealed class OfflineDeliveryCommandConflictException : Exception { }
+public sealed class IncidentCommandConflictException : Exception { }

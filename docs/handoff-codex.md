@@ -2,7 +2,7 @@
 
 ## Responsable y ramas
 
-Un solo responsable mantiene todos los módulos, contratos, `AppDbContext`, migraciones, pruebas y despliegue. `main` es la base de integración; contiene la base inicial y PR #22–#26 hasta `1d75577`, incluidos sync offline, SignalR, catálogo, horarios, cancelaciones, incidencias y reembolsos manuales. Crear incrementos desde el `main` actualizado, usar ramas `feature/*` y abrir PRs pequeños. OpenCode ya no participa; su asignación previa queda como antecedente.
+Un solo responsable mantiene todos los módulos, contratos, `AppDbContext`, migraciones, pruebas y despliegue. `main` es la base de integración; contiene la base inicial y PR #22–#27 hasta `ce0cc7b`, incluidos sync offline, SignalR, catálogo, horarios, cancelaciones, incidencias, reembolsos manuales e idempotencia de transiciones. Crear incrementos desde el `main` actualizado, usar ramas `feature/*` y abrir PRs pequeños. OpenCode ya no participa; su asignación previa queda como antecedente.
 
 Los cambios posteriores permanecen en ramas apiladas. No asumir que están integrados ni que sus pruebas corresponden al `main`; revisar cada cambio y revalidarlo contra la rama actual antes de presentar PR.
 
@@ -24,9 +24,13 @@ PR #25, merge `c372018` a `main`. Configura siete días y zona horaria, publica 
 
 PR #26, merge `1d75577`. Implementa cancelación por cliente/negocio, auditoría de cancelación, cierre de ofertas externas abiertas, incidencias y revisión de reembolso manual. Restore/build pasaron (0 warnings/errores) y 18/18 pruebas SQLite. Migraciones aditivas `OrderCancellationRefundsIncidents` y `OrderCancellationAuditConstraints`.
 
-## Incremento activo: reintentos de transiciones
+## Incremento integrado: reintentos de transiciones
 
-Rama `feature/workflow-idempotency-main`, commits `0c39f51` y `69131f7`, basada en `main` `1d75577`. Reintentar decisión de negocio, preparación, recogida, inicio y confirmación de recorrido no duplica los efectos persistidos. Restore/build pasan (0 warnings/errores), 21/21 pruebas SQLite. PR pendiente; no requiere migración.
+Rama `feature/workflow-idempotency-main`, commits `0c39f51` y `69131f7`, basada en `main` `1d75577`. Reintentar decisión de negocio, preparación, recogida, inicio y confirmación de recorrido no duplica los efectos persistidos. Restore/build pasan (0 warnings/errores), 21/21 pruebas SQLite. PR #27 integrado; no requirió migración.
+
+## Incremento activo: idempotencia de reportes de incidentes
+
+Rama `feature/incident-idempotency`, commit `8181753`, basada en `main` `ce0cc7b`. Reportar una incidencia acepta `commandId`; el mismo ID y payload repiten el resultado sin registrar una segunda incidencia. Usa la migración `IncidentCommandIdempotency`, ya presente en el historial de SQL Server. Restore/build y 21/21 pruebas SQLite pasan. PR pendiente.
 
 ## SQL Server y datos compartidos
 

@@ -260,11 +260,25 @@ public sealed class BusinessApiTests
         Assert.Equal(HttpStatusCode.Forbidden, (await SendAsync(client, HttpMethod.Put,
             $"api/option-groups/{optionGroupId}/availability", otherMerchantToken,
             JsonContent.Create(new { isAvailable = false }))).StatusCode);
+        var incidentCommandId = Guid.NewGuid();
+        var incidentRequest = new { commandId = incidentCommandId, category = "OrderQuestion", description = "El cliente solicita una actualización." };
         using var reportedIncidentResponse = await SendAsync(client, HttpMethod.Post, $"api/orders/{orderId}/incidents", customerToken,
-            JsonContent.Create(new { category = "OrderQuestion", description = "El cliente solicita una actualización." }));
+            JsonContent.Create(incidentRequest));
         Assert.Equal(HttpStatusCode.OK, reportedIncidentResponse.StatusCode);
         using var reportedIncidentJson = JsonDocument.Parse(await reportedIncidentResponse.Content.ReadAsStringAsync());
         var incidentId = reportedIncidentJson.RootElement.GetProperty("id").GetGuid();
+        using (var replayedIncidentResponse = await SendAsync(client, HttpMethod.Post, $"api/orders/{orderId}/incidents", customerToken,
+                   JsonContent.Create(incidentRequest)))
+        {
+            using var replayedIncidentJson = JsonDocument.Parse(await replayedIncidentResponse.Content.ReadAsStringAsync());
+            Assert.Equal(HttpStatusCode.OK, replayedIncidentResponse.StatusCode);
+            Assert.Equal(incidentId, replayedIncidentJson.RootElement.GetProperty("id").GetGuid());
+        }
+        Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(client, HttpMethod.Post, $"api/orders/{orderId}/incidents", customerToken,
+            JsonContent.Create(new { commandId = incidentCommandId, category = "OrderQuestion", description = "Otro contenido" }))).StatusCode);
+        using (var incidentList = await SendAsync(client, HttpMethod.Get, $"api/orders/{orderId}/incidents", customerToken))
+        using (var incidentListJson = JsonDocument.Parse(await incidentList.Content.ReadAsStringAsync()))
+            Assert.Single(incidentListJson.RootElement.EnumerateArray());
         Assert.Equal(HttpStatusCode.Forbidden, (await SendAsync(client, HttpMethod.Get,
             $"api/orders/{orderId}/incidents", otherMerchantToken)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await SendAsync(client, HttpMethod.Post,

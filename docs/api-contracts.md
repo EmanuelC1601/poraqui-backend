@@ -1,8 +1,8 @@
 # Contratos API y entre módulos
 
-Estado: `main` integra la base inicial y PR #22–#26 hasta `1d75577`: sincronización offline, SignalR, opciones de catálogo, horarios comerciales, cancelaciones/incidencias y reembolsos manuales. Un responsable mantiene contratos y migraciones. OpenAPI en Development: `/openapi/v1.json`.
+Estado: `main` integra la base inicial y PR #22–#27 hasta `ce0cc7b`: sincronización offline, SignalR, opciones de catálogo, horarios comerciales, cancelaciones/incidencias y reembolsos manuales. Un responsable mantiene contratos y migraciones. OpenAPI en Development: `/openapi/v1.json`.
 
-## Integrado en `main` (base inicial y PR #22–#26)
+## Integrado en `main` (base inicial y PR #22–#27)
 
 ### Identidad, permisos y negocio
 
@@ -88,13 +88,15 @@ La cadena privada `ConnectionStrings:DefaultConnection` existe y EF verificó SQ
 
 ## Integrado en `main`: cancelaciones, incidencias y reembolsos manuales (PR #26)
 
+La idempotencia de reportes de incidentes, con clave `commandId` y huella de payload, está en `feature/incident-idempotency`, aún pendiente de integrar.
+
 - Cliente cancela antes de enviar comprobante; negocio propietario/admin puede cancelar hasta antes de que el repartidor recoja. Se guarda motivo, actor, fecha e historial; las ofertas externas abiertas se cancelan con el pedido.
 - Si existe transferencia pendiente o aprobada, se registra un caso de reembolso manual. `GET .../refund` consulta el caso y `POST .../refund-review` permite al negocio propietario/admin marcarlo reembolsado con importe y referencia, o marcar que no se requiere. La API no transfiere dinero.
-- Los participantes autorizados consultan y reportan incidencias con `GET/POST /api/orders/{orderId}/incidents`; el negocio propietario/admin resuelve por `POST .../incidents/{incidentId}/resolve`.
+- Los participantes autorizados consultan y reportan incidencias con `GET/POST /api/orders/{orderId}/incidents`; el cuerpo de creación acepta `commandId` para reintentar sin duplicar; el negocio propietario/admin resuelve por `POST .../incidents/{incidentId}/resolve`.
 - Migraciones aditivas `OrderCancellationRefundsIncidents` y `OrderCancellationAuditConstraints`, con SQL revisable en `docs/sql/OrderCancellationRefundsIncidents.sql`.
 
-## En desarrollo: idempotencia de transiciones
+## Integrado en `main`: idempotencia de transiciones (PR #27)
 
 Decisiones de negocio, inicio/listo de preparación, recogida, inicio del recorrido y confirmación de entrega toleran reintentos con el mismo actor y datos, sin duplicar eventos o pago de recogida. Acciones sobre ofertas externas también comparan su estado ya persistido. Parámetros distintos continúan sujetos a validación/conflicto. No se añade migración en este incremento.
 
-Pendiente: OTP real, idempotencia de reportes, creación de pedidos, comprobantes y asignación, métricas, reconexión SignalR en cliente real, pruebas SQL Server aisladas y despliegue. No hay GPS, distancias inferidas ni transferencias bancarias automáticas.
+Pendiente: OTP real, idempotencia de reportes (en rama), creación de pedidos, comprobantes y asignación, métricas, reconexión SignalR en cliente real, pruebas SQL Server aisladas y despliegue. No hay GPS, distancias inferidas ni transferencias bancarias automáticas.

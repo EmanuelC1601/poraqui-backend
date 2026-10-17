@@ -137,10 +137,10 @@ public sealed class Order
                 OrderStatus.Confirmed, OrderStatus.Preparing, OrderStatus.ReadyForPickup]);
     }
 
-    public OrderIncident AddIncident(Guid reporterUserId, string category, string description)
+    public OrderIncident AddIncident(Guid reporterUserId, string category, string description, Guid? commandId = null)
     {
         if (reporterUserId == Guid.Empty) throw new ArgumentException("An incident reporter is required.", nameof(reporterUserId));
-        var incident = new OrderIncident(Id, reporterUserId, category, description, DateTimeOffset.UtcNow);
+        var incident = new OrderIncident(Id, reporterUserId, category, description, DateTimeOffset.UtcNow, commandId);
         _incidents.Add(incident);
         RecordActivity(reporterUserId, $"Incident reported: {incident.Category}", incident.ReportedAtUtc);
         return incident;
