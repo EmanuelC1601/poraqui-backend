@@ -6,7 +6,7 @@ El backend tiene un único responsable. `main` es la base de integración; cada 
 
 ## Cambios integrados
 
-- PR #1 y PR #22–#40 están integrados en `main` antes de esta rama. El recorrido cubre identidad y autorización por rol/recurso, configuración comercial y catálogo, pedidos con precios de servidor, comprobante privado y revisión manual, preparación, reparto propio/externo, ofertas, códigos, contacto autorizado, historial, incidencias, reembolsos manuales, sincronización offline, SignalR, idempotencia, métricas piloto y verificación telefónica OTP. PR #32 agrega pruebas de concurrencia SQL Server; los casos están añadidos pero no se han ejecutado aún contra SQL Server.
+- PR #1 y PR #22–#41 están integrados en `main`. El recorrido cubre identidad y autorización por rol/recurso, configuración comercial y catálogo, pedidos con precios de servidor, comprobante privado y revisión manual, preparación, reparto propio/externo, ofertas, códigos, contacto autorizado, historial, incidencias, reembolsos manuales, sincronización offline, SignalR, idempotencia, métricas piloto y verificación telefónica OTP. PR #32 agrega pruebas de concurrencia SQL Server; los casos están añadidos pero no se han ejecutado aún contra SQL Server.
 - PR #29 incorpora idempotencia de creación de pedido.
 - PR #30 incorpora idempotencia de subida del comprobante.
 - PR #31 incorpora idempotencia de asignación de courier propio.
@@ -23,6 +23,7 @@ PR #33 integra `GET /api/admin/metrics/pilot`, restringido a PlatformAdmin, con 
 - En 2026-10-17, `dotnet ef migrations list` se ejecutó en lectura sobre SQL Server y devolvió las 12 migraciones actuales; no reportó IDs pendientes. No se ejecutó ninguna migración durante esta entrega.
 - `dotnet build Poraqui.sln --no-restore`: correcto, 0 advertencias y errores.
 - `dotnet test Poraqui.sln`: 29 correctos; 2 carreras SQL omitidas por falta de `ConnectionStrings__SqlServerTest`.
+- PR #41 añade cinco pruebas unitarias del guard de destino aislado. El catálogo de `ConnectionStrings__SqlServerTest` se compara contra el de `DefaultConnection` (User Secrets); ambos no pueden compartir el mismo nombre.
 - `dotnet ef migrations has-pending-model-changes`: sin cambios pendientes del modelo.
 - OpenAPI local: HTTP 200; snapshot versionado.
 - La API no aplica migraciones automáticamente. Antes de futuras migraciones compartidas, conciliar `__EFMigrationsHistory` y revisar el SQL generado para asegurar que preserva datos.

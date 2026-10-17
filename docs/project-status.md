@@ -17,13 +17,14 @@ Actualizado: 2026-10-17. `main` es la base de integración y tiene un único res
 | Integrado; verificación externa pendiente | OTP vía Twilio Verify, E.164, confirmación Identity y límite de 5 intentos/10 min/IP | PR #36, merge `0f4dd51`; proveedor cubierto con handler HTTP simulado. Envío real requiere secretos y no se ha comprobado |
 | Integrado | Consulta del snapshot persistido al reconectar SignalR | PR #38, merge `a0c3b0f`; prueba con `Microsoft.AspNetCore.SignalR.Client` comprueba nueva conexión, resuscripción y estado/versión actuales |
 | Integrado | Guía de publicación MonsterASP.NET | PR #39; documentación preparada, sitio aún no publicado |
+| Integrado | Guard de pruebas SQL Server: omite las carreras si el catálogo aislado coincide con `DefaultConnection`, incluso con alias de servidor distintos | PR #41; cinco pruebas unitarias cubren configuración ausente, catálogo compartido, base distinta y cadena inválida |
 | Pendiente | Ejecutar carreras SQL de concurrencia; publicar/verificar en MonsterASP.NET | No verificado en SQL Server ni desplegado; guía de hosting en `docs/deployment-monsterasp.md` |
 | Bloqueado por acceso remoto/configuración | Ejecutar carreras reales en SQL Server | Se creó una base MSSQL gratuita aislada desde el panel; está vacía. Aún falta `ConnectionStrings__SqlServerTest` en User Secrets y acceso desde la estación externa. Las pruebas nuevas comparan ese destino con `DefaultConnection` y se omiten si coinciden. No se habilitó acceso remoto. |
 | Fuera de alcance | GPS, distancias estimadas, transferencias bancarias automáticas y frontend | Se usan zonas/tarifas configuradas y revisión manual |
 
 ## Verificaciones de la rama activa
 
-Última verificación de código (PR #38): restore/build sin advertencias ni errores; el cambio incluía cliente SignalR que comprueba snapshot tras nueva conexión. En la rama actual, `dotnet test Poraqui.sln` aprobó 29 pruebas y omitió 2 carreras SQL por falta de `ConnectionStrings__SqlServerTest`; `dotnet build Poraqui.sln --no-restore` terminó con cero advertencias y errores; `git diff --check` pasó. Las carreras todavía no se han ejecutado contra SQL Server.
+Última verificación de código (PR #41, ahora integrada): `dotnet test Poraqui.sln` aprobó 29 pruebas y omitió 2 carreras SQL por falta de `ConnectionStrings__SqlServerTest`; `dotnet build Poraqui.sln --no-restore` terminó con cero advertencias y errores; `git diff --check` pasó. Las carreras todavía no se han ejecutado contra SQL Server.
 
 ## SQL Server privado
 
