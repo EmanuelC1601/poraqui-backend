@@ -20,5 +20,3 @@ VALUES (N'20261017200001_BusinessOpeningHours', N'9.0.10');
 
 COMMIT;
 GO
-
-

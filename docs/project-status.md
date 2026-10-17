@@ -1,85 +1,33 @@
 # Estado verificable del proyecto
 
-Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167` y es la base de integración. PR #6 (reparto externo), #7 (sincronización offline), #8 (SignalR), #9 (opciones de catálogo), #10 (horarios) y #11 (cancelaciones/incidencias/reembolsos) están abiertos y apilados en ese orden. El desarrollo tiene un único responsable; las asignaciones previas a OpenCode se conservan como antecedente, sin dependencia operativa.
+Actualizado: 2026-10-17. `main` integra PR #1–#6. PR #7–#10 se han integrado en ramas de trabajo apiladas, todavía fuera de `main`. PR #11 está abierto desde `feature/order-cancellations-refunds-incidents`; PR #12 (métricas) ya está integrado en esa rama. PR #13–#14 y PR #18–#21 siguen en sus pilas de ramas, fuera de `main`. El equipo trabaja con un único responsable; OpenCode ya no participa.
 
-## Implementado en `main`
+## Implementado
 
-- Solución .NET 9 compilable: Domain, Application, Infrastructure y Api; EF Core SQL Server e Identity con GUID.
-- Identity API, roles y policies; negocio con permisos por propietario/recurso.
-- Catálogo básico, zonas, tarifas y pedido con importes calculados por el servidor.
-- Datos de transferencia del negocio y snapshot por pedido; comprobante privado y revisión manual.
-- Decisión del negocio, preparación explícita, repartidor propio, códigos de recogida/recepción, registro separado del pago al courier, contacto autorizado y consulta de estado/historial.
+- En `main` (PR #1–#6): Clean Architecture compilable; Identity, roles y autorización por recurso; alta/configuración de comercio, catálogo básico, zonas/tarifas y pedidos calculados por el servidor; transferencia manual, comprobante privado, revisión, preparación, repartidor propio, códigos, estados e historial; reparto externo con ofertas, disponibilidad, expiración, cancelación y aceptación exclusiva.
+- En ramas apiladas #7–#10: sincronización offline de entrega con validación/idempotencia; SignalR con audiencias autorizadas y snapshot; opciones/precios del catálogo con snapshots; horarios y zona horaria local.
+- En la rama de PR #11: cancelación, auditoría, casos de reembolso manual, incidencias y resolución autorizada; PR #12 aporta métricas protegidas del piloto.
+- La API no migra al iniciar. No se borraron ni recrearon datos compartidos.
 
-## PR #6 abierto: reparto externo
+## Pendiente o bloqueado
 
-- Perfil externo administrado por admin, disponibilidad por zona, publicar/ver/rechazar/cancelar ofertas, vencimiento y respuesta `NoCouriersAvailable`.
-- La oferta muestra origen, destino, zona, condiciones y remuneración. Reintentos de publicación no generan ofertas duplicadas mientras exista una abierta.
-- Aceptar persiste oferta y asignación; `Order.Version`, `ExternalDeliveryOffer.Version` e índice filtrado único protegen frente a duplicidad.
-- Build/test locales pasan en SQLite; migración de tablas/índices y script SQL están en PR. SQL Server y la aceptación simultánea real aún no se han verificado.
+| Función | Estado verificable |
+|---|---|
+| Integrar PR #7–#12 hasta `main` | Pendiente; #7–#10 ya están integrados en ramas apiladas. PR #11 sigue abierto y contiene PR #12. |
+| OTP de teléfono | PR #14 en pila; proveedor/configuración real pendientes. |
+| Reintentos/idempotencia durable para comandos y altas | PR #13–#14 y #18–#21 en ramas; verificar implementación e integrar en orden. |
+| Revisión SQL Server de restricciones y aceptación/asignación concurrente | Bloqueada para pruebas automatizadas aisladas por falta de `ConnectionStrings:SqlServerTest`. La conexión privada `DefaultConnection` sí permite consultar historial. |
+| Prueba de reconexión SignalR con cliente real | Pendiente; el hub devuelve snapshot persistido al suscribirse. |
+| Despliegue MonsterASP.NET, almacenamiento privado persistente y recorrido publicado | Pendiente. |
+| GPS/distancias automáticas, transferencias bancarias automáticas y frontend | Fuera de alcance. |
 
-## Rama actual: sincronización offline
+## Verificación de este incremento
 
-- `POST /api/orders/{orderId}/sync/delivery-confirmation` recibe ID idempotente, código y hora local de captura.
-- El servidor valida courier asignado, estado y código antes de aceptar. Hora del servidor es la de aceptación; la hora del dispositivo solo es auditoría.
-- Reintento igual reproduce la aceptación guardada sin duplicar historial; mismo ID con payload/orden distinto da conflicto. Código inválido no consume el ID.
-- Registro idempotente y transición de pedido se guardan en la misma transacción; la migración agrega una tabla nueva.
+- Rama probada: `feature/order-cancellations-refunds-incidents` incluyendo PR #12 y el último commit de `feature/business-hours`.
+- `dotnet build Poraqui.sln --no-restore`: correcto, 0 advertencias y 0 errores; requiere `DOTNET_ROLL_FORWARD=Major` en este host que tiene runtime .NET 10 para ejecutar tests net9.
+- `dotnet test Poraqui.sln --no-build --no-restore`: 19/19 con SQLite aislada (incluye una prueba que inspecciona traducción SQL Server, sin conexión SQL).
+- `git diff --check`: pendiente tras esta actualización documental.
+- EF Core contra la configuración privada `ConnectionStrings:DefaultConnection` lista las migraciones hasta `OrderCancellationAuditConstraints` y `has-pending-model-changes` confirma que el modelo coincide. Esto confirma conectividad e historial, no ejecuta una prueba de bloqueo/concurrencia. No se aplicó una migración en esta sesión.
+- `ConnectionStrings:SqlServerTest` no está configurada; no ejecutar pruebas con borrado/limpieza en la BD compartida.
 
-## PR #8 abierto: SignalR de pedidos
-
-- Hub autenticado `/hubs/orders`; la negociación acepta `access_token` únicamente en la ruta del hub.
-- `SubscribeOrder` comprueba la relación de usuario con el pedido y devuelve una instantánea persistida con estado y versión. Los eventos `OrderChanged` salen después del guardado, solo a los grupos autorizados por pedido y sin datos personales.
-- Al reconectar, el cliente vuelve a suscribirse y recibe el estado vigente. El fallo de publicación se registra y no cambia la respuesta de una transición ya persistida.
-
-## PR #9 abierto: opciones del catálogo
-
-- Grupos de opciones obligatorios/opcionales con límite mínimo/máximo, diferencias no negativas de precio y disponibilidad por grupo/variante.
-- El cliente elige IDs de opciones; el servidor valida pertenencia/disponibilidad y calcula cada precio unitario. Pedido e historial de consulta conservan snapshots de nombres/diferencias.
-- Migración `CatalogProductOptions` y `docs/sql/CatalogProductOptions.sql` crean tres tablas e índices únicos. El script de aplicación es aditivo; no se aplicó.
-
-## Rama actual: horarios del negocio
-
-- Dueño/admin configura los siete días y una zona horaria; consulta pública devuelve horario y si acepta pedidos ahora.
-- La creación valida la hora local del negocio. El comportamiento previo sigue hasta que el comercio configura su horario.
-- Migración aditiva `BusinessOpeningHours` y script `docs/sql/BusinessOpeningHours.sql`; no aplicado. Pruebas nuevas cubren horario local, cierre, rango y permisos entre negocios.
-
-## PR #11 abierto: cancelaciones, incidencias y reembolsos manuales
-
-Rama `feature/order-cancellations-refunds-incidents`, commit `1347648`, PR https://github.com/EmanuelC1601/poraqui-backend/pull/11, basado en PR #10.
-
-- Cliente cancela solo antes de enviar comprobante; negocio/admin puede cancelar antes de asignar courier. Las ofertas externas abiertas se cancelan junto con el pedido. La repetición del mismo comando de cancelación no duplica historial.
-- Si hay evidencia de transferencia enviada o el pago fue aprobado, se crea un caso de revisión manual. Rechazar un pedido con transferencia aprobada también crea el caso. El negocio registra si reembolsó manualmente, el importe y referencia; el cliente ve solo el estado del caso.
-- Participantes autorizados informan y consultan incidencias; negocio/admin las resuelve. Incidencias y reembolsos quedan en historial/versionado del pedido y notifican después de persistir.
-- Migraciones `OrderCancellationRefundsIncidents` y `OrderCancellationAuditConstraints`, script `docs/sql/OrderCancellationRefundsIncidents.sql`; no aplicadas. La alteración de `CancellationReason` solo afecta a una columna nullable que esta misma pila acaba de añadir, y el dominio limita el texto a 500 caracteres.
-
-## PR #12 abierto: métricas del piloto
-
-- Rama `feature/pilot-metrics`, commit `c8df529`, PR https://github.com/EmanuelC1601/poraqui-backend/pull/12, basada en PR #11. Añade `GET /api/admin/metrics/pilot`, con permiso exclusivo de admin, filtro UTC de hasta 366 días y datos agregados sin información personal. Resume pedidos por estado, valor total, entregas, cancelaciones, incidencias abiertas, reembolsos pendientes y tiempo medio de entrega.
-- No requiere migración. El endpoint se prueba en SQLite; queda pendiente revisar el SQL generado y el comportamiento en SQL Server cuando exista una conexión remota accesible para la aplicación.
-
-## Verificaciones actuales
-
-- Build: `dotnet build Poraqui.sln`, 0 advertencias y 0 errores.
-- Pruebas: `dotnet test Poraqui.sln`, 19/19: 18 de recorrido API con SQLite en memoria/archivos temporales y una prueba de traducción SQL Server que no abre conexión. El recorrido verifica horarios, opciones, permisos entre negocios, importes, cancelación/refund manual, incidencias, métricas, snapshots, SignalR y entrega persistida.
-- Scripts `ExternalCourierOffers`, `OfflineDeliveryCommandSync`, `CatalogProductOptions`, `BusinessOpeningHours` y `OrderCancellationRefundsIncidents` están disponibles para revisión; la última migración agrega `OrderCancellationAuditConstraints`. No hay cambios pendientes del modelo.
-- `BusinessOpeningHours` y cancelaciones/incidencias se generaron desde el modelo; los scripts no eliminan tablas ni filas. El segundo script estrecha `CancellationReason`, una columna nueva y todavía sin datos; falta validarlo en SQL Server.
-- Portal MonsterASP, solo lectura: `dbo` aparece sin tablas. Esto informa el esquema actual; no verifica conexión EF ni restricciones/carreras SQL Server.
-
-## Pendiente
-
-- Verificar migraciones, restricciones y aceptación simultánea en SQL Server antes de integrar PR #6/#7.
-- Prueba de aceptación simultánea de ofertas y ejecución/revisión de migraciones en SQL Server.
-- Probar reconexión SignalR en cliente real; la suscripción ya devuelve instantánea persistida al reconectar.
-- PR #9: `feature/catalog-options` en commit `084acb3`, publicado en https://github.com/EmanuelC1601/poraqui-backend/pull/9.
-- OTP e idempotencia general de operaciones que aún no la tienen.
-- PR #10: `feature/business-hours`, commit `d25e64f`, publicado en https://github.com/EmanuelC1601/poraqui-backend/pull/10. Requiere validación SQL Server antes de integrar.
-- PR #11 implementa cancelaciones/incidencias/reembolsos; falta verificar migraciones en SQL Server antes de integrar.
-- PR #12 agrega métricas del piloto; falta verificar SQL Server.
-- Instrucciones finales de despliegue en MonsterASP.NET y recorrido SQL Server reproducible.
-
-## Bloqueado por configuración privada
-
-No existe `ConnectionStrings:DefaultConnection` en User Secrets/entorno de la API. Configúrala con `dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<cadena privada>" --project src/Poraqui.Api`. No compartas el valor ni uses secretos del chat. Sin la clave no se verifica conexión EF, no se puede comprobar esquema vivo con la aplicación ni aplicar migraciones. Ninguna migración se ha aplicado.
-
-## Fuera de alcance
-
-GPS y distancias automáticas, transferencias bancarias automáticas y frontend.
+Para configurar una copia local, establece `ConnectionStrings:DefaultConnection` con User Secrets del proyecto `src/Poraqui.Api`. Para pruebas SQL aisladas, configura además `ConnectionStrings:SqlServerTest` apuntando a una base separada. Nunca incluyas los valores en Git o logs.
