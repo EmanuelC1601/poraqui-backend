@@ -22,16 +22,17 @@ La suite ejecutada para PR #33 tuvo 24 casos: 22 correctos y 2 omitidos porque n
 
 - `ConnectionStrings:DefaultConnection` existe en User Secrets; una consulta de solo lectura confirmó acceso al SQL Server compartido. No se revela su valor.
 - Falta `ConnectionStrings:SqlServerTest`. Configurar `ConnectionStrings__SqlServerTest` como variable de entorno privada o User Secrets y apuntarla a una instancia aislada cuyo catálogo sea `PoraquiIntegrationTests`.
+- En 2026-10-17, `dotnet ef migrations list` se ejecutó en lectura sobre SQL Server y devolvió las 12 migraciones actuales; no reportó IDs pendientes. No se ejecutó ninguna migración durante esta entrega.
 - Restore y build de solución: correctos, 0 advertencias y errores.
 - Tests de solución: 21 correctos, 2 omitidos en esta rama.
 - `dotnet ef migrations has-pending-model-changes`: sin cambios pendientes del modelo.
 - OpenAPI local: HTTP 200; snapshot versionado.
-- La API no aplica migraciones automáticamente. Antes de aplicar cualquier migración compartida, conciliar `__EFMigrationsHistory` y revisar todos los scripts para asegurar que preservan datos.
+- La API no aplica migraciones automáticamente. Antes de futuras migraciones compartidas, conciliar `__EFMigrationsHistory` y revisar el SQL generado para asegurar que preserva datos.
 
 ## Próximos pasos verificables
 
 1. Configurar la cadena privada SQL Server de pruebas aisladas y ejecutar las dos carreras concurrentes; conservar la BD y verificar las restricciones afectadas.
-2. Revisar y conciliar el historial de migraciones del servidor compartido; después aplicar únicamente migraciones aditivas aprobadas por el responsable.
+2. Para cambios futuros del modelo, generar y revisar la migración; revisar el historial de nuevo antes de aplicar cualquier migración compartida.
 3. Completar OTP con proveedor real, prueba de reconexión SignalR de cliente, y configuración/documentación de despliegue MonsterASP.NET.
 
 El ledger vigente de implementado, pendiente y bloqueado está en `docs/project-status.md`; ejecución reproducible del recorrido está en `docs/order-flow.md`.
