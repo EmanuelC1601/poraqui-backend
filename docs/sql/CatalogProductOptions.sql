@@ -1,4 +1,4 @@
-﻿BEGIN TRANSACTION;
+BEGIN TRANSACTION;
 CREATE TABLE [OrderLineOptions] (
     [Id] uniqueidentifier NOT NULL,
     [ProductOptionId] uniqueidentifier NOT NULL,
@@ -41,4 +41,3 @@ VALUES (N'20261017194824_CatalogProductOptions', N'9.0.10');
 
 COMMIT;
 GO
-

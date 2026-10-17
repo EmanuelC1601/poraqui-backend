@@ -49,4 +49,4 @@ La suite suma 19 pruebas: 18 de API con SQLite en memoria/carpeta temporal (opci
 
 ## Límites
 
-WhatsApp/llamada se hace fuera de la API; esta registra canal y entrega datos autorizados. Las tarifas se basan en zonas configuradas; no hay GPS ni distancias inventadas. Falta OTP, reconexión SignalR en cliente real, idempotencia en otros comandos, métricas, despliegue y validación SQL Server. La cancelación del negocio está disponible hasta antes de asignar courier.
+WhatsApp/llamada se hace fuera de la API; esta registra canal y entrega datos autorizados. Las tarifas se basan en zonas configuradas; no hay GPS ni distancias inventadas. Métricas del piloto ya están en la pila #11. Falta OTP, reconexión SignalR en cliente real, idempotencia en otros comandos, despliegue y validación aislada de SQL Server. La cancelación del negocio está disponible hasta antes de asignar courier.
