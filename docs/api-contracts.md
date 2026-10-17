@@ -96,4 +96,4 @@ Cada transición de pedido incrementa `Order.Version`; la persistencia detecta e
 
 El contrato provisional `src/Poraqui.Application/Delivery/DeliveryOrderContracts.cs` se eliminó en PR #4 al implementar reparto propio. La asignación previa a OpenCode se conserva como antecedente; hay un solo responsable.
 
-Pendiente: OTP, idempotencia general para otros comandos, métricas, despliegue y verificación SQL Server incluyendo carreras simultáneas. No hay GPS, distancias inferidas ni transferencias bancarias automáticas.
+OTP está implementado mediante Twilio Verify en `POST /api/account/phone/verification` y `POST /api/account/phone/verification/confirm`, con verificación de aprobación antes de actualizar Identity y límite de 5 solicitudes por IP cada 10 minutos. Sigue pendiente la validación con credenciales/SMS reales. También quedan idempotencia general para comandos mutables restantes, despliegue y verificación SQL Server incluyendo carreras simultáneas. No hay GPS, distancias inferidas ni transferencias bancarias automáticas.
