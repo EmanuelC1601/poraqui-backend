@@ -1,5 +1,13 @@
 # Handoff de desarrollo
 
+## Incremento .NET 10 LTS (`feature/net10-lts`)
+
+La rama actual parte de `feature/phone-verification` (`24e1a3a`) e instala .NET 10 / EF Core 10. El cambio actualiza todos los proyectos a `net10.0`, alinea paquetes Microsoft y la herramienta `dotnet-ef` en `10.0.13`, y fija `Microsoft.Data.SqlClient` 7.1.1 con `System.Security.Cryptography.Pkcs` 10.0.13 para resolver alertas de una dependencia transitiva. `README.md` y `docs/architecture.md` documentan el runtime y publicación en MonsterASP.NET.
+
+Verificación local: build correcto (0 advertencias/errores), suite 24 aprobadas/1 omitida (la prueba optativa de concurrencia requiere `ConnectionStrings__SqlServerTest`) y `migrations has-pending-model-changes` indica que el modelo coincide con las migraciones. La suite usa SQLite aislado; no hubo conexión con SQL Server, no se aplicaron migraciones y no se ejecutó prueba de concurrencia SQL Server. No hay migración nueva en este cambio. PR #17 (`https://github.com/EmanuelC1601/poraqui-backend/pull/17`) está abierto contra `feature/phone-verification`, encabezado por `b686ddd`; también contiene un seguimiento documental.
+
+Para seguir: integrar PR #17 en `feature/phone-verification` y actualizar la rama local. La cadena funcional sigue apilada sobre ramas previas y fuera de `main`. Después, configurar `ConnectionStrings:DefaultConnection` en User Secrets/entorno privado y ejecutar primero la validación SQL Server y scripts revisados. Nunca apuntar la prueba automatizada a la BD compartida.
+
 ## Base, ramas y responsabilidad
 
 `main` contiene PR #1–#5 hasta `d677167` y es la base de integración. PR #6 agrega reparto externo; PR #7 sincronización offline está apilado sobre #6; PR #8 SignalR está apilado sobre #7; PR #9 opciones de catálogo se apila sobre #8; PR #10 horarios se apila sobre #9; PR #11 cancelaciones/incidencias/reembolsos continúa desde #10. Un solo responsable mantiene todos los módulos, contratos, `AppDbContext` y migraciones. OpenCode ya no participa; su anterior asignación de reparto se conserva como antecedente.

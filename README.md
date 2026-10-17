@@ -1,6 +1,6 @@
 # Poraqui Backend
 
-API de la plataforma de comida local, construida en .NET 9 con Clean Architecture.
+API de la plataforma de comida local, construida en .NET 10 LTS con Clean Architecture.
 
 ## Compilar
 
@@ -8,6 +8,8 @@ API de la plataforma de comida local, construida en .NET 9 con Clean Architectur
 dotnet build Poraqui.sln
 dotnet test Poraqui.sln
 ```
+
+La solución apunta a `net10.0` y utiliza EF Core 10. Usa el SDK .NET 10 para compilar, ejecutar pruebas y restaurar `dotnet-ef`.
 
 ## Ejecutar localmente
 
@@ -26,6 +28,12 @@ Configura los tres valores Twilio para que los endpoints de verificación telef�
 La API no aplica migraciones al iniciar. Revisa los scripts y aplica las migraciones de forma explícita después de validar el esquema de destino. En entorno Development, OpenAPI se sirve en `/openapi/v1.json`. El hub autenticado de estados de pedido está en `/hubs/orders`; consulta [contratos](docs/api-contracts.md) para suscribirse y recuperar estado tras reconectar.
 
 Consulta [arquitectura](docs/architecture.md), [contratos](docs/api-contracts.md) y [acuerdos del equipo](docs/team-work.md).
+
+## Despliegue en MonsterASP.NET
+
+Publica la API con `dotnet publish src/Poraqui.Api/Poraqui.Api.csproj -c Release -o ./publish` y despliega el contenido de `publish` en el sitio ASP.NET Core. En el panel del sitio, configura `ASPNETCORE_ENVIRONMENT=Production`, `ConnectionStrings__DefaultConnection` con la cadena privada de la base del mismo hosting y los valores privados de Twilio. Usa la sección Environment Variables para evitar incluir secretos en el repositorio. Configura también `PrivateFiles__Root` en una ruta persistente que no sea servida como contenido web para almacenar comprobantes. Configura WebSockets para SignalR.
+
+La API no ejecuta migraciones al arrancar. Revisa los scripts SQL de la versión que despliegas y aplica las migraciones de forma explícita en la base elegida. OpenAPI se publica en `/openapi/v1.json` en Development; no habilites Development para un sitio público.
 
 ## Prueba de concurrencia SQL Server
 
