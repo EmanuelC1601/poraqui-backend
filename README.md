@@ -1,23 +1,28 @@
 # Poraqui Backend
 
-API de la plataforma de comida local, construida en .NET 9 con Clean Architecture.
+API de la plataforma de comida local, construida en .NET 9 con Clean Architecture. `main` es la base de integración y el proyecto tiene un único responsable.
 
-## Compilar
+## Compilar y probar
 
 ```sh
+dotnet restore Poraqui.sln
 dotnet build Poraqui.sln
 dotnet test Poraqui.sln
 ```
 
+Las pruebas de API usan SQLite en memoria y archivos temporales. No validan concurrencia ni sintaxis/índices del servidor SQL.
+
 ## Ejecutar localmente
 
-Configura la conexión en User Secrets; no guardes valores privados en archivos versionados:
+Guarda la conexión en User Secrets; no añadas valores privados a archivos versionados:
 
 ```powershell
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<cadena privada de SQL Server>" --project src/Poraqui.Api
+dotnet user-secrets set "Bootstrap:AdminKey" "<clave privada aleatoria>" --project src/Poraqui.Api
+dotnet user-secrets set "PrivateFiles:Root" "<ruta privada fuera del web root>" --project src/Poraqui.Api
 dotnet run --project src/Poraqui.Api
 ```
 
-La API no aplica migraciones al iniciar. Revisa los scripts y aplica las migraciones de forma explícita después de validar el esquema de destino. En entorno Development, OpenAPI se sirve en `/openapi/v1.json`. El hub autenticado de estados de pedido está en `/hubs/orders`; consulta [contratos](docs/api-contracts.md) para suscribirse y recuperar estado tras reconectar.
+La API no ejecuta migraciones al iniciar. Revisa scripts SQL y aplica migraciones explícitamente solo tras reconciliar el historial y comprobar el destino. Para pruebas de integración, configura `ConnectionStrings:SqlServerTest` con una BD aislada. En Development, OpenAPI está en `/openapi/v1.json`; snapshot en [docs/openapi.json](docs/openapi.json). El hub autenticado está en `/hubs/orders`.
 
-El snapshot OpenAPI generado está en [docs/openapi.json](docs/openapi.json). Consulta [arquitectura](docs/architecture.md), [contratos](docs/api-contracts.md), [estado](docs/project-status.md) y [acuerdos del equipo](docs/team-work.md).
+Consulta [arquitectura](docs/architecture.md), [contratos](docs/api-contracts.md), [estado](docs/project-status.md), [flujo reproducible](docs/order-flow.md) y [flujo de desarrollo](docs/team-work.md).

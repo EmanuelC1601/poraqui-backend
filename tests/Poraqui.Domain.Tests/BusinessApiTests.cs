@@ -163,7 +163,7 @@ public sealed class BusinessApiTests
         var customerToken = await LoginAsync(client, "customer@example.test");
         Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put, "api/account/phone", customerToken,
             JsonContent.Create(new { phoneNumber = "+52 55 1234 5678" }))).StatusCode);
-        var requestJson = $$"""{"businessId":"{{businessId}}","zoneId":"{{zoneId}}","deliveryAddress":"Calle de prueba","items":[{"productId":"{{productId}}","quantity":2,"unitPrice":0.01}]}""";
+        var requestJson = $$"""{"commandId":"{{Guid.NewGuid()}}","businessId":"{{businessId}}","zoneId":"{{zoneId}}","deliveryAddress":"Calle de prueba","items":[{"productId":"{{productId}}","quantity":2,"unitPrice":0.01}]}""";
         Assert.Equal(HttpStatusCode.BadRequest, (await SendAsync(client, HttpMethod.Post, "api/orders", customerToken,
             new StringContent(requestJson, Encoding.UTF8, "application/json"))).StatusCode);
         using var paymentDetailsResponse = await SendAsync(client, HttpMethod.Put,
@@ -171,15 +171,16 @@ public sealed class BusinessApiTests
             JsonContent.Create(new { recipientName = "Mercado Poraqui", institution = "Banco de prueba", accountReference = "CLABE-TEST-001", instructions = "Usa el número de pedido como concepto." }));
         Assert.Equal(HttpStatusCode.OK, paymentDetailsResponse.StatusCode);
         using var missingRequiredOption = await SendAsync(client, HttpMethod.Post, "api/orders", customerToken,
-            JsonContent.Create(new { businessId, zoneId, deliveryAddress = "Calle de prueba", items = new[] { new { productId, quantity = 2 } } }));
+            JsonContent.Create(new { commandId = Guid.NewGuid(), businessId, zoneId, deliveryAddress = "Calle de prueba", items = new[] { new { productId, quantity = 2 } } }));
         Assert.Equal(HttpStatusCode.BadRequest, missingRequiredOption.StatusCode);
         using var unavailableOption = await SendAsync(client, HttpMethod.Post, "api/orders", customerToken,
-            JsonContent.Create(new { businessId, zoneId, deliveryAddress = "Calle de prueba", items = new[] { new { productId, quantity = 2, optionIds = new[] { largeOptionId, baconOptionId } } } }));
+            JsonContent.Create(new { commandId = Guid.NewGuid(), businessId, zoneId, deliveryAddress = "Calle de prueba", items = new[] { new { productId, quantity = 2, optionIds = new[] { largeOptionId, baconOptionId } } } }));
         Assert.Equal(HttpStatusCode.BadRequest, unavailableOption.StatusCode);
         using var tooManyRequiredChoices = await SendAsync(client, HttpMethod.Post, "api/orders", customerToken,
-            JsonContent.Create(new { businessId, zoneId, deliveryAddress = "Calle de prueba", items = new[] { new { productId, quantity = 2, optionIds = new[] { largeOptionId, regularOptionId } } } }));
+            JsonContent.Create(new { commandId = Guid.NewGuid(), businessId, zoneId, deliveryAddress = "Calle de prueba", items = new[] { new { productId, quantity = 2, optionIds = new[] { largeOptionId, regularOptionId } } } }));
         Assert.Equal(HttpStatusCode.BadRequest, tooManyRequiredChoices.StatusCode);
-        var optionOrderRequest = $$"""{"businessId":"{{businessId}}","zoneId":"{{zoneId}}","deliveryAddress":"Calle de prueba","items":[{"productId":"{{productId}}","quantity":2,"optionIds":["{{largeOptionId}}","{{cheeseOptionId}}"]}]}""";
+        var orderCommandId = Guid.NewGuid();
+        var optionOrderRequest = $$"""{"commandId":"{{orderCommandId}}","businessId":"{{businessId}}","zoneId":"{{zoneId}}","deliveryAddress":"Calle de prueba","items":[{"productId":"{{productId}}","quantity":2,"optionIds":["{{largeOptionId}}","{{cheeseOptionId}}"]}]}""";
         using var orderResponse = await SendAsync(client, HttpMethod.Post, "api/orders", customerToken,
             new StringContent(optionOrderRequest, Encoding.UTF8, "application/json"));
 
@@ -195,13 +196,25 @@ public sealed class BusinessApiTests
         var customerDeliveryCode = orderJson.RootElement.GetProperty("customerDeliveryCode").GetString()!;
         Assert.Equal(6, customerDeliveryCode.Length);
         var orderId = orderJson.RootElement.GetProperty("id").GetGuid();
+        using (var replayedOrderResponse = await SendAsync(client, HttpMethod.Post, "api/orders", customerToken,
+                   new StringContent(optionOrderRequest, Encoding.UTF8, "application/json")))
+        using (var replayedOrderJson = JsonDocument.Parse(await replayedOrderResponse.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(HttpStatusCode.Created, replayedOrderResponse.StatusCode);
+            Assert.Equal(orderId, replayedOrderJson.RootElement.GetProperty("id").GetGuid());
+            Assert.Equal(customerDeliveryCode, replayedOrderJson.RootElement.GetProperty("customerDeliveryCode").GetString());
+        }
+        using (var conflictingOrderResponse = await SendAsync(client, HttpMethod.Post, "api/orders", customerToken,
+                   JsonContent.Create(new { commandId = orderCommandId, businessId, zoneId, deliveryAddress = "Otra dirección",
+                       items = new[] { new { productId, quantity = 2, optionIds = new[] { largeOptionId, cheeseOptionId } } } })))
+            Assert.Equal(HttpStatusCode.Conflict, conflictingOrderResponse.StatusCode);
         using (var hoursResponse = await SendAsync(client, HttpMethod.Put,
                    $"api/businesses/{businessId}/opening-hours", merchantToken,
                    JsonContent.Create(new { timeZoneId = "UTC", days = Enum.GetValues<DayOfWeek>()
                        .Select(day => new { day = (int)day, isClosed = true, opensAt = (string?)null, closesAt = (string?)null }).ToArray() })))
             Assert.Equal(HttpStatusCode.OK, hoursResponse.StatusCode);
         using (var closedOrderResponse = await SendAsync(client, HttpMethod.Post, "api/orders", customerToken,
-                   new StringContent(optionOrderRequest, Encoding.UTF8, "application/json")))
+                   JsonContent.Create(new { commandId = Guid.NewGuid(), businessId, zoneId, deliveryAddress = "Calle de prueba", items = new[] { new { productId, quantity = 2, optionIds = new[] { largeOptionId, cheeseOptionId } } } })))
             Assert.Equal(HttpStatusCode.BadRequest, closedOrderResponse.StatusCode);
         using var realtimeSocket = await ConnectOrdersHubAsync(factory, client, customerToken, orderId);
         Assert.Equal(HttpStatusCode.Unauthorized,
@@ -296,7 +309,7 @@ public sealed class BusinessApiTests
             $"api/businesses/{businessId}/opening-hours", merchantToken, JsonContent.Create(alwaysOpenHours))).StatusCode);
 
         using var cancellableOrderResponse = await SendAsync(client, HttpMethod.Post, "api/orders", customerToken,
-            new StringContent(optionOrderRequest, Encoding.UTF8, "application/json"));
+            new StringContent($$"""{"commandId":"{{Guid.NewGuid()}}","businessId":"{{businessId}}","zoneId":"{{zoneId}}","deliveryAddress":"Calle de prueba","items":[{"productId":"{{productId}}","quantity":2,"optionIds":["{{largeOptionId}}","{{cheeseOptionId}}"]}]}""", Encoding.UTF8, "application/json"));
         Assert.Equal(HttpStatusCode.Created, cancellableOrderResponse.StatusCode);
         using var cancellableOrderJson = JsonDocument.Parse(await cancellableOrderResponse.Content.ReadAsStringAsync());
         var cancellableOrderId = cancellableOrderJson.RootElement.GetProperty("id").GetGuid();
