@@ -304,9 +304,10 @@ public sealed class OrderWorkflowController(OrderWorkflowService workflow, UserM
         {
             var order = await workflow.GetForBusinessAsync(orderId, actorId, false, cancellationToken);
             if (order is null || order.BusinessId != businessId) return NotFound();
-            return Ok(await workflow.AssignCourierAsync(orderId, actorId, request.CourierUserId, request.CourierPaymentAmount, cancellationToken));
+            return Ok(await workflow.AssignCourierAsync(orderId, actorId, request.CourierUserId, request.CourierPaymentAmount, request.CommandId, cancellationToken));
         }
         catch (OrderResourceForbiddenException) { return Forbid(); }
+        catch (CourierAssignmentCommandConflictException) { return Conflict(new { error = "Command ID was already used for different assignment details." }); }
         catch (KeyNotFoundException) { return NotFound(); }
         catch (InvalidOperationException exception) { return Conflict(new { error = exception.Message }); }
         catch (ArgumentException exception) { return BadRequest(new { error = exception.Message }); }
@@ -397,7 +398,7 @@ public sealed record ReportIncidentRequest(Guid CommandId, string Category, stri
 public sealed record ResolveIncidentRequest(string Resolution);
 public sealed record ReviewRefundRequest(bool Refunded, decimal? Amount, string? Reference, string? Note);
 public sealed record BusinessDecisionRequest(bool Accept, string? Reason);
-public sealed record AssignCourierRequest(Guid CourierUserId, decimal CourierPaymentAmount);
+public sealed record AssignCourierRequest(Guid CourierUserId, decimal CourierPaymentAmount, Guid CommandId);
 public sealed record PickupCodeRequest(string Code);
 public sealed record BeginDeliveryRequest(string ContactChannel);
 public sealed record SyncDeliveryConfirmationRequest(Guid CommandId, string Code, DateTimeOffset ClientCapturedAtUtc);

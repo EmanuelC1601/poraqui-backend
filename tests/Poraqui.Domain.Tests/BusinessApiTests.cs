@@ -457,6 +457,57 @@ public sealed class BusinessApiTests
             courierTwoId = (await userManager.FindByEmailAsync("courier-two@example.test"))!.Id;
         }
         Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put,
+            $"api/admin/users/{courierTwoId}/delivery-person", adminToken,
+            JsonContent.Create(new { isDeliveryPerson = true }))).StatusCode);
+        using var internalOrderResponse = await SendAsync(client, HttpMethod.Post, "api/orders", customerToken,
+            JsonContent.Create(new { commandId = Guid.NewGuid(), businessId, zoneId, deliveryAddress = "Domicilio courier propio",
+                items = new[] { new { productId, quantity = 1, optionIds = new[] { largeOptionId, cheeseOptionId } } } }));
+        Assert.Equal(HttpStatusCode.Created, internalOrderResponse.StatusCode);
+        using var internalOrderJson = JsonDocument.Parse(await internalOrderResponse.Content.ReadAsStringAsync());
+        var internalOrderId = internalOrderJson.RootElement.GetProperty("id").GetGuid();
+        using (var internalProofContent = new MultipartFormDataContent())
+        {
+            var proof = new ByteArrayContent(Encoding.UTF8.GetBytes("%PDF-1.7 internal courier test"));
+            proof.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+            internalProofContent.Add(new StringContent(Guid.NewGuid().ToString()), "commandId");
+            internalProofContent.Add(proof, "file", "internal-receipt.pdf");
+            using var internalProofRequest = new HttpRequestMessage(HttpMethod.Post, $"api/orders/{internalOrderId}/transfer-evidence") { Content = internalProofContent };
+            internalProofRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", customerToken);
+            using var internalProofResponse = await client.SendAsync(internalProofRequest);
+            Assert.Equal(HttpStatusCode.Accepted, internalProofResponse.StatusCode);
+        }
+        Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Post,
+            $"api/businesses/{businessId}/orders/{internalOrderId}/payment-review", merchantToken,
+            JsonContent.Create(new { approved = true, note = "Validación para courier propio" }))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Post,
+            $"api/businesses/{businessId}/orders/{internalOrderId}/decision", merchantToken,
+            JsonContent.Create(new { accept = true, reason = "" }))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Post,
+            $"api/businesses/{businessId}/orders/{internalOrderId}/preparation", merchantToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Post,
+            $"api/businesses/{businessId}/orders/{internalOrderId}/ready", merchantToken)).StatusCode);
+        var assignmentCommandId = Guid.NewGuid();
+        var assignmentRequest = JsonContent.Create(new { courierUserId = courierTwoId, courierPaymentAmount = 37.50m, commandId = assignmentCommandId });
+        using var assignmentResponse = await SendAsync(client, HttpMethod.Post,
+            $"api/businesses/{businessId}/orders/{internalOrderId}/assign-courier", merchantToken, assignmentRequest);
+        Assert.Equal(HttpStatusCode.OK, assignmentResponse.StatusCode);
+        using var assignmentJson = JsonDocument.Parse(await assignmentResponse.Content.ReadAsStringAsync());
+        var internalPickupCode = assignmentJson.RootElement.GetProperty("pickupCode").GetString();
+        using (var assignmentReplay = await SendAsync(client, HttpMethod.Post,
+                   $"api/businesses/{businessId}/orders/{internalOrderId}/assign-courier", merchantToken,
+                   JsonContent.Create(new { courierUserId = courierTwoId, courierPaymentAmount = 37.50m, commandId = assignmentCommandId })))
+        using (var replayJson = JsonDocument.Parse(await assignmentReplay.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(HttpStatusCode.OK, assignmentReplay.StatusCode);
+            Assert.Equal(internalPickupCode, replayJson.RootElement.GetProperty("pickupCode").GetString());
+        }
+        Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(client, HttpMethod.Post,
+            $"api/businesses/{businessId}/orders/{internalOrderId}/assign-courier", merchantToken,
+            JsonContent.Create(new { courierUserId = courierTwoId, courierPaymentAmount = 38m, commandId = assignmentCommandId }))).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(client, HttpMethod.Post,
+            $"api/businesses/{businessId}/orders/{internalOrderId}/assign-courier", merchantToken,
+            JsonContent.Create(new { courierUserId = courierTwoId, courierPaymentAmount = 37.50m, commandId = Guid.NewGuid() }))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put,
             $"api/admin/users/{courierId}/external-courier", adminToken,
             JsonContent.Create(new { isExternalCourier = true }))).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put,
@@ -619,8 +670,8 @@ public sealed class BusinessApiTests
         {
             Assert.Equal(HttpStatusCode.OK, metricsResponse.StatusCode);
             using var metrics = JsonDocument.Parse(await metricsResponse.Content.ReadAsStringAsync());
-            Assert.Equal(2, metrics.RootElement.GetProperty("orderCount").GetInt32());
-            Assert.Equal(189.50m, metrics.RootElement.GetProperty("grossOrderValue").GetDecimal());
+            Assert.Equal(3, metrics.RootElement.GetProperty("orderCount").GetInt32());
+            Assert.Equal(246.00m, metrics.RootElement.GetProperty("grossOrderValue").GetDecimal());
             Assert.Equal(1, metrics.RootElement.GetProperty("deliveredCount").GetInt32());
             Assert.Equal(1, metrics.RootElement.GetProperty("cancelledCount").GetInt32());
             Assert.Contains(metrics.RootElement.GetProperty("ordersByStatus").EnumerateArray(),

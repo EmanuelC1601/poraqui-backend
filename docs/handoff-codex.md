@@ -8,6 +8,10 @@ Migración `20261017212343_TransferEvidenceCommandIdempotency`: columnas nullabl
 
 Verificación previa de código: build limpio; 24 pruebas aprobadas y una optativa omitida por ausencia de `ConnectionStrings__SqlServerTest`; pruebas funcionales en SQLite aislado. La prueba de concurrencia SQL Server aún no se ejecuta. La asignación propia con reintento durable es pendiente. Antes de publicar este incremento, repetir build, pruebas y `git diff --check`.
 
+## Incremento en curso: asignación propia idempotente
+
+La rama `feature/courier-assignment-idempotency`, apilada sobre PR #20, requiere `commandId` para `POST /api/businesses/{businessId}/orders/{orderId}/assign-courier`. Actor/orden/repartidor/importe forman la huella del comando; un reintento exacto devuelve el pedido asignado y el mismo código protegido, y una clave con datos distintos da 409. Comando y cambio del pedido se guardan juntos. Prueba API cubre creación, replay y conflicto. Migración `20261017212850_CourierAssignmentCommandIdempotency` crea una tabla nueva con FK/PK e índice único; SQL revisado, sin operaciones destructivas y aplicada explícitamente a desarrollo. Doce migraciones aplicadas; EF confirma modelo actualizado. Build 0 warnings/errors; suite 24 aprobadas, 1 omitida por falta de SQL Server aislado. No se ha probado carrera contra SQL Server.
+
 ## Estado actual: idempotencia de incidencias
 
 La rama `feature/command-idempotency-increment` agrega `commandId` durable a `POST /api/orders/{id}/incidents`. Un reintento con el mismo actor, pedido y contenido devuelve la incidencia persistida; una clave reutilizada con contenido distinto responde 409. La notificación no se vuelve a publicar en el reintento. La migración `20261017210748_IncidentCommandIdempotency` ya se generó, se revisó y se aplicó explícitamente a la BD compartida; agrega una columna nullable y un índice único filtrado, sin borrar filas o columnas. EF lista diez migraciones aplicadas y no encuentra cambios pendientes del modelo.
