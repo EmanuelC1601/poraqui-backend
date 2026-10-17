@@ -4,7 +4,7 @@
 
 La rama `feature/command-idempotency-increment` agrega `commandId` durable a `POST /api/orders/{id}/incidents`. Un reintento con el mismo actor, pedido y contenido devuelve la incidencia persistida; una clave reutilizada con contenido distinto responde 409. La notificación no se vuelve a publicar en el reintento. La migración `20261017210748_IncidentCommandIdempotency` ya se generó, se revisó y se aplicó explícitamente a la BD compartida; agrega una columna nullable y un índice único filtrado, sin borrar filas o columnas. EF lista nueve migraciones aplicadas y no encuentra cambios pendientes del modelo.
 
-Verificación local: build .NET 10 limpio, suite completa 24 aprobadas y 1 prueba optativa omitida porque no está configurada una BD SQL Server aislada (`ConnectionStrings__SqlServerTest`). Las pruebas funcionales corren sobre SQLite aislado; no se ha verificado aún aceptación concurrente en SQL Server. Este incremento aún no tiene commit ni PR publicado. El desarrollo y la integración tienen un único responsable; no hay dependencias operativas con OpenCode.
+Verificación local: build .NET 10 limpio, suite completa 24 aprobadas y 1 prueba optativa omitida porque no está configurada una BD SQL Server aislada (`ConnectionStrings__SqlServerTest`). Las pruebas funcionales corren sobre SQLite aislado; no se ha verificado aún aceptación concurrente en SQL Server. El cambio está publicado como commit `52bf5b6` en `feature/command-idempotency-increment`, PR #18, apilado sobre `feature/phone-verification` (PR #14). El desarrollo y la integración tienen un único responsable; no hay dependencias operativas con OpenCode.
 
 ## Incremento .NET 10 LTS (`feature/net10-lts`, PR #17)
 
