@@ -2,15 +2,19 @@
 
 ## Responsable y ramas
 
-Un solo responsable mantiene todos los módulos, contratos, `AppDbContext`, migraciones, pruebas y despliegue. `main` es la base de integración y contiene PR #1–#7; PR #22 (`8ed5cb3`) integró la sincronización offline. Crear incrementos desde el `main` actualizado, usar ramas `feature/*` y abrir PRs pequeños. OpenCode ya no participa; su asignación previa queda como antecedente.
+Un solo responsable mantiene todos los módulos, contratos, `AppDbContext`, migraciones, pruebas y despliegue. `main` es la base de integración y contiene PR #1–#8 hasta PR #23 (`6993610`), incluido sync offline y SignalR. Crear incrementos desde el `main` actualizado, usar ramas `feature/*` y abrir PRs pequeños. OpenCode ya no participa; su asignación previa queda como antecedente.
 
-El trabajo previo de SignalR y módulos posteriores permanece en ramas apiladas. No asumir que está integrado ni que sus pruebas corresponden al `main`; revisar cada cambio y revalidarlo contra la rama actual antes de presentar PR.
+Los cambios posteriores permanecen en ramas apiladas. No asumir que están integrados ni que sus pruebas corresponden al `main`; revisar cada cambio y revalidarlo contra la rama actual antes de presentar PR.
 
-## Incremento activo: SignalR
+## Incremento integrado: SignalR
 
 Rama `feature/comercio-pedidos-next`, commit inicial `b2d015e` sobre el `main` integrado. El hub autenticado `/hubs/orders` autoriza suscripciones por relación con el pedido. Devuelve estado/versión actuales y publica `OrderChanged` después de persistir cada cambio. El snapshot se vuelve a leer tras unirse al grupo para evitar perder transiciones concurrentes. Payload no contiene datos personales.
 
-Verificado en esta rama: `dotnet restore Poraqui.sln`, `dotnet build Poraqui.sln --no-restore` (0 warnings/errores) y `dotnet test Poraqui.sln --no-build --no-restore` (14/14 en SQLite aislado; `DOTNET_ROLL_FORWARD=Major` por runtime .NET 10). Las pruebas existentes ejercitan WebSocket SignalR en TestServer, autenticación y acceso cruzado. `dotnet ef migrations has-pending-model-changes` no reportó cambios de modelo. Este incremento no requiere migración. La reconexión de un cliente real sigue pendiente.
+Verificado al integrar PR #23: `dotnet restore Poraqui.sln`, build (0 warnings/errores) y 14/14 pruebas SQLite. Las pruebas ejercitan WebSocket SignalR en TestServer, autenticación y acceso cruzado. `dotnet ef migrations has-pending-model-changes` no reportó cambios de modelo. La reconexión de un cliente real sigue pendiente.
+
+## Incremento activo: opciones de catálogo
+
+Rama `feature/catalog-options-main`, commit `819bd20` sobre `main`. Negocio crea grupos de opciones y cambia su disponibilidad; el servidor valida límites y disponibilidad al crear pedido y guarda snapshots de nombre/precio. Restore/build pasan (0 warnings/errores), 15/15 pruebas en SQLite. `CatalogProductOptions` agrega tablas e índices; script en `docs/sql/CatalogProductOptions.sql`, aún no aplicado.
 
 ## SQL Server y datos compartidos
 

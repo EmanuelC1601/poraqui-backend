@@ -1,6 +1,6 @@
 # Contratos API y entre módulos
 
-Estado: `main` integra PR #1–#7 (merge PR #22, `8ed5cb3`). SignalR está en desarrollo en `feature/comercio-pedidos-next`. Un solo responsable mantiene contratos y migraciones. OpenAPI en Development: `/openapi/v1.json`.
+Estado: `main` integra PR #1–#8 (`6993610`; PR #23 añadió SignalR). Opciones de catálogo están en desarrollo en `feature/catalog-options-main`; horarios aún no están integrados. Un solo responsable mantiene contratos y migraciones. OpenAPI en Development: `/openapi/v1.json`.
 
 ## Integrado en `main` (PR #1–#6)
 
@@ -16,6 +16,8 @@ Estado: `main` integra PR #1–#7 (merge PR #22, `8ed5cb3`). SignalR está en de
 ### Catálogo, tarifa y pedido
 
 - `GET/POST /api/businesses/{id}/products`; `PUT /api/products/{productId}`.
+- Negocio administra grupos de opciones con `POST /api/products/{productId}/option-groups`; cambia disponibilidad del grupo/opción con `PUT /api/option-groups/{optionGroupId}/availability` y `PUT /api/product-options/{optionId}/availability`.
+- Los productos muestran solo grupos/opciones disponibles. Al crear pedido, `items[].optionIds` debe satisfacer los límites configurados; el servidor valida disponibilidad y calcula el precio de cada línea con los incrementos de opción. El pedido conserva snapshot de nombres e importes.
 - `GET /api/delivery-zones/active`; admins administran zonas con `POST/PUT /api/delivery-zones`.
 - Negocio/admin administra tarifas por zona con `GET/POST /api/businesses/{id}/delivery-rates` y `PUT /api/businesses/{id}/delivery-rates/{zoneId}`.
 - `GET/PUT /api/businesses/{businessId}/transfer-details`: propietario/admin configura destinatario, institución, referencia e instrucciones.
@@ -62,12 +64,19 @@ El contrato provisional `src/Poraqui.Application/Delivery/DeliveryOrderContracts
 
 La cadena privada `ConnectionStrings:DefaultConnection` existe y EF verificó SQL Server. `ConnectionStrings:SqlServerTest` falta; configura esa clave solo con una base aislada `PoraquiIntegrationTests` para ejecutar las carreras.
 
-## En desarrollo: SignalR de pedidos (`feature/comercio-pedidos-next`)
+## Integrado en `main`: SignalR de pedidos (PR #23)
 
 - Hub autenticado en `/hubs/orders`. La conexión usa el bearer de Identity; `access_token` de query string se procesa solo para esta ruta.
 - `SubscribeOrder(orderId)` autoriza cliente propietario, negocio propietario, courier asignado o administrador. Devuelve `{ orderId, status, version, changedAtUtc }` y suscribe al grupo asociado al pedido.
 - Tras guardar una transición, se publica `OrderChanged` con estado, versión y fecha. No incluye dirección, teléfono, comprobante ni códigos. Un fallo de publicación queda registrado y no revierte una transición persistida.
 - La suscripción vuelve a consultar el snapshot después de entrar al grupo para cubrir cambios que ocurran mientras se autoriza/conecta. Al reconectar, invocar `SubscribeOrder` otra vez para recuperar el estado actual.
 - Pruebas de acceso cruzado, negociación anónima y entrega WebSocket en TestServer existen en la rama; esta rama requiere volver a compilar y ejecutarlas tras el ajuste de snapshot.
+
+## En desarrollo: opciones del catálogo (`feature/catalog-options-main`)
+
+- `POST /api/products/{productId}/option-groups` recibe `name`, `minSelections`, `maxSelections` y `options[]` (`name`, `priceDelta`). Cada opción parte disponible.
+- Grupo y opción pueden habilitarse/deshabilitarse solo por propietario del negocio o admin.
+- El pedido envía `optionIds` por renglón; selecciones repetidas/no disponibles o límites inválidos se rechazan. Se conservan opciones, nombres e importes en el pedido.
+- Migración aditiva `CatalogProductOptions`; script revisable en `docs/sql/CatalogProductOptions.sql`. No aplicada en este incremento.
 
 Pendiente: opciones/horarios, OTP real, cancelaciones/incidencias/reembolsos, idempotencia adicional, métricas, reconexión SignalR en cliente real y despliegue. No hay GPS, distancias inferidas ni transferencias bancarias automáticas.
