@@ -2,7 +2,7 @@
 
 ## Base, ramas y responsabilidad
 
-`main` contiene PR #1–#5 hasta `d677167`. PR #6 está abierto desde `feature/external-courier-offers`. El incremento actual está en `feature/offline-delivery-sync`, basado en PR #6; integra #6 antes de llevar esta rama a `main`. Un solo responsable mantiene todos los módulos, contratos, `AppDbContext` y migraciones. OpenCode ya no participa; su anterior asignación de reparto se conserva como antecedente.
+`main` contiene PR #1–#5 hasta `d677167`. PR #6 agrega reparto externo y PR #7 sincronización offline; #7 está apilado sobre #6. La rama activa `feature/realtime-order-updates` continúa sobre PR #7. Un solo responsable mantiene todos los módulos, contratos, `AppDbContext` y migraciones. OpenCode ya no participa; su anterior asignación de reparto se conserva como antecedente.
 
 ## Incremento actual
 
@@ -14,12 +14,16 @@ Migración nueva `OfflineDeliveryCommandSync` crea tabla e índice por pedido. S
 
 Verificado antes de publicar PR #7: `dotnet build Poraqui.sln` (0 advertencias, 0 errores), `dotnet test Poraqui.sln` (14/14; SQLite en memoria y archivos temporales), `git diff --check` y `dotnet tool run dotnet-ef migrations has-pending-model-changes --project src/Poraqui.Infrastructure --startup-project src/Poraqui.Api` (sin cambios pendientes en el modelo). La suite cubre código inválido, acceso del courier asignado, sync aceptado, repetición sin duplicado y colisión de clave.
 
-PR #7 está publicado y apilado sobre PR #6. La base compartida se inspeccionó desde el portal de solo lectura: `dbo` sin tablas. Falta `ConnectionStrings:DefaultConnection` en la configuración privada de la API, así que no se verificó EF contra SQL Server, migraciones vivas ni aceptación simultánea real. Mantener PR #6/#7 abiertos hasta hacer esas verificaciones. No ejecutar migraciones hasta configurar la clave y revisar estado actual. La API no aplica migraciones automáticamente al iniciar.
+PR #7 está publicado y apilado sobre PR #6; PR #8 agrega SignalR encima de #7. La base compartida se inspeccionó desde el portal de solo lectura: `dbo` sin tablas. Falta `ConnectionStrings:DefaultConnection` en la configuración privada de la API, así que no se verificó EF contra SQL Server, migraciones vivas ni aceptación simultánea real. Mantener PR #6/#7 abiertos hasta hacer esas verificaciones. No ejecutar migraciones hasta configurar la clave y revisar estado actual. La API no aplica migraciones automáticamente al iniciar.
 
 ```powershell
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<cadena privada>" --project src/Poraqui.Api
 ```
 
+## Incremento SignalR
+
+`/hubs/orders` acepta solo conexiones autenticadas. `SubscribeOrder(orderId)` valida cliente, propietario, courier asignado o administrador y devuelve `{ orderId, status, version, changedAtUtc }`. Los eventos `OrderChanged` se publican tras persistir y contienen solo estado/version. Al reconectar, volver a invocar `SubscribeOrder` para recuperar la instantánea actual. La suite completa 14/14 pasa en SQLite; una conexión WebSocket SignalR en TestServer recibe el evento y luego lee la transición persistida. Falta verificar reconexión de un cliente real.
+
 ## Siguiente trabajo
 
-SignalR con autorización tras persistencia y estado al reconectar; idempotencia general de otras operaciones; cancelaciones de pedidos, incidencias y reembolsos; opciones/horarios de catálogo; métricas y despliegue. Ver contratos y ledger en `docs/api-contracts.md` y `docs/project-status.md`.
+Probar entrega SignalR a una conexión real y aislamiento de grupos; después, idempotencia general de otras operaciones, cancelaciones de pedidos, incidencias y reembolsos; opciones/horarios de catálogo; métricas y despliegue. Ver contratos y ledger en `docs/api-contracts.md` y `docs/project-status.md`.

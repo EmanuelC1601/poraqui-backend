@@ -6,11 +6,14 @@ using Poraqui.Api.Security;
 using Poraqui.Application.Commerce;
 using Poraqui.Application.Orders;
 using Poraqui.Infrastructure.Storage;
+using Poraqui.Api.Realtime;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+builder.Services.AddSignalR();
+builder.Services.AddScoped<IOrderChangePublisher, SignalROrderChangePublisher>();
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 var identityConfigured = !string.IsNullOrWhiteSpace(connectionString);
 if (!string.IsNullOrWhiteSpace(connectionString))
@@ -40,6 +43,15 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/hubs/orders") &&
+        string.IsNullOrEmpty(context.Request.Headers.Authorization) &&
+        !string.IsNullOrEmpty(context.Request.Query["access_token"]))
+        context.Request.Headers.Authorization = $"Bearer {context.Request.Query["access_token"]}";
+    await next();
+});
+
 app.UseHttpsRedirection();
 
 if (identityConfigured)
@@ -47,6 +59,7 @@ if (identityConfigured)
     app.UseAuthentication();
     app.MapGroup("/api/auth").MapIdentityApi<ApplicationUser>();
     app.MapControllers();
+    app.MapHub<OrdersHub>("/hubs/orders");
 }
 
 app.UseAuthorization();
