@@ -31,6 +31,25 @@ public sealed class CommerceRulesTests
     }
 
     [Fact]
+    public void Business_opening_hours_validate_week_and_evaluate_local_time_zone()
+    {
+        var business = new Business(Guid.NewGuid(), "Tacos", "Centro");
+        var schedule = Enum.GetValues<DayOfWeek>().Select(day =>
+            (day, day != DayOfWeek.Monday,
+                day == DayOfWeek.Monday ? TimeOnly.Parse("09:00") : (TimeOnly?)null,
+                day == DayOfWeek.Monday ? TimeOnly.Parse("17:00") : (TimeOnly?)null));
+
+        business.ConfigureOpeningHours("UTC", schedule);
+
+        Assert.True(business.HasConfiguredOpeningHours);
+        Assert.True(business.IsAcceptingOrdersAt(new DateTimeOffset(2026, 10, 19, 9, 0, 0, TimeSpan.Zero)));
+        Assert.False(business.IsAcceptingOrdersAt(new DateTimeOffset(2026, 10, 19, 17, 0, 0, TimeSpan.Zero)));
+        Assert.False(business.IsAcceptingOrdersAt(new DateTimeOffset(2026, 10, 18, 12, 0, 0, TimeSpan.Zero)));
+        Assert.Throws<ArgumentException>(() => business.ConfigureOpeningHours("UTC", []));
+        Assert.Throws<ArgumentException>(() => business.ConfigureOpeningHours("not-a-time-zone", schedule));
+    }
+
+    [Fact]
     public void Product_and_delivery_fee_reject_negative_prices()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new CatalogProduct(Guid.NewGuid(), "Taco", -1m));

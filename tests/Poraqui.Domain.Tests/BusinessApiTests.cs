@@ -33,6 +33,15 @@ public sealed class BusinessApiTests
 
         await RegisterAsync(client, "second-owner@example.test");
         var secondToken = await LoginAsync(client, "second-owner@example.test");
+
+        var weeklyHours = new
+        {
+            timeZoneId = "UTC",
+            days = Enum.GetValues<DayOfWeek>().Select(day => new { day = (int)day, isClosed = false,
+                opensAt = "00:00:00", closesAt = "23:59:59" }).ToArray()
+        };
+        Assert.Equal(HttpStatusCode.Forbidden, (await SendAsync(client, HttpMethod.Put,
+            $"api/businesses/{firstBusinessId}/opening-hours", secondToken, JsonContent.Create(weeklyHours))).StatusCode);
         var secondBusinessId = await RegisterBusinessAsync(client, secondToken, "Taquería Dos");
         secondToken = await LoginAsync(client, "second-owner@example.test");
 
@@ -133,6 +142,22 @@ public sealed class BusinessApiTests
         using var rateResponse = await SendAsync(client, HttpMethod.Post, $"api/businesses/{businessId}/delivery-rates", merchantToken,
             JsonContent.Create(new { zoneId, fee = 18.25m }));
         Assert.Equal(HttpStatusCode.OK, rateResponse.StatusCode);
+        var alwaysOpenHours = new
+        {
+            timeZoneId = "UTC",
+            days = Enum.GetValues<DayOfWeek>().Select(day => new { day = (int)day, isClosed = false,
+                opensAt = "00:00:00", closesAt = "23:59:59" }).ToArray()
+        };
+        using (var hoursResponse = await SendAsync(client, HttpMethod.Put,
+                   $"api/businesses/{businessId}/opening-hours", merchantToken, JsonContent.Create(alwaysOpenHours)))
+            Assert.Equal(HttpStatusCode.OK, hoursResponse.StatusCode);
+        using (var publicHours = await client.GetAsync($"api/businesses/{businessId}/opening-hours"))
+        {
+            using var publicHoursJson = JsonDocument.Parse(await publicHours.Content.ReadAsStringAsync());
+            Assert.Equal(HttpStatusCode.OK, publicHours.StatusCode);
+            Assert.True(publicHoursJson.RootElement.GetProperty("isConfigured").GetBoolean());
+            Assert.Equal(7, publicHoursJson.RootElement.GetProperty("days").GetArrayLength());
+        }
 
         await RegisterAsync(client, "customer@example.test");
         var customerToken = await LoginAsync(client, "customer@example.test");
@@ -170,6 +195,14 @@ public sealed class BusinessApiTests
         var customerDeliveryCode = orderJson.RootElement.GetProperty("customerDeliveryCode").GetString()!;
         Assert.Equal(6, customerDeliveryCode.Length);
         var orderId = orderJson.RootElement.GetProperty("id").GetGuid();
+        using (var hoursResponse = await SendAsync(client, HttpMethod.Put,
+                   $"api/businesses/{businessId}/opening-hours", merchantToken,
+                   JsonContent.Create(new { timeZoneId = "UTC", days = Enum.GetValues<DayOfWeek>()
+                       .Select(day => new { day = (int)day, isClosed = true, opensAt = (string?)null, closesAt = (string?)null }).ToArray() })))
+            Assert.Equal(HttpStatusCode.OK, hoursResponse.StatusCode);
+        using (var closedOrderResponse = await SendAsync(client, HttpMethod.Post, "api/orders", customerToken,
+                   new StringContent(optionOrderRequest, Encoding.UTF8, "application/json")))
+            Assert.Equal(HttpStatusCode.BadRequest, closedOrderResponse.StatusCode);
         using var realtimeSocket = await ConnectOrdersHubAsync(factory, client, customerToken, orderId);
         Assert.Equal(HttpStatusCode.Unauthorized,
             (await client.PostAsync("hubs/orders/negotiate?negotiateVersion=1", null)).StatusCode);
