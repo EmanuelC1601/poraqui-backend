@@ -92,6 +92,44 @@ public sealed class BusinessApiTests
         using var productJson = JsonDocument.Parse(await productResponse.Content.ReadAsStringAsync());
         var productId = productJson.RootElement.GetProperty("id").GetGuid();
 
+        using var optionGroupResponse = await SendAsync(client, HttpMethod.Post,
+            $"api/products/{productId}/option-groups", merchantToken,
+            JsonContent.Create(new
+            {
+                name = "Tamaño", minSelections = 1, maxSelections = 1,
+                options = new[] { new { name = "Regular", priceDelta = 0m }, new { name = "Grande", priceDelta = 5.50m } }
+            }));
+        Assert.Equal(HttpStatusCode.Created, optionGroupResponse.StatusCode);
+        using var optionGroupJson = JsonDocument.Parse(await optionGroupResponse.Content.ReadAsStringAsync());
+        var optionGroupId = optionGroupJson.RootElement.GetProperty("id").GetGuid();
+        var largeOptionId = optionGroupJson.RootElement.GetProperty("options").EnumerateArray()
+            .Single(option => option.GetProperty("name").GetString() == "Grande").GetProperty("id").GetGuid();
+        var regularOptionId = optionGroupJson.RootElement.GetProperty("options").EnumerateArray()
+            .Single(option => option.GetProperty("name").GetString() == "Regular").GetProperty("id").GetGuid();
+        using var extrasGroupResponse = await SendAsync(client, HttpMethod.Post,
+            $"api/products/{productId}/option-groups", merchantToken,
+            JsonContent.Create(new
+            {
+                name = "Extras", minSelections = 0, maxSelections = 2,
+                options = new[] { new { name = "Queso", priceDelta = 7.25m }, new { name = "Tocino", priceDelta = 10m } }
+            }));
+        Assert.Equal(HttpStatusCode.Created, extrasGroupResponse.StatusCode);
+        using var extrasGroupJson = JsonDocument.Parse(await extrasGroupResponse.Content.ReadAsStringAsync());
+        var cheeseOptionId = extrasGroupJson.RootElement.GetProperty("options").EnumerateArray()
+            .Single(option => option.GetProperty("name").GetString() == "Queso").GetProperty("id").GetGuid();
+        var baconOptionId = extrasGroupJson.RootElement.GetProperty("options").EnumerateArray()
+            .Single(option => option.GetProperty("name").GetString() == "Tocino").GetProperty("id").GetGuid();
+        Assert.Equal(HttpStatusCode.OK, (await SendAsync(client, HttpMethod.Put,
+            $"api/product-options/{baconOptionId}/availability", merchantToken,
+            JsonContent.Create(new { isAvailable = false }))).StatusCode);
+        using (var catalogResponse = await client.GetAsync($"api/businesses/{businessId}/products"))
+        {
+            using var catalogJson = JsonDocument.Parse(await catalogResponse.Content.ReadAsStringAsync());
+            Assert.Equal(2, catalogJson.RootElement[0].GetProperty("optionGroups").GetArrayLength());
+            Assert.Single(catalogJson.RootElement[0].GetProperty("optionGroups").EnumerateArray()
+                .Single(group => group.GetProperty("name").GetString() == "Extras").GetProperty("options").EnumerateArray());
+        }
+
         using var rateResponse = await SendAsync(client, HttpMethod.Post, $"api/businesses/{businessId}/delivery-rates", merchantToken,
             JsonContent.Create(new { zoneId, fee = 18.25m }));
         Assert.Equal(HttpStatusCode.OK, rateResponse.StatusCode);
@@ -107,14 +145,27 @@ public sealed class BusinessApiTests
             $"api/businesses/{businessId}/transfer-details", merchantToken,
             JsonContent.Create(new { recipientName = "Mercado Poraqui", institution = "Banco de prueba", accountReference = "CLABE-TEST-001", instructions = "Usa el número de pedido como concepto." }));
         Assert.Equal(HttpStatusCode.OK, paymentDetailsResponse.StatusCode);
+        using var missingRequiredOption = await SendAsync(client, HttpMethod.Post, "api/orders", customerToken,
+            JsonContent.Create(new { businessId, zoneId, deliveryAddress = "Calle de prueba", items = new[] { new { productId, quantity = 2 } } }));
+        Assert.Equal(HttpStatusCode.BadRequest, missingRequiredOption.StatusCode);
+        using var unavailableOption = await SendAsync(client, HttpMethod.Post, "api/orders", customerToken,
+            JsonContent.Create(new { businessId, zoneId, deliveryAddress = "Calle de prueba", items = new[] { new { productId, quantity = 2, optionIds = new[] { largeOptionId, baconOptionId } } } }));
+        Assert.Equal(HttpStatusCode.BadRequest, unavailableOption.StatusCode);
+        using var tooManyRequiredChoices = await SendAsync(client, HttpMethod.Post, "api/orders", customerToken,
+            JsonContent.Create(new { businessId, zoneId, deliveryAddress = "Calle de prueba", items = new[] { new { productId, quantity = 2, optionIds = new[] { largeOptionId, regularOptionId } } } }));
+        Assert.Equal(HttpStatusCode.BadRequest, tooManyRequiredChoices.StatusCode);
+        var optionOrderRequest = $$"""{"businessId":"{{businessId}}","zoneId":"{{zoneId}}","deliveryAddress":"Calle de prueba","items":[{"productId":"{{productId}}","quantity":2,"optionIds":["{{largeOptionId}}","{{cheeseOptionId}}"]}]}""";
         using var orderResponse = await SendAsync(client, HttpMethod.Post, "api/orders", customerToken,
-            new StringContent(requestJson, Encoding.UTF8, "application/json"));
+            new StringContent(optionOrderRequest, Encoding.UTF8, "application/json"));
 
         Assert.Equal(HttpStatusCode.Created, orderResponse.StatusCode);
         using var orderJson = JsonDocument.Parse(await orderResponse.Content.ReadAsStringAsync());
-        Assert.Equal(51.00m, orderJson.RootElement.GetProperty("subtotal").GetDecimal());
+        Assert.Equal(76.50m, orderJson.RootElement.GetProperty("subtotal").GetDecimal());
         Assert.Equal(18.25m, orderJson.RootElement.GetProperty("deliveryFee").GetDecimal());
-        Assert.Equal(69.25m, orderJson.RootElement.GetProperty("total").GetDecimal());
+        Assert.Equal(94.75m, orderJson.RootElement.GetProperty("total").GetDecimal());
+        Assert.Equal(2, orderJson.RootElement.GetProperty("items")[0].GetProperty("options").GetArrayLength());
+        Assert.Equal(38.25m, orderJson.RootElement.GetProperty("items")[0].GetProperty("unitPrice").GetDecimal());
+        Assert.Equal(76.50m, orderJson.RootElement.GetProperty("items")[0].GetProperty("lineTotal").GetDecimal());
         Assert.Equal("CLABE-TEST-001", orderJson.RootElement.GetProperty("transferInstructions").GetProperty("accountReference").GetString());
         var customerDeliveryCode = orderJson.RootElement.GetProperty("customerDeliveryCode").GetString()!;
         Assert.Equal(6, customerDeliveryCode.Length);
@@ -173,6 +224,9 @@ public sealed class BusinessApiTests
         otherMerchantToken = await LoginAsync(client, "other-merchant@example.test");
         Assert.Equal(HttpStatusCode.Forbidden, (await SendAsync(client, HttpMethod.Get,
             $"api/businesses/{otherBusinessId}/orders/{orderId}/transfer-evidence", otherMerchantToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await SendAsync(client, HttpMethod.Put,
+            $"api/option-groups/{optionGroupId}/availability", otherMerchantToken,
+            JsonContent.Create(new { isAvailable = false }))).StatusCode);
         using (var scope = factory.Services.CreateScope())
         {
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
@@ -367,6 +421,7 @@ public sealed class BusinessApiTests
         using var customerOrderResponse = await SendAsync(client, HttpMethod.Get, $"api/orders/{orderId}", customerToken);
         using var customerOrder = JsonDocument.Parse(await customerOrderResponse.Content.ReadAsStringAsync());
         Assert.Equal("Delivered", customerOrder.RootElement.GetProperty("status").GetString());
+        Assert.Equal(2, customerOrder.RootElement.GetProperty("items")[0].GetProperty("options").GetArrayLength());
         Assert.True(customerOrder.RootElement.GetProperty("courierPaymentAmount").ValueKind == JsonValueKind.Null);
         Assert.Equal("CLABE-TEST-001", customerOrder.RootElement.GetProperty("transferInstructions").GetProperty("accountReference").GetString());
         Assert.Equal(10, customerOrder.RootElement.GetProperty("history").GetArrayLength());

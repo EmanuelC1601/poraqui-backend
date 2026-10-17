@@ -8,6 +8,8 @@ public interface ICatalogOrderRepository
     Task<Business?> GetBusinessAsync(Guid businessId, CancellationToken cancellationToken);
     Task<Business?> GetBusinessOwnedByAsync(Guid businessId, Guid ownerId, CancellationToken cancellationToken);
     Task<CatalogProduct?> GetProductAsync(Guid productId, CancellationToken cancellationToken);
+    Task<ProductOptionGroup?> GetOptionGroupAsync(Guid optionGroupId, CancellationToken cancellationToken);
+    Task<ProductOption?> GetOptionAsync(Guid optionId, CancellationToken cancellationToken);
     Task<IReadOnlyList<CatalogProduct>> GetProductsAsync(Guid businessId, CancellationToken cancellationToken);
     Task<IReadOnlyList<CatalogProduct>> GetProductsAsync(IReadOnlyCollection<Guid> productIds, CancellationToken cancellationToken);
     Task<DeliveryZone?> GetZoneAsync(Guid zoneId, CancellationToken cancellationToken);
@@ -15,20 +17,30 @@ public interface ICatalogOrderRepository
     Task<DeliveryRate?> GetRateAsync(Guid businessId, Guid zoneId, CancellationToken cancellationToken);
     Task<IReadOnlyList<DeliveryRate>> GetRatesAsync(Guid businessId, CancellationToken cancellationToken);
     Task AddProductAsync(CatalogProduct product, CancellationToken cancellationToken);
+    Task AddOptionGroupAsync(ProductOptionGroup group, CancellationToken cancellationToken);
     Task AddZoneAsync(DeliveryZone zone, CancellationToken cancellationToken);
     Task AddRateAsync(DeliveryRate rate, CancellationToken cancellationToken);
     Task AddOrderAsync(Order order, CancellationToken cancellationToken);
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }
 
-public sealed record ProductView(Guid Id, Guid BusinessId, string Name, decimal Price, bool IsAvailable);
+public sealed record ProductOptionView(Guid Id, string Name, decimal PriceDelta, bool IsAvailable);
+public sealed record ProductOptionGroupView(Guid Id, string Name, int MinSelections, int MaxSelections, bool IsAvailable,
+    IReadOnlyList<ProductOptionView> Options);
+public sealed record ProductView(Guid Id, Guid BusinessId, string Name, decimal Price, bool IsAvailable,
+    IReadOnlyList<ProductOptionGroupView> OptionGroups);
+public sealed record OptionRequest(string Name, decimal PriceDelta);
+public sealed record OptionGroupRequest(string Name, int MinSelections, int MaxSelections, IReadOnlyCollection<OptionRequest> Options);
+public sealed record AvailabilityRequest(bool IsAvailable);
 public sealed record ZoneView(Guid Id, string Name, bool IsActive);
 public sealed record RateView(Guid Id, Guid BusinessId, Guid ZoneId, decimal Fee, bool IsActive);
-public sealed record OrderItemRequest(Guid ProductId, int Quantity);
+public sealed record OrderItemRequest(Guid ProductId, int Quantity, IReadOnlyCollection<Guid>? OptionIds = null);
 public sealed record CreatedOrderView(Guid Id, string OrderNumber, Guid BusinessId, Guid ZoneId,
     string DeliveryAddress, decimal Subtotal, decimal DeliveryFee, decimal Total, OrderStatus Status,
     IReadOnlyList<CreatedOrderLineView> Items, string CustomerDeliveryCode, TransferInstructionsView TransferInstructions);
-public sealed record CreatedOrderLineView(Guid ProductId, string ProductName, decimal UnitPrice, int Quantity, decimal LineTotal);
+public sealed record SelectedOrderOptionView(Guid OptionId, string Name, decimal PriceDelta);
+public sealed record CreatedOrderLineView(Guid ProductId, string ProductName, decimal UnitPrice, int Quantity, decimal LineTotal,
+    IReadOnlyList<SelectedOrderOptionView> Options);
 public sealed record TransferInstructionsView(string RecipientName, string Institution, string AccountReference, string? Instructions);
 
 public sealed class CatalogOrderService(ICatalogOrderRepository repository, Poraqui.Application.Orders.IOrderChangePublisher publisher)
@@ -71,6 +83,54 @@ public sealed class CatalogOrderService(ICatalogOrderRepository repository, Pora
         product.SetAvailable(available);
         await repository.SaveChangesAsync(cancellationToken);
         return ToView(product);
+    }
+
+    public async Task<ProductOptionGroupView?> AddOptionGroupAsync(Guid productId, Guid ownerId, bool isAdmin,
+        OptionGroupRequest request, CancellationToken cancellationToken)
+    {
+        if (request.Options is null) throw new ArgumentException("Options are required.", nameof(request));
+        var product = await repository.GetProductAsync(productId, cancellationToken);
+        if (product is null) return null;
+        var business = isAdmin
+            ? await repository.GetBusinessAsync(product.BusinessId, cancellationToken)
+            : await repository.GetBusinessOwnedByAsync(product.BusinessId, ownerId, cancellationToken);
+        if (business is null) throw new BusinessAuthorizationException();
+        var group = product.AddOptionGroup(request.Name, request.MinSelections, request.MaxSelections,
+            request.Options.Select(option => (option.Name, option.PriceDelta)));
+        await repository.AddOptionGroupAsync(group, cancellationToken);
+        await repository.SaveChangesAsync(cancellationToken);
+        return ToView(group);
+    }
+
+    public async Task<ProductOptionGroupView?> SetOptionGroupAvailabilityAsync(Guid optionGroupId, Guid ownerId,
+        bool isAdmin, bool isAvailable, CancellationToken cancellationToken)
+    {
+        var group = await repository.GetOptionGroupAsync(optionGroupId, cancellationToken);
+        if (group is null) return null;
+        var product = await repository.GetProductAsync(group.ProductId, cancellationToken);
+        var business = product is null ? null : isAdmin
+            ? await repository.GetBusinessAsync(product.BusinessId, cancellationToken)
+            : await repository.GetBusinessOwnedByAsync(product.BusinessId, ownerId, cancellationToken);
+        if (business is null) throw new BusinessAuthorizationException();
+        group.SetAvailable(isAvailable);
+        await repository.SaveChangesAsync(cancellationToken);
+        return ToView(group);
+    }
+
+    public async Task<ProductOptionView?> SetOptionAvailabilityAsync(Guid optionId, Guid ownerId, bool isAdmin,
+        bool isAvailable, CancellationToken cancellationToken)
+    {
+        var option = await repository.GetOptionAsync(optionId, cancellationToken);
+        if (option is null) return null;
+        var group = await repository.GetOptionGroupAsync(option.GroupId, cancellationToken);
+        var product = group is null ? null : await repository.GetProductAsync(group.ProductId, cancellationToken);
+        var business = product is null ? null : isAdmin
+            ? await repository.GetBusinessAsync(product.BusinessId, cancellationToken)
+            : await repository.GetBusinessOwnedByAsync(product.BusinessId, ownerId, cancellationToken);
+        if (business is null) throw new BusinessAuthorizationException();
+        option.SetAvailable(isAvailable);
+        await repository.SaveChangesAsync(cancellationToken);
+        return new ProductOptionView(option.Id, option.Name, option.PriceDelta, option.IsAvailable);
     }
 
     public async Task<IReadOnlyList<ZoneView>> GetZonesAsync(CancellationToken cancellationToken) =>
@@ -172,6 +232,25 @@ public sealed class CatalogOrderService(ICatalogOrderRepository repository, Pora
         var transferDetails = new OrderTransferDetails(business.TransferRecipientName!, business.TransferInstitution!,
             business.TransferAccountReference!, business.TransferInstructions);
         var order = new Order(customerId, businessId, zoneId, deliveryAddress, rate.Fee, lines, transferDetails);
+        foreach (var item in requestedItems)
+        {
+            var product = byId[item.ProductId];
+            var optionIds = item.OptionIds?.ToArray() ?? [];
+            if (optionIds.Distinct().Count() != optionIds.Length)
+                throw new ArgumentException("Each option may only be selected once.", nameof(requestedItems));
+            var activeGroups = product.OptionGroups.Where(group => group.IsAvailable).ToArray();
+            var availableOptions = activeGroups.SelectMany(group => group.Options.Where(option => option.IsAvailable)).ToArray();
+            if (optionIds.Any(id => availableOptions.All(option => option.Id != id)))
+                throw new ArgumentException("One or more selected options are unavailable.", nameof(requestedItems));
+            foreach (var group in activeGroups)
+            {
+                var selectedCount = optionIds.Count(id => group.Options.Any(option => option.IsAvailable && option.Id == id));
+                if (selectedCount < group.MinSelections || selectedCount > group.MaxSelections)
+                    throw new ArgumentException($"Select between {group.MinSelections} and {group.MaxSelections} options for '{group.Name}'.", nameof(requestedItems));
+            }
+            order.ApplyLineOptions(product.Id, availableOptions.Where(option => optionIds.Contains(option.Id))
+                .Select(option => (option.Id, option.Name, option.PriceDelta)));
+        }
         var deliveryCode = OrderAccessCode.Generate();
         order.SetDeliveryCodeHash(OrderAccessCode.Hash(deliveryCode));
         await repository.AddOrderAsync(order, cancellationToken);
@@ -182,10 +261,18 @@ public sealed class CatalogOrderService(ICatalogOrderRepository repository, Pora
         return ToView(order, deliveryCode);
     }
 
-    private static ProductView ToView(CatalogProduct product) => new(product.Id, product.BusinessId, product.Name, product.Price, product.IsAvailable);
+    private static ProductView ToView(CatalogProduct product) => new(product.Id, product.BusinessId, product.Name, product.Price,
+        product.IsAvailable, product.OptionGroups.Where(group => group.IsAvailable).Select(group => new ProductOptionGroupView(group.Id,
+            group.Name, group.MinSelections, group.MaxSelections, group.IsAvailable,
+            group.Options.Where(option => option.IsAvailable).Select(option => new ProductOptionView(option.Id, option.Name,
+                option.PriceDelta, option.IsAvailable)).ToArray())).ToArray());
+    private static ProductOptionGroupView ToView(ProductOptionGroup group) => new(group.Id, group.Name, group.MinSelections,
+        group.MaxSelections, group.IsAvailable, group.Options.Select(option => new ProductOptionView(option.Id, option.Name,
+            option.PriceDelta, option.IsAvailable)).ToArray());
     private static CreatedOrderView ToView(Order order, string deliveryCode) => new(order.Id, order.OrderNumber, order.BusinessId, order.ZoneId,
         order.DeliveryAddress, order.Items.Sum(item => item.LineTotal), order.DeliveryFee, order.Total, order.Status,
-        order.Items.Select(item => new CreatedOrderLineView(item.ProductId, item.ProductName, item.UnitPrice, item.Quantity, item.LineTotal)).ToArray(), deliveryCode,
+        order.Items.Select(item => new CreatedOrderLineView(item.ProductId, item.ProductName, item.UnitPrice, item.Quantity, item.LineTotal,
+            item.Options.Select(option => new SelectedOrderOptionView(option.ProductOptionId, option.Name, option.PriceDelta)).ToArray())).ToArray(), deliveryCode,
         new TransferInstructionsView(order.TransferRecipientName!, order.TransferInstitution!, order.TransferAccountReference!, order.TransferInstructions));
 }
 

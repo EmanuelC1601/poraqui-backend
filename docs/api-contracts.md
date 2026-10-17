@@ -14,6 +14,8 @@
 ### Catálogo, tarifa y pedido
 
 - `GET/POST /api/businesses/{id}/products`; `PUT /api/products/{productId}`.
+- El negocio agrega grupos de opciones con `POST /api/products/{productId}/option-groups` (`name`, `minSelections`, `maxSelections`, `options[{name,priceDelta}]`); cambia disponibilidad con `PUT /api/option-groups/{id}/availability` y `PUT /api/product-options/{id}/availability`. Requiere propietario del producto o administrador.
+- `GET /api/businesses/{id}/products` incluye solo grupos y opciones disponibles con límites y diferencias de precio. Al crear pedido, `items[]` puede incluir `optionIds[]`. El servidor comprueba opciones disponibles y límites de cada grupo, calcula `precio base + diferencias` y guarda snapshots de nombres/precios seleccionados en cada línea. El cliente no envía importes.
 - `GET /api/delivery-zones/active`; admins administran zonas con `POST/PUT /api/delivery-zones`.
 - Negocio/admin administra tarifas por zona con `GET/POST /api/businesses/{id}/delivery-rates` y `PUT /api/businesses/{id}/delivery-rates/{zoneId}`.
 - `GET/PUT /api/businesses/{businessId}/transfer-details`: propietario/admin configura destinatario, institución, referencia e instrucciones.
@@ -61,10 +63,16 @@ Cada transición de pedido incrementa `Order.Version`; la persistencia detecta e
 - Un fallo de SignalR no revierte la transición guardada; se registra y el cliente puede consultar `GET /api/orders/{id}`, `GET /api/businesses/{businessId}/orders/{orderId}` o `GET /api/courier/orders/{orderId}` con su permiso. Las notificaciones no son una cola durable.
 - Pruebas: conexión WebSocket SignalR real en TestServer/SQLite temporal; el cliente recibe `OrderChanged` después del envío del comprobante y la consulta confirma el estado persistido. También se verifica negociación anónima rechazada y acceso cruzado de otro negocio denegado. SQL Server sigue sin comprobar.
 
+## En desarrollo: opciones de catálogo (`feature/catalog-options`, basada en PR #8)
+
+- Grupos con selección mínima/máxima y variantes con diferencia de precio no negativa. Grupo/variante se puede poner no disponible; la lectura pública oculta los no disponibles y el servidor rechaza su selección.
+- El precio unitario de línea refleja las opciones y el pedido guarda una copia de nombre/importe para conservar el recibo si el negocio cambia el catálogo después.
+- Migración `CatalogProductOptions` y `docs/sql/CatalogProductOptions.sql` crean tres tablas e índices aditivos. No elimina datos ni está aplicada. La suite pasa en SQLite; SQL Server aún no se ha validado.
+
 ## Validación, antecedentes y pendientes
 
 `dotnet test Poraqui.sln` ejercita un recorrido aislado SQLite con importes, permisos, transferencia, comprobante, oferta externa, cancelación, ausencia de repartidores, rechazo, aceptación, códigos, pago al recoger y entrega. SQLite no verifica por sí solo los bloqueos, índices y concurrencia de SQL Server.
 
 El contrato provisional `src/Poraqui.Application/Delivery/DeliveryOrderContracts.cs` se eliminó en PR #4 al implementar reparto propio. La asignación previa a OpenCode se conserva como antecedente; hay un solo responsable.
 
-Pendiente: opciones de producto, horarios, OTP, cancelación de pedido, incidencias/reembolsos completos, idempotencia general para otros comandos, métricas, despliegue y verificación SQL Server incluyendo carreras simultáneas. No hay GPS, distancias inferidas ni transferencias bancarias automáticas.
+Pendiente: horarios, OTP, cancelación de pedido, incidencias/reembolsos completos, idempotencia general para otros comandos, métricas, despliegue y verificación SQL Server incluyendo carreras simultáneas. No hay GPS, distancias inferidas ni transferencias bancarias automáticas.

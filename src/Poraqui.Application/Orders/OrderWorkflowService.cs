@@ -23,7 +23,8 @@ public interface ITransferEvidenceStorage
     Task DeleteAsync(string reference, CancellationToken cancellationToken);
 }
 
-public sealed record OrderWorkflowLine(Guid ProductId, string ProductName, decimal UnitPrice, int Quantity, decimal LineTotal);
+public sealed record OrderWorkflowLine(Guid ProductId, string ProductName, decimal UnitPrice, int Quantity, decimal LineTotal,
+    IReadOnlyList<SelectedOrderOptionView> Options);
 public sealed record OrderWorkflowHistory(Guid ActorUserId, string Status, DateTimeOffset ChangedAtUtc, string Reason);
 public sealed record OrderWorkflowView(Guid Id, string OrderNumber, Guid CustomerUserId, Guid BusinessId, string BusinessPickupAddress, Guid ZoneId,
     Guid? CourierUserId, string DeliveryAddress, decimal Subtotal, decimal DeliveryFee, decimal Total,
@@ -251,7 +252,8 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IO
         order.BusinessId, businessAddress, order.ZoneId, order.CourierUserId, order.DeliveryAddress, order.Items.Sum(item => item.LineTotal),
         order.DeliveryFee, order.Total, order.CourierPaymentAmount, order.CourierPaymentReceivedAtUtc is not null,
         order.Status.ToString(), order.CreatedAtUtc, order.DeliveryStartedAtUtc, order.DeliveredAtUtc,
-        order.Items.Select(item => new OrderWorkflowLine(item.ProductId, item.ProductName, item.UnitPrice, item.Quantity, item.LineTotal)).ToArray(),
+        order.Items.Select(item => new OrderWorkflowLine(item.ProductId, item.ProductName, item.UnitPrice, item.Quantity, item.LineTotal,
+            item.Options.Select(option => new SelectedOrderOptionView(option.ProductOptionId, option.Name, option.PriceDelta)).ToArray())).ToArray(),
         order.StatusHistory.OrderBy(entry => entry.ChangedAtUtc)
             .Select(entry => new OrderWorkflowHistory(entry.ActorUserId, entry.Status.ToString(), entry.ChangedAtUtc, entry.Reason)).ToArray(), null);
 }

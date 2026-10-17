@@ -2,9 +2,9 @@
 
 ## Base, ramas y responsabilidad
 
-`main` contiene PR #1–#5 hasta `d677167`. PR #6 agrega reparto externo y PR #7 sincronización offline; #7 está apilado sobre #6. La rama activa `feature/realtime-order-updates` continúa sobre PR #7. Un solo responsable mantiene todos los módulos, contratos, `AppDbContext` y migraciones. OpenCode ya no participa; su anterior asignación de reparto se conserva como antecedente.
+`main` contiene PR #1–#5 hasta `d677167`. PR #6 agrega reparto externo; PR #7 sincronización offline está apilado sobre #6; PR #8 SignalR está apilado sobre #7. La rama activa `feature/catalog-options` continúa sobre PR #8. Un solo responsable mantiene todos los módulos, contratos, `AppDbContext` y migraciones. OpenCode ya no participa; su anterior asignación de reparto se conserva como antecedente.
 
-## Incremento actual
+## Incremento previo: sincronización offline (PR #7)
 
 Agrega `POST /api/orders/{orderId}/sync/delivery-confirmation` para confirmaciones capturadas offline. El servidor valida courier y código con el estado actual del pedido; el dato de hora del dispositivo se guarda como auditoría y no determina una transición. Guarda transición e ID/payload idempotente en una transacción. Un reintento idéntico devuelve la aceptación guardada; misma clave para datos distintos responde 409.
 
@@ -24,6 +24,12 @@ dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<cadena privada>"
 
 `/hubs/orders` acepta solo conexiones autenticadas. `SubscribeOrder(orderId)` valida cliente, propietario, courier asignado o administrador y devuelve `{ orderId, status, version, changedAtUtc }`. Los eventos `OrderChanged` se publican tras persistir y contienen solo estado/version. Al reconectar, volver a invocar `SubscribeOrder` para recuperar la instantánea actual. La suite completa 14/14 pasa en SQLite; una conexión WebSocket SignalR en TestServer recibe el evento y luego lee la transición persistida. Falta verificar reconexión de un cliente real.
 
+## Incremento actual: opciones de catálogo
+
+Agrega grupos de opciones obligatorios/opcionales con límites de selección, opciones con diferencia de precio y cambios de disponibilidad. El alta requiere propietario o administrador. La lectura pública oculta las opciones no disponibles. `POST /api/orders` recibe `optionIds`; el servidor valida disponibilidad y cardinalidad antes de calcular subtotal/total. La línea guarda un snapshot de nombre y precio elegido para mantener el recibo histórico.
+
+Migración `CatalogProductOptions` crea `ProductOptionGroups`, `ProductOptions` y `OrderLineOptions`; script aditivo `docs/sql/CatalogProductOptions.sql`, generado desde `OfflineDeliveryCommandSync`. No aplicado. Verificado con `dotnet build Poraqui.sln` (0 advertencias/errores), `dotnet test Poraqui.sln` (14/14; SQLite temporal), `git diff --check` y `migrations has-pending-model-changes` (sin cambios). SQL Server no está configurado.
+
 ## Siguiente trabajo
 
-Probar entrega SignalR a una conexión real y aislamiento de grupos; después, idempotencia general de otras operaciones, cancelaciones de pedidos, incidencias y reembolsos; opciones/horarios de catálogo; métricas y despliegue. Ver contratos y ledger en `docs/api-contracts.md` y `docs/project-status.md`.
+Probar reconexión de un cliente SignalR; después, idempotencia general de otras operaciones, cancelaciones de pedidos, incidencias y reembolsos; horarios de catálogo; métricas y despliegue. Ver contratos y ledger en `docs/api-contracts.md` y `docs/project-status.md`.

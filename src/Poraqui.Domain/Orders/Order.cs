@@ -143,6 +143,15 @@ public sealed class Order
         DeliveryCodeHash = deliveryCodeHash;
     }
 
+    public void ApplyLineOptions(Guid productId, IEnumerable<(Guid OptionId, string Name, decimal PriceDelta)> options)
+    {
+        EnsureStatus(OrderStatus.PendingPayment);
+        var line = _items.SingleOrDefault(item => item.ProductId == productId)
+            ?? throw new ArgumentException("Product is not part of this order.", nameof(productId));
+        line.SetOptions(options);
+        Total = decimal.Round(_items.Sum(item => item.LineTotal) + DeliveryFee, 2, MidpointRounding.AwayFromZero);
+    }
+
     public void MarkPickedUp(Guid courierUserId, string submittedCodeHash)
     {
         EnsureCourier(courierUserId);
@@ -224,6 +233,7 @@ public sealed class OrderStatusChange(Guid id, Guid actorUserId, OrderStatus sta
 
 public sealed class OrderLine
 {
+    private readonly List<OrderLineOption> _options = [];
     private OrderLine() { }
 
     internal OrderLine(Guid productId, string productName, decimal unitPrice, int quantity)
@@ -246,6 +256,39 @@ public sealed class OrderLine
     public decimal UnitPrice { get; private set; }
     public int Quantity { get; private set; }
     public decimal LineTotal { get; private set; }
+    public IReadOnlyCollection<OrderLineOption> Options => _options.AsReadOnly();
+
+    internal void SetOptions(IEnumerable<(Guid OptionId, string Name, decimal PriceDelta)> options)
+    {
+        var selections = options?.ToArray() ?? throw new ArgumentNullException(nameof(options));
+        if (selections.Select(option => option.OptionId).Distinct().Count() != selections.Length)
+            throw new ArgumentException("An option may only be selected once.", nameof(options));
+        var previousOptionsTotal = _options.Sum(option => option.PriceDelta);
+        _options.Clear();
+        foreach (var selection in selections)
+            _options.Add(new OrderLineOption(selection.OptionId, selection.Name, selection.PriceDelta));
+        UnitPrice = decimal.Round(UnitPrice - previousOptionsTotal + selections.Sum(option => option.PriceDelta), 2, MidpointRounding.AwayFromZero);
+        LineTotal = decimal.Round(UnitPrice * Quantity, 2, MidpointRounding.AwayFromZero);
+    }
+}
+
+public sealed class OrderLineOption
+{
+    private OrderLineOption() { }
+    internal OrderLineOption(Guid productOptionId, string name, decimal priceDelta)
+    {
+        if (productOptionId == Guid.Empty) throw new ArgumentException("A catalog option is required.", nameof(productOptionId));
+        if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("An option name is required.", nameof(name));
+        if (priceDelta < 0) throw new ArgumentOutOfRangeException(nameof(priceDelta));
+        Id = Guid.NewGuid();
+        ProductOptionId = productOptionId;
+        Name = name.Trim();
+        PriceDelta = decimal.Round(priceDelta, 2, MidpointRounding.AwayFromZero);
+    }
+    public Guid Id { get; private set; }
+    public Guid ProductOptionId { get; private set; }
+    public string Name { get; private set; } = string.Empty;
+    public decimal PriceDelta { get; private set; }
 }
 
 public enum TransferDecision { Approved, Rejected }
