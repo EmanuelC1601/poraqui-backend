@@ -1,6 +1,6 @@
 # Estado verificable del proyecto
 
-Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167`. PR #6 (`feature/external-courier-offers`) está abierto. La rama actual `feature/offline-delivery-sync` está basada en PR #6 y depende de que se integre primero.
+Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167`. PR #6 (reparto externo), #7 (sincronización offline) y #8 (SignalR) están abiertos y apilados en ese orden. La rama activa `feature/realtime-order-updates` termina en `2bcf2b3`.
 
 ## Implementado en `main`
 
@@ -24,7 +24,7 @@ Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167`. PR #6 (`fea
 - Reintento igual reproduce la aceptación guardada sin duplicar historial; mismo ID con payload/orden distinto da conflicto. Código inválido no consume el ID.
 - Registro idempotente y transición de pedido se guardan en la misma transacción; la migración agrega una tabla nueva.
 
-## Rama actual apilada: SignalR de pedidos
+## PR #8 abierto: SignalR de pedidos
 
 - Hub autenticado `/hubs/orders`; la negociación acepta `access_token` únicamente en la ruta del hub.
 - `SubscribeOrder` comprueba la relación de usuario con el pedido y devuelve una instantánea persistida con estado y versión. Los eventos `OrderChanged` salen después del guardado, solo a los grupos autorizados por pedido y sin datos personales.
