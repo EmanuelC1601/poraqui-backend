@@ -78,8 +78,7 @@ public sealed class ExternalCourierService(IExternalCourierRepository repository
     public async Task RejectAsync(Guid offerId, Guid courierId, CancellationToken ct)
     {
         var offer = await RequiredOffer(offerId, courierId, ct);
-        offer.Reject(DateTimeOffset.UtcNow);
-        await repository.SaveChangesAsync(ct);
+        if (offer.Reject(DateTimeOffset.UtcNow)) await repository.SaveChangesAsync(ct);
     }
 
     public async Task<ExternalOfferAcceptance> AcceptAsync(Guid offerId, Guid courierId, CancellationToken ct)
