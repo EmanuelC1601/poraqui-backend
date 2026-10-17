@@ -9,7 +9,7 @@ Este repositorio tiene un único responsable para todos los módulos: identidad/
 - `main` integra PR #1–#6 (`d39d265`).
 - PR #7–#9 fueron integrados en sus ramas apiladas.
 - PR #10 se integró en `feature/catalog-options` con merge commit `fc68274` y ya está cerrado como merged.
-- PR #11 (cancelaciones/incidencias/reembolsos) sigue abierto; contiene PR #12 (métricas) ya integrado en su rama.
+- PR #11 (cancelaciones/incidencias/reembolsos), que contiene PR #12 (métricas), se integró en `feature/business-hours` con `efa53d9`; aún no está en `main`.
 - PR #13–#14 y PR #18–#21 se mantienen en ramas apiladas y todavía no están en `main`.
 
 ## SQL Server y migraciones
@@ -26,7 +26,7 @@ El recorrido funcional, endpoints y límites están en `docs/order-flow.md`. Con
 
 ## Próximos pasos
 
-1. Terminar revisión e integrar PR #11 cuando la rama fuente esté sincronizada con `feature/business-hours` y pase el árbol de merge.
+1. Revisar PR #13 sobre la base actualizada de cancelaciones y continuar la cadena de reparto/idempotencia.
 2. Revisar PR #13–#14 y #18–#21 en orden, con foco en permisos cruzados, transiciones, códigos, concurrencia e idempotencia.
 3. Preparar una BD aislada SQL Server para migraciones/restricciones y pruebas concurrentes; nunca hacer pruebas destructivas sobre la BD compartida.
 4. Completar despliegue MonsterASP.NET, almacenamiento privado persistente y recorrido publicado; validar reconexión SignalR con cliente.

@@ -1,6 +1,6 @@
 # Estado verificable del proyecto
 
-Actualizado: 2026-10-17. `main` integra PR #1–#6. PR #7–#10 se han integrado en ramas de trabajo apiladas, todavía fuera de `main`. PR #11 está abierto desde `feature/order-cancellations-refunds-incidents`; PR #12 (métricas) ya está integrado en esa rama. PR #13–#14 y PR #18–#21 siguen en sus pilas de ramas, fuera de `main`. El equipo trabaja con un único responsable; OpenCode ya no participa.
+Actualizado: 2026-10-17. `main` integra PR #1–#6. PR #7–#12 se han integrado en ramas de trabajo apiladas, todavía fuera de `main`. PR #10 se integró en `feature/catalog-options` (`fc68274`) y PR #11, que incluye PR #12, en `feature/business-hours` (`efa53d9`). PR #13–#14 y PR #18–#21 siguen en sus pilas de ramas, fuera de `main`. El equipo trabaja con un único responsable; OpenCode ya no participa.
 
 ## Implementado
 
@@ -13,7 +13,7 @@ Actualizado: 2026-10-17. `main` integra PR #1–#6. PR #7–#10 se han integrado
 
 | Función | Estado verificable |
 |---|---|
-| Integrar PR #7–#12 hasta `main` | Pendiente; #7–#10 ya están integrados en ramas apiladas. PR #11 sigue abierto y contiene PR #12. |
+| Integrar PR #7–#12 hasta `main` | Pendiente; #7–#12 están integrados en ramas apiladas, fuera de `main`. |
 | OTP de teléfono | PR #14 en pila; proveedor/configuración real pendientes. |
 | Reintentos/idempotencia durable para comandos y altas | PR #13–#14 y #18–#21 en ramas; verificar implementación e integrar en orden. |
 | Revisión SQL Server de restricciones y aceptación/asignación concurrente | Bloqueada para pruebas automatizadas aisladas por falta de `ConnectionStrings:SqlServerTest`. La conexión privada `DefaultConnection` sí permite consultar historial. |
