@@ -6,9 +6,9 @@ Actualizado: 2026-10-17. `main` es la base de integración y tiene un único res
 
 | Estado | Capacidad | Evidencia |
 |---|---|---|
-| Integrado | Clean Architecture, Identity, roles y autorización por relación con negocio/pedido; comercios, catálogo y opciones, zonas y tarifas; horario; precios y snapshots calculados en servidor | `main` en `bddc081`, PR #1 y #22–#33; `BusinessApiTests` |
-| Integrado | Comprobante privado, revisión manual de transferencia, decisión del negocio, preparación, reparto propio/externo, ofertas, recogida con pago del negocio, contacto autorizado, códigos e historial | contratos y recorrido `docs/order-flow.md`; pruebas SQLite API |
-| Integrado | Confirmación offline validada por servidor, SignalR con destinatarios autorizados y snapshot al suscribirse, cancelaciones, incidencias, reembolsos manuales y reintentos idempotentes de transiciones e incidencias | PR #22–#28; pruebas SQLite API |
+| Integrado; cobertura funcional parcial | Clean Architecture, Identity, roles y autorización por relación con negocio/pedido; comercios, catálogo y opciones, zonas y tarifas; horario; precios y snapshots calculados en servidor | PR #1 y #22–#33; `BusinessApiTests`; ver pendientes de cobertura de extremo a extremo abajo |
+| Integrado; cobertura funcional parcial | Comprobante privado, revisión manual de transferencia, decisión del negocio, preparación, reparto propio/externo, ofertas, recogida con pago del negocio, contacto autorizado, códigos e historial | contratos y recorrido `docs/order-flow.md`; pruebas API con SQLite; faltan pruebas SQL Server aisladas y verificación real de almacenamiento/hosting |
+| Integrado; cobertura funcional parcial | Confirmación offline validada por servidor, SignalR con destinatarios autorizados y snapshot al suscribirse, cancelaciones, incidencias, reembolsos manuales y reintentos idempotentes de transiciones e incidencias | PR #22–#28; pruebas API con SQLite; ver ledger de pruebas omitidas |
 | Integrado | Idempotencia de `POST /api/orders`, respuesta estable con replay y conflicto 409 por payload distinto | PR #29, merge `36a71fc`; migración aditiva ya integrada, no aplicada por este cambio |
 | Integrado | Idempotencia de comprobantes por `commandId` y hash del archivo | PR #30, merge `2a15ea2`; reintentos idénticos devuelven replay y no duplican revisión/archivo |
 | Integrado | Idempotencia de asignación de courier propio y persistencia protegida del código de recogida | PR #31, merge `cf3da9f`; prueba API de replay y conflictos |
@@ -18,13 +18,14 @@ Actualizado: 2026-10-17. `main` es la base de integración y tiene un único res
 | Integrado | Consulta del snapshot persistido al reconectar SignalR | PR #38, merge `a0c3b0f`; prueba con `Microsoft.AspNetCore.SignalR.Client` comprueba nueva conexión, resuscripción y estado/versión actuales |
 | Integrado | Guía de publicación MonsterASP.NET | PR #39; documentación preparada, sitio aún no publicado |
 | Integrado | Guard de pruebas SQL Server: omite las carreras si el catálogo aislado coincide con `DefaultConnection`, incluso con alias de servidor distintos | PR #41; cinco pruebas unitarias cubren configuración ausente, catálogo compartido, base distinta y cadena inválida |
-| Pendiente | Ejecutar carreras SQL de concurrencia; publicar/verificar en MonsterASP.NET | No verificado en SQL Server ni desplegado; guía de hosting en `docs/deployment-monsterasp.md` |
+| Pendiente | Ejecutar recorrido de punta a punta y carreras concurrentes en SQL Server aislado; publicar/verificar en MonsterASP.NET | El recorrido amplio de `BusinessApiTests` usa SQLite; no se ha ejecutado todo el recorrido ni concurrencia sobre SQL Server, ni se ha desplegado |
+| En curso | Reintento de aceptación de oferta externa devuelve el mismo código de recogida protegido y persistido | Rama `feature/external-offer-accept-idempotency`; prueba API cubre replay; migración aditiva nullable generada y revisada localmente, pendiente PR e integración |
 | Bloqueado por acceso remoto/configuración | Ejecutar carreras reales en SQL Server | Se creó una base MSSQL gratuita aislada desde el panel; está vacía. Aún falta `ConnectionStrings__SqlServerTest` en User Secrets y acceso desde la estación externa. Las pruebas nuevas comparan ese destino con `DefaultConnection` y se omiten si coinciden. No se habilitó acceso remoto. |
 | Fuera de alcance | GPS, distancias estimadas, transferencias bancarias automáticas y frontend | Se usan zonas/tarifas configuradas y revisión manual |
 
 ## Verificaciones de la rama activa
 
-Última verificación (rama `feature/external-offer-change-events`): `dotnet test Poraqui.sln` aprobó 31 pruebas y omitió 2 carreras SQL porque falta `ConnectionStrings__SqlServerTest`; `dotnet build Poraqui.sln --no-restore` terminó con cero advertencias y errores; `git diff --check` pasó. Las carreras todavía no se han ejecutado contra SQL Server.
+Última verificación (rama activa `feature/external-offer-accept-idempotency`): `dotnet test Poraqui.sln` aprobó 31 pruebas y omitió 2 carreras SQL porque falta `ConnectionStrings__SqlServerTest`; `dotnet build Poraqui.sln --no-restore` terminó con cero advertencias y errores; `git diff --check` pasó; `dotnet ef migrations has-pending-model-changes` informó que el snapshot coincide. Las carreras todavía no se han ejecutado contra SQL Server.
 
 PR #43 (`6063058`) valida que courier externo active disponibilidad solo en zona existente y activa; prueba API SQLite cubre zona inexistente.
 
@@ -32,10 +33,14 @@ PR #44 (`099c3ad`) añade un proceso hospedado que barre ofertas vencidas cada m
 
 PR #45 (`2988a00`) añade grupo SignalR privado por courier para ofertas externas; el cliente suscrito recibe la oferta después de persistir y obtiene snapshot actual al suscribirse.
 
-En curso en `feature/external-offer-change-events`: aceptación, rechazo, cancelación y vencimiento notifican el nuevo estado al courier tras persistir; aceptar una oferta cancela las restantes del pedido. Prueba SignalR cubre cancelación sincronizada para dos couriers; rama aún no integrada.
+PR #46 (`f53f627`, commit de trabajo `e86947d`) integra eventos SignalR de cambio para aceptación, rechazo, cancelación y vencimiento después de persistir; aceptar una oferta cancela las restantes del pedido. Pruebas cubren cancelación sincronizada para dos couriers y cancelación al aceptar. Este cambio no añade esquema ni migraciones.
+
+Rama activa `feature/external-offer-accept-idempotency`: reutilizar aceptación de la misma oferta por el courier asignado debe reproducir el mismo código de recogida sin almacenarlo en claro. La migración `ExternalOfferAcceptancePickupCode` solo agrega una columna nullable; el SQL revisado contiene únicamente `ALTER TABLE ... ADD` y alta en `__EFMigrationsHistory`. Aún no se ha aplicado a SQL Server.
 
 ## SQL Server privado
 
 `ConnectionStrings:DefaultConnection` existe en User Secrets. El 2026-10-17, `dotnet ef migrations list` conectó en modo de consulta y devolvió las 12 migraciones de desarrollo aplicadas. No se ejecutó ninguna migración sobre esa BD. Se creó una segunda base MSSQL gratuita en el panel como destino aislado de pruebas; está habilitada, aún sin esquema ni datos. El proveedor indica que su acceso Local solo funciona desde sitios alojados; el acceso Remote de esta nueva base continúa deshabilitado. Para ejecutar pruebas desde el equipo, falta aprobar/habilitar ese acceso, obtener la cadena Remote y guardarla localmente como `ConnectionStrings__SqlServerTest`. El guard de pruebas rechaza cualquier test catalog que tenga el mismo nombre que el catálogo configurado en `DefaultConnection`. La API nunca migra al iniciar. Antes de una futura aplicación en la BD compartida, revisa el SQL generado y concilia el historial; no usar pruebas concurrentes ni limpieza en esa BD.
+
+En la rama activa, `dotnet ef migrations list` confirmó las 12 migraciones integradas como aplicadas y `ExternalOfferAcceptancePickupCode` pendiente. Su SQL es aditivo (`ProtectedPickupCode nvarchar(2000) NULL`), sin borrado ni reconstrucción. No se aplicó todavía: se integrará primero y se volverá a revisar el historial antes de `database update`.
 
 El proveedor Twilio Verify requiere `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid` y `TwilioVerify:ApiKeySecret` en configuración privada. No están configurados para esta ejecución y no se envió SMS real.

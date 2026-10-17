@@ -46,15 +46,18 @@ public sealed class ExternalDeliveryOffer
     public DateTimeOffset? RespondedAtUtc { get; private set; }
     public ExternalDeliveryOfferStatus Status { get; private set; }
     public long Version { get; private set; } = 1;
+    public string? ProtectedPickupCode { get; private set; }
     public bool Reject(DateTimeOffset now)
     {
         if (Status == ExternalDeliveryOfferStatus.Rejected) return false;
         EnsureOpen(now); Status = ExternalDeliveryOfferStatus.Rejected; RespondedAtUtc = now; Version++;
         return true;
     }
-    public void Accept(DateTimeOffset now)
+    public void Accept(DateTimeOffset now, string protectedPickupCode)
     {
-        EnsureOpen(now); Status = ExternalDeliveryOfferStatus.Accepted; RespondedAtUtc = now; Version++;
+        if (string.IsNullOrWhiteSpace(protectedPickupCode)) throw new ArgumentException("A protected pickup code is required.", nameof(protectedPickupCode));
+        EnsureOpen(now); Status = ExternalDeliveryOfferStatus.Accepted; RespondedAtUtc = now;
+        ProtectedPickupCode = protectedPickupCode; Version++;
     }
     public void Expire(DateTimeOffset now)
     {

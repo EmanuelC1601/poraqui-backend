@@ -21,13 +21,19 @@ public interface IExternalCourierRepository
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }
 
+public interface IExternalOfferSecretProtector
+{
+    string Protect(string secret);
+    string Unprotect(string protectedSecret);
+}
+
 public sealed record ExternalOfferView(Guid Id, Guid OrderId, Guid ZoneId, string PickupAddress,
     string DestinationAddress, decimal Remuneration, string? Conditions, DateTimeOffset ExpiresAtUtc, string Status);
 public sealed record ExternalOfferAcceptance(Guid OfferId, string PickupCode, decimal Remuneration);
 public sealed record ExternalOfferDispatchResult(int AvailableCourierCount, int NewOfferCount);
 
 public sealed class ExternalCourierService(IExternalCourierRepository repository, IOrderChangePublisher publisher,
-    IExternalOfferPublisher offerPublisher)
+    IExternalOfferPublisher offerPublisher, IExternalOfferSecretProtector secretProtector)
 {
     public async Task SetAvailabilityAsync(Guid courierId, bool available, Guid? zoneId, CancellationToken ct)
     {
@@ -131,13 +137,21 @@ public sealed class ExternalCourierService(IExternalCourierRepository repository
     public async Task<ExternalOfferAcceptance> AcceptAsync(Guid offerId, Guid courierId, CancellationToken ct)
     {
         var offer = await RequiredOffer(offerId, courierId, ct);
+        if (offer.Status == ExternalDeliveryOfferStatus.Accepted)
+        {
+            var acceptedOrder = await repository.GetOrderAsync(offer.OrderId, ct)
+                ?? throw new KeyNotFoundException("Order was not found.");
+            if (acceptedOrder.CourierUserId != courierId || string.IsNullOrWhiteSpace(offer.ProtectedPickupCode))
+                throw new InvalidOperationException("Accepted offer cannot be replayed by this courier.");
+            return new ExternalOfferAcceptance(offer.Id, secretProtector.Unprotect(offer.ProtectedPickupCode), offer.Remuneration);
+        }
         if (await repository.HasAcceptedOfferAsync(offer.OrderId, ct)) throw new InvalidOperationException("Order already has an accepted external offer.");
         var order = await repository.GetOrderAsync(offer.OrderId, ct) ?? throw new KeyNotFoundException("Order was not found.");
         var pickupCode = OrderAccessCode.Generate();
         var offerVersion = offer.Version;
         try
         {
-            offer.Accept(DateTimeOffset.UtcNow);
+            offer.Accept(DateTimeOffset.UtcNow, secretProtector.Protect(pickupCode));
         }
         catch (InvalidOperationException)
         {

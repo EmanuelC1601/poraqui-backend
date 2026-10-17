@@ -166,7 +166,7 @@ public sealed class PersistenceModelTests
         await using (var db = new AppDbContext(options))
         {
             var service = new ExternalCourierService(new ExternalCourierRepository(db), new NullOrderChangePublisher(),
-                new NullExternalOfferPublisher());
+                new NullExternalOfferPublisher(), new TestExternalOfferSecretProtector());
             await service.AcceptAsync(firstOffer.Id, firstCourier.Id, default);
         }
 

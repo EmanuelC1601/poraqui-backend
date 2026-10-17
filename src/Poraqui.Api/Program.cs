@@ -55,6 +55,8 @@ if (!string.IsNullOrWhiteSpace(connectionString))
     builder.Services.AddScoped<ICatalogOrderRepository, CatalogOrderRepository>();
     builder.Services.AddScoped<CatalogOrderService>();
     builder.Services.AddScoped<IOrderCommandSecretProtector, DataProtectionOrderCommandSecretProtector>();
+    builder.Services.AddScoped<IExternalOfferSecretProtector>(provider =>
+        (IExternalOfferSecretProtector)provider.GetRequiredService<IOrderCommandSecretProtector>());
     builder.Services.AddScoped<IOrderWorkflowRepository, OrderWorkflowRepository>();
     builder.Services.AddScoped<OrderWorkflowService>();
     builder.Services.AddScoped<IExternalCourierRepository, ExternalCourierRepository>();
