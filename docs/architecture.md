@@ -11,6 +11,8 @@ La dependencia de ejecución apunta hacia el dominio. La API registra persistenc
 
 El contexto EF compartido es `AppDbContext` en Infrastructure. El responsable del backend genera y revisa migraciones, y las aplica a la BD de desarrollo tras verificar que son aditivas y preservan los datos. No usar `EnsureDeleted`, reinicios ni migraciones destructivas en esa BD. La API no ejecuta migraciones automáticamente al iniciar.
 
+EF tooling se fija en `.config/dotnet-tools.json`; ejecutar `dotnet tool restore` para usarlo. La factoría de diseño permite crear migraciones sin conexión privada usando una BD local de diseño que nunca se conecta al servidor compartido. La aplicación de migraciones debe usar `ConnectionStrings:DefaultConnection` privada configurada. Comprobantes de transferencia quedan en almacenamiento privado; configura `PrivateFiles:Root` a una ruta persistente fuera de `wwwroot` para el despliegue.
+
 ## Publicación
 
 MonsterASP.NET debe ejecutar `src/Poraqui.Api/Poraqui.Api.csproj` con runtime .NET 9 y recibir `ConnectionStrings__DefaultConnection` desde configuración segura del hosting. La cadena para SQL Server debe tener cifrado TLS habilitado y confiar solo en el certificado configurado por el proveedor.

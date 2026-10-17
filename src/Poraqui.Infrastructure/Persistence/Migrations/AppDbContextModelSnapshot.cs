@@ -175,6 +175,22 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("OwnerUserId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("TransferAccountReference")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("TransferInstitution")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("TransferInstructions")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("TransferRecipientName")
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("OwnerUserId");
@@ -329,6 +345,22 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                     b.Property<decimal>("Total")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("TransferAccountReference")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("TransferInstitution")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("TransferInstructions")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("TransferRecipientName")
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
 
                     b.Property<long>("Version")
                         .IsConcurrencyToken()

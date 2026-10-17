@@ -1,6 +1,6 @@
 # Estado verificable del proyecto
 
-Actualizado: 2026-10-17. `main` contiene PR #1, PR #2 (`a38ed4e`) y PR #3 (`962e74a`). Rama de trabajo: `feature/order-lifecycle`. Esta página diferencia código existente, pruebas ejecutadas y trabajo pendiente.
+Actualizado: 2026-10-17. `main` contiene PR #1 a #4 y apunta a `e9c4435`. Rama de trabajo: `feature/business-payment-details`. Esta página diferencia código existente, pruebas ejecutadas y trabajo pendiente.
 
 ## Implementado y verificado
 
@@ -12,10 +12,12 @@ Actualizado: 2026-10-17. `main` contiene PR #1, PR #2 (`a38ed4e`) y PR #3 (`962e
 - Autorización por rol y recurso para leer/configurar negocio; prueba integrada cubre denegación entre propietarios.
 - PR #2: `dotnet build Poraqui.sln` (0 advertencias/errores), `dotnet test Poraqui.sln` (10/10 SQLite en memoria; API Identity/negocio y dominio/persistencia).
 - En `feature/catalog-pricing` local: rutas CRUD básico de productos, zonas, tarifas; creación de pedido autenticado con totales calculados por productos y tarifa persistidos. Suite actual: build 0 warnings/errors y `dotnet test Poraqui.sln` 11/11 con SQLite aislado, incluyendo permiso entre propietarios, importes autoritativos y recorrido de pedido. Todavía no hay commit/PR para este incremento.
-- En `feature/order-lifecycle` local: evidencia PDF/JPEG/PNG privada, revisión manual, aceptación/rechazo del negocio, inicio/fin de preparación, asignación de courier interno, códigos de seis dígitos persistidos como hash, confirmación separada del pago al courier al recoger, inicio de viaje/contacto autorizado y entrega. Incluye historial append-only y token optimista de concurrencia.
+- PR #4 integrado: evidencia PDF/JPEG/PNG privada, revisión manual, aceptación/rechazo del negocio, inicio/fin de preparación, courier interno, códigos hash, confirmación separada del pago al courier al recoger, contacto autorizado y entrega. Incluye historial y token optimista de concurrencia.
 - Repartidor propio consulta solo asignaciones propias con origen, destino y remuneración. Teléfono de cliente puede actualizarse por cuenta y solo lo recibe el courier asignado al iniciar recorrido.
-- La prueba API integral recorre creación a entrega en SQLite aislado/directorio temporal; una prueba con dos contextos comprueba conflicto ante decisión concurrente. Suite actual pasa 13/13. La rama está todavía sin commit/PR.
+- La prueba API integral recorre creación a entrega en SQLite aislado/directorio temporal; una prueba con dos contextos comprueba conflicto ante decisión concurrente.
 - Migración inicial revisable `InitialCommerceAndIdentity`, snapshot EF y script SQL Server idempotente creados. `dotnet ef migrations has-pending-model-changes` confirma que snapshot coincide. La operación `Up` solo crea tablas/índices.
+- `feature/business-payment-details` local: propietario/admin configura datos de transferencia. Pedido guarda snapshot que solo ve su cliente; el API impide crear el pedido antes de la configuración. Prueba cubre cambio posterior sin alterar pedido previo. Suite actual pasa 14/14 con SQLite y build 0 warnings/errors; aún sin commit/PR.
+- Migración `BusinessTransferInstructionsSnapshot` añade columnas nullable a Businesses y Orders; no aplica cambios destructivos en `Up`. Generada localmente, sin aplicar.
 - API no migra automáticamente al iniciar. La migración inicial está generada pero no aplicada.
 
 ## Pendiente
@@ -24,7 +26,7 @@ Actualizado: 2026-10-17. `main` contiene PR #1, PR #2 (`a38ed4e`) y PR #3 (`962e
 - Opciones de producto; disponibilidad tiene CRUD básico, falta validación por horario.
 - Consulta y actualización del pedido; aceptación/rechazo del negocio, pagos manuales, evidencia privada y confirmación de revisión.
 - Reparto externo: disponibilidad, ofertas, aceptación/rechazo concurrentes, cancelación, vencimiento y ausencia de repartidores.
-- Datos de transferencia del negocio, opciones de productos y disponibilidad por horario; flujo de cancelaciones/reembolsos.
+- Opciones de productos y disponibilidad por horario; flujo de cancelaciones/reembolsos.
 - Verificación de teléfono del cliente antes del contacto.
 - SignalR autorizado, estado tras reconexión, idempotencia, sincronización offline validada, incidencias/reembolsos, métricas y despliegue MonsterASP.NET.
 - Verificar esquema y concurrencia en SQL Server; OpenAPI y recorrido escritos, aún requieren validación de servicio y despliegue.

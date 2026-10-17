@@ -16,6 +16,21 @@ public sealed class CommerceRulesTests
     }
 
     [Fact]
+    public void Business_transfer_instructions_are_validated_and_normalized()
+    {
+        var business = new Business(Guid.NewGuid(), "Tacos", "Centro");
+        Assert.False(business.HasTransferDetails);
+        business.ConfigureTransferDetails("  Taquería  ", " Banco Uno ", " CLABE-TEST-001 ", "  Usa el folio  ");
+
+        Assert.True(business.HasTransferDetails);
+        Assert.Equal("Taquería", business.TransferRecipientName);
+        Assert.Equal("CLABE-TEST-001", business.TransferAccountReference);
+        Assert.Equal("Usa el folio", business.TransferInstructions);
+        Assert.Throws<ArgumentException>(() => business.ConfigureTransferDetails("", "Banco Dos", "Otra cuenta", null));
+        Assert.Equal("CLABE-TEST-001", business.TransferAccountReference);
+    }
+
+    [Fact]
     public void Product_and_delivery_fee_reject_negative_prices()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new CatalogProduct(Guid.NewGuid(), "Taco", -1m));
