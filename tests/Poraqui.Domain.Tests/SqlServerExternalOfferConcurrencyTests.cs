@@ -57,7 +57,8 @@ public sealed class SqlServerExternalOfferConcurrencyTests
                     .AddInterceptors(saveBarrier)
                     .Options;
                 await using var db = new AppDbContext(options);
-                var service = new ExternalCourierService(new ExternalCourierRepository(db), new NullOrderChangePublisher());
+                var service = new ExternalCourierService(new ExternalCourierRepository(db), new NullOrderChangePublisher(),
+                    new NullExternalOfferPublisher());
                 try
                 {
                     var accepted = await service.AcceptAsync(offerId, courierId, CancellationToken.None);

@@ -33,6 +33,7 @@ builder.Services.AddRateLimiter(options =>
 });
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IOrderChangePublisher, SignalROrderChangePublisher>();
+builder.Services.AddScoped<IExternalOfferPublisher, SignalRExternalOfferPublisher>();
 var dataProtection = builder.Services.AddDataProtection().SetApplicationName("Poraqui");
 var dataProtectionKeysPath = builder.Configuration["DataProtection:KeysPath"];
 if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))

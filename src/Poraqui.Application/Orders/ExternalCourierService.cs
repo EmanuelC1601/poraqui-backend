@@ -26,7 +26,8 @@ public sealed record ExternalOfferView(Guid Id, Guid OrderId, Guid ZoneId, strin
 public sealed record ExternalOfferAcceptance(Guid OfferId, string PickupCode, decimal Remuneration);
 public sealed record ExternalOfferDispatchResult(int AvailableCourierCount, int NewOfferCount);
 
-public sealed class ExternalCourierService(IExternalCourierRepository repository, IOrderChangePublisher publisher)
+public sealed class ExternalCourierService(IExternalCourierRepository repository, IOrderChangePublisher publisher,
+    IExternalOfferPublisher offerPublisher)
 {
     public async Task SetAvailabilityAsync(Guid courierId, bool available, Guid? zoneId, CancellationToken ct)
     {
@@ -53,11 +54,19 @@ public sealed class ExternalCourierService(IExternalCourierRepository repository
         var couriers = await repository.GetAvailableCouriersAsync(order.ZoneId, ct);
         var existing = await repository.GetCouriersWithActiveOffersAsync(order.Id, DateTimeOffset.UtcNow, ct);
         var expiresAt = DateTimeOffset.UtcNow.Add(offerDuration);
+        var createdOffers = new List<ExternalDeliveryOffer>();
         foreach (var courierId in couriers)
             if (!existing.Contains(courierId))
-                repository.AddOffer(new ExternalDeliveryOffer(order.Id, courierId, order.ZoneId, pickup, order.DeliveryAddress,
-                    remuneration, conditions, expiresAt));
+            {
+                var offer = new ExternalDeliveryOffer(order.Id, courierId, order.ZoneId, pickup, order.DeliveryAddress,
+                    remuneration, conditions, expiresAt);
+                repository.AddOffer(offer);
+                createdOffers.Add(offer);
+            }
         await repository.SaveChangesAsync(ct);
+        foreach (var offer in createdOffers)
+            await offerPublisher.PublishAvailableAsync(offer.CourierUserId,
+                new ExternalOfferNotice(offer.Id, offer.OrderId), ct);
         return new ExternalOfferDispatchResult(couriers.Count, couriers.Count(courierId => !existing.Contains(courierId)));
     }
 
