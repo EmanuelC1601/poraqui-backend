@@ -225,6 +225,24 @@ public sealed class OrderWorkflowController(OrderWorkflowService workflow, UserM
         catch (DbUpdateConcurrencyException) { return Conflict(new { error = "Order changed; reload its current state." }); }
     }
 
+    [Authorize(Policy = ApplicationPolicies.DeliveryOperations)]
+    [HttpPost("orders/{orderId:guid}/sync/delivery-confirmation")]
+    public async Task<IActionResult> SyncDeliveryConfirmation(Guid orderId, SyncDeliveryConfirmationRequest request, CancellationToken cancellationToken)
+    {
+        if (!TryGetActor(out var courierId, out _)) return Unauthorized();
+        try
+        {
+            return Ok(await workflow.SyncDeliveryConfirmationAsync(orderId, courierId, request.CommandId, request.Code,
+                request.ClientCapturedAtUtc, cancellationToken));
+        }
+        catch (OrderResourceForbiddenException) { return Forbid(); }
+        catch (KeyNotFoundException) { return NotFound(); }
+        catch (OfflineDeliveryCommandConflictException) { return Conflict(new { error = "Command id was already used for a different order or payload." }); }
+        catch (InvalidOperationException exception) { return Conflict(new { error = exception.Message }); }
+        catch (ArgumentException exception) { return BadRequest(new { error = exception.Message }); }
+        catch (DbUpdateConcurrencyException) { return Conflict(new { error = "Order changed; retry the same command id to read its accepted result." }); }
+    }
+
     private async Task<IActionResult> ChangePreparation(Guid businessId, Guid orderId, bool ready, CancellationToken cancellationToken)
     {
         if (!TryGetActor(out var actorId, out _)) return Unauthorized();
@@ -253,3 +271,4 @@ public sealed record BusinessDecisionRequest(bool Accept, string? Reason);
 public sealed record AssignCourierRequest(Guid CourierUserId, decimal CourierPaymentAmount);
 public sealed record PickupCodeRequest(string Code);
 public sealed record BeginDeliveryRequest(string ContactChannel);
+public sealed record SyncDeliveryConfirmationRequest(Guid CommandId, string Code, DateTimeOffset ClientCapturedAtUtc);

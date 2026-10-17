@@ -32,6 +32,11 @@ public sealed class OrderWorkflowRepository(AppDbContext db) : IOrderWorkflowRep
     public Task<string?> GetCustomerPhoneAsync(Guid customerUserId, CancellationToken cancellationToken) =>
         db.Users.Where(user => user.Id == customerUserId).Select(user => user.PhoneNumber).SingleOrDefaultAsync(cancellationToken);
 
+    public Task<OfflineDeliverySyncRecord?> GetOfflineDeliveryCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken) =>
+        db.OfflineDeliverySyncRecords.SingleOrDefaultAsync(command => command.ActorUserId == actorUserId && command.Id == commandId, cancellationToken);
+
+    public void AddOfflineDeliveryCommand(OfflineDeliverySyncRecord command) => db.OfflineDeliverySyncRecords.Add(command);
+
     public async Task SaveChangesAsync(CancellationToken cancellationToken)
     {
         // Status history is append-only. EF's field-backed read-only collection can

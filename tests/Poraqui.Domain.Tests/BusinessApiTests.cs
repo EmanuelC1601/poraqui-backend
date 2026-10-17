@@ -292,10 +292,33 @@ public sealed class BusinessApiTests
         }
         Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(client, HttpMethod.Post,
             $"api/orders/{orderId}/delivery/confirm", courierToken, JsonContent.Create(new { code = "111111" }))).StatusCode);
-        Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Post,
-            $"api/orders/{orderId}/delivery/confirm", courierToken, JsonContent.Create(new { code = customerDeliveryCode }))).StatusCode);
+        var syncCommandId = Guid.NewGuid();
+        var clientCapturedAt = DateTimeOffset.UtcNow.AddMinutes(-2);
+        var offlineCommand = JsonContent.Create(new { commandId = syncCommandId, code = "111111", clientCapturedAtUtc = clientCapturedAt });
         Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(client, HttpMethod.Post,
-            $"api/orders/{orderId}/delivery/confirm", courierToken, JsonContent.Create(new { code = customerDeliveryCode }))).StatusCode);
+            $"api/orders/{orderId}/sync/delivery-confirmation", courierToken, offlineCommand)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await SendAsync(client, HttpMethod.Post,
+            $"api/orders/{orderId}/sync/delivery-confirmation", courierTwoToken,
+            JsonContent.Create(new { commandId = Guid.NewGuid(), code = customerDeliveryCode, clientCapturedAtUtc = clientCapturedAt }))).StatusCode);
+        using (var syncResponse = await SendAsync(client, HttpMethod.Post,
+                   $"api/orders/{orderId}/sync/delivery-confirmation", courierToken,
+                   JsonContent.Create(new { commandId = syncCommandId, code = customerDeliveryCode, clientCapturedAtUtc = clientCapturedAt })))
+        {
+            Assert.Equal(HttpStatusCode.OK, syncResponse.StatusCode);
+            using var syncJson = JsonDocument.Parse(await syncResponse.Content.ReadAsStringAsync());
+            Assert.False(syncJson.RootElement.GetProperty("replayed").GetBoolean());
+        }
+        using (var syncRetry = await SendAsync(client, HttpMethod.Post,
+                   $"api/orders/{orderId}/sync/delivery-confirmation", courierToken,
+                   JsonContent.Create(new { commandId = syncCommandId, code = customerDeliveryCode, clientCapturedAtUtc = clientCapturedAt })))
+        {
+            Assert.Equal(HttpStatusCode.OK, syncRetry.StatusCode);
+            using var retryJson = JsonDocument.Parse(await syncRetry.Content.ReadAsStringAsync());
+            Assert.True(retryJson.RootElement.GetProperty("replayed").GetBoolean());
+        }
+        Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(client, HttpMethod.Post,
+            $"api/orders/{orderId}/sync/delivery-confirmation", courierToken,
+            JsonContent.Create(new { commandId = syncCommandId, code = "111111", clientCapturedAtUtc = clientCapturedAt }))).StatusCode);
 
         using var customerOrderResponse = await SendAsync(client, HttpMethod.Get, $"api/orders/{orderId}", customerToken);
         using var customerOrder = JsonDocument.Parse(await customerOrderResponse.Content.ReadAsStringAsync());
