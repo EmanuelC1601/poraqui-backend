@@ -1,25 +1,29 @@
 # Estado verificable del proyecto
 
-Actualizado: 2026-10-17. `main` es la base de integración y contiene PR #1–#6 (`d39d265`). PR #7 ya se integró en la rama de PR #6 y está preparado en `feature/offline-sync-main` como incremento acotado hacia `main`. PR #8–#21 están en ramas apiladas y fuera de `main`; `feature/backend-integration-verified` contiene esa pila completa. Hay un solo responsable; OpenCode ya no participa.
+Actualizado: 2026-10-17. `main` es la base de integración. PR #1–#7 están integrados; el último merge es `8ed5cb3` (PR #22, sincronización offline). Hay un solo responsable; OpenCode ya no participa. Los siguientes incrementos se crean desde `main` en ramas `feature/*` y se integran por PR después de revisión y verificación.
 
 ## Ledger de funciones
 
 | Estado | Función | Evidencia / pendiente |
 |---|---|---|
-| En `main` | Arquitectura, Identity y permisos por recurso, negocio, catálogo básico, zonas/tarifas, pedido con precio del servidor, transferencia/revisión manual, reparto propio y externo inicial | PR #1–#6, `d39d265` |
-| En PR #7 hacia `main` | Sincronización offline validada por el servidor, con commandId idempotente | `feature/offline-sync-main`; build limpio, 14/14 pruebas SQLite |
-| En la pila, fuera de `main` | SignalR autorizado, opciones/horarios, cancelaciones, incidencias/reembolsos, métricas, OTP, idempotencia de comandos y asignación | PR #8–#21, en `feature/backend-integration-verified` |
+| En `main` | Arquitectura, Identity y permisos por recurso, negocio, catálogo básico, zonas/tarifas, precio calculado por servidor, transferencia/revisión manual, reparto propio/externo inicial y confirmación de entrega offline idempotente | PR #1–#7; último merge `8ed5cb3` |
+| En rama activa | SignalR autenticado por pedido: permisos del suscriptor, snapshot con estado/versión y eventos posteriores al guardado | `feature/comercio-pedidos-next`, `b2d015e` más ajuste local; build 0 warnings/errores y 14/14 pruebas SQLite |
+| Pendiente | Opciones y horarios del catálogo, OTP real, cancelaciones/incidencias/reembolsos, idempotencia de comandos, métricas, despliegue MonsterASP.NET y reconexión desde cliente real | Código previo en ramas apiladas, no integrado; se incorporará incrementalmente solo después de revisión y pruebas |
 | Pendiente | Aceptación simultánea de oferta y asignación simultánea de courier comprobadas en SQL Server | Falta `ConnectionStrings:SqlServerTest` para `PoraquiIntegrationTests` |
 | Pendiente | SMS real, reconexión SignalR desde cliente real, almacenamiento persistente y publicación MonsterASP.NET | Configuración externa no probada |
 | Fuera de alcance | GPS, distancias calculadas, transferencias bancarias automáticas y frontend | Usar zonas/tarifas configuradas y revisión manual |
 
-## Verificación del incremento actual
+## Verificación del último incremento integrado
 
-- Rama: `feature/offline-sync-main`, basada en `origin/main`; commits `cc83f10` y `231315c`.
+- Rama: `feature/offline-sync-main`; PR #22, merge `8ed5cb3`.
 - `dotnet restore Poraqui.sln`: correcto.
 - `dotnet build Poraqui.sln --no-restore`: correcto, 0 advertencias y 0 errores con salida net9.0.
 - `dotnet test Poraqui.sln --no-build --no-restore`: 14/14 aprobadas, SQLite aislado. Se configuró `DOTNET_ROLL_FORWARD=Major` para ejecutar net9.0 con runtime .NET 10 disponible localmente.
-- La migración de este incremento crea una tabla e índice; el script está en `docs/sql/20261017192726_OfflineDeliveryCommandSync.sql`. No se aplicó durante esta verificación.
+- La migración de este incremento agrega una tabla e índice; script en `docs/sql/20261017192726_OfflineDeliveryCommandSync.sql`. No se aplicó durante este PR. En la rama acumulada se había observado su registro en el historial de EF.
+
+## Incremento activo
+
+SignalR notifica cambios de estado a usuarios autenticados suscritos al pedido tras persistir la transición. Cada suscripción comprueba cliente, negocio propietario, courier asignado o administrador y entrega snapshot actual. Tras unirse al grupo se vuelve a leer el snapshot para cubrir transiciones concurrentes con la suscripción. El evento no incluye datos personales. En la rama actual, restore/build pasan (0 warnings/errores) y 14/14 pruebas SQLite pasan. Pendiente: comprobar reconexión con cliente real.
 
 ## SQL Server
 

@@ -24,7 +24,7 @@ public sealed record ExternalOfferView(Guid Id, Guid OrderId, Guid ZoneId, strin
 public sealed record ExternalOfferAcceptance(Guid OfferId, string PickupCode, decimal Remuneration);
 public sealed record ExternalOfferDispatchResult(int AvailableCourierCount, int NewOfferCount);
 
-public sealed class ExternalCourierService(IExternalCourierRepository repository)
+public sealed class ExternalCourierService(IExternalCourierRepository repository, IOrderChangePublisher publisher)
 {
     public async Task SetAvailabilityAsync(Guid courierId, bool available, Guid? zoneId, CancellationToken ct)
     {
@@ -93,6 +93,9 @@ public sealed class ExternalCourierService(IExternalCourierRepository repository
         var profile = await repository.GetAvailabilityAsync(courierId, ct);
         profile?.SetAvailable(false);
         await repository.SaveChangesAsync(ct);
+        var change = order.StatusHistory.OrderByDescending(entry => entry.ChangedAtUtc).First();
+        await publisher.PublishAsync(new OrderChangeNotice(order.Id, order.BusinessId, order.CustomerUserId,
+            order.CourierUserId, order.Status.ToString(), order.Version, change.ChangedAtUtc), ct);
         return new ExternalOfferAcceptance(offer.Id, pickupCode, offer.Remuneration);
     }
 
