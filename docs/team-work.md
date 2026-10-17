@@ -1,21 +1,22 @@
 # Flujo de desarrollo
 
-## Responsable
+## Responsable único
 
-Una persona mantiene todos los módulos: identidad y permisos, comercio, pedidos, pagos manuales, reparto propio y externo, notificaciones, sincronización, métricas, infraestructura y despliegue. Esa persona es también la única responsable de `AppDbContext`, las migraciones y su aplicación a las bases de desarrollo y producción. OpenCode ya no participa; su asignación anterior a reparto se conserva como antecedente y no es un bloqueo.
+Una persona mantiene identidad y permisos, comercio, pedidos, pagos manuales, reparto propio y externo, notificaciones, sincronización, métricas, infraestructura y despliegue. También es propietaria de `AppDbContext`, contratos persistidos, migraciones y su aplicación. OpenCode ya no participa; su asignación previa a reparto se conserva solo como antecedente.
 
-## Archivos y contratos
+## Propiedad de archivos
 
-- `src/Poraqui.Domain/Orders/OrderStatus.cs` y `src/Poraqui.Application/Orders/OrderWorkflowService.cs` definen el flujo operativo implementado; mantener API, mapeos, pruebas y docs sincronizados. El contrato de reparto inicial fue sustituido al implementar el recorrido propio.
-- `src/Poraqui.Infrastructure/Persistence/AppDbContext.cs`, configuración de DI y `src/Poraqui.Infrastructure/Persistence/Migrations/` pertenecen al responsable único del backend.
-- `docs/api-contracts.md` y `docs/project-status.md` son la fuente de estado actual y contratos.
+- `src/Poraqui.Domain/Orders/OrderStatus.cs` y `src/Poraqui.Application/Orders/OrderWorkflowService.cs`: estados y reglas del recorrido.
+- `src/Poraqui.Infrastructure/Persistence/AppDbContext.cs`, configuración EF, `src/Poraqui.Infrastructure/Persistence/Migrations/` y scripts `docs/sql/`: propietario único del esquema, sin cambios paralelos.
+- `docs/api-contracts.md`, `docs/project-status.md`, `docs/handoff-codex.md` y OpenAPI: actualizar junto con cada cambio observable.
+- Controllers coordinan HTTP y autorización; Application aplica casos de uso; Domain concentra invariantes; Infrastructure persiste y protege datos.
 
-## Ramas y base de datos
+## Ramas, PR y bases
 
-`main` es la base de integración. Un solo responsable trabaja en incrementos `feature/*`, con PR, build, pruebas y chequeos SQL Server pertinentes antes de integrar. Actualiza `docs/project-status.md`, `docs/handoff-codex.md` y `docs/api-contracts.md` por incremento. PR #22–#25 están integrados en `main`. El siguiente PR de cancelaciones/incidencias/reembolsos manuales se prepara desde `feature/order-incidents-refunds`. Algunas ramas #11–#21 contienen incrementos que el historial de la BD compartida ya registra; audítalas y reincorpóralas gradualmente antes de migrar.
+`main` es la base de integración. Crear `feature/*` desde `main` actualizado, mantener cambios revisables y abrir PR. Antes de integrar, restaurar, compilar, probar reglas/permisos y revisar el SQL generado. No declarar terminado un módulo por entidades o mapeos sin recorrer sus casos de uso.
 
-Las pruebas que creen o limpien datos usan bases aisladas. La BD de desarrollo puede recibir solo registros identificables de prueba. No borrar ni recrear datos ni reiniciar la BD compartida. No incluir credenciales en Git; usar User Secrets localmente y la configuración privada del hosting en despliegue. La API no aplica migraciones al arrancar.
+La conexión compartida solo se usa para lecturas seguras y datos funcionales identificables. Las pruebas que modifiquen, compitan o limpien datos deben apuntar a una BD aislada. Nunca borrar/recrear/resetear la compartida. Mantener cadenas y secretos en User Secrets o configuración privada del hosting. La API no aplica migraciones al arrancar.
 
 ## Antecedentes
 
-El plan inicial contempló dos agentes y asignó reparto a OpenCode. El equipo cambió a un responsable único antes de integrar PR #1. Los contratos y esa asignación se conservan como antecedentes; no hay dependencia operativa de otra persona.
+El plan inicial contempló dos agentes y asignó reparto a OpenCode. Después se cambió a un responsable único; el contrato provisional de reparto fue sustituido al implementar la API de entrega. PR #1 ya está integrado; las asignaciones previas no implican dependencias operativas.

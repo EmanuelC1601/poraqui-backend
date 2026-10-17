@@ -137,6 +137,17 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasIndex(x => new { x.BusinessId, x.Status, x.CreatedAtUtc });
         });
 
+        builder.Entity<OrderCreationCommand>(entity =>
+        {
+            entity.ToTable("OrderCreationCommands");
+            entity.HasKey(x => new { x.CustomerUserId, x.CommandId });
+            entity.Property(x => x.RequestHash).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.ProtectedDeliveryCode).HasMaxLength(2000).IsRequired();
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CustomerUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Order>().WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.OrderId).IsUnique();
+        });
+
         builder.Entity<OrderLine>(entity =>
         {
             entity.ToTable("OrderLines");

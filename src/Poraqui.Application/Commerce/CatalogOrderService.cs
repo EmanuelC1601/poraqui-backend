@@ -5,6 +5,8 @@ namespace Poraqui.Application.Commerce;
 
 public interface ICatalogOrderRepository
 {
+    Task<OrderCreationCommand?> GetOrderCreationCommandAsync(Guid customerId, Guid commandId, CancellationToken cancellationToken);
+    Task<Order?> GetOrderForCreationReplayAsync(Guid orderId, CancellationToken cancellationToken);
     Task<Business?> GetBusinessAsync(Guid businessId, CancellationToken cancellationToken);
     Task<Business?> GetBusinessOwnedByAsync(Guid businessId, Guid ownerId, CancellationToken cancellationToken);
     Task<CatalogProduct?> GetProductAsync(Guid productId, CancellationToken cancellationToken);
@@ -21,7 +23,14 @@ public interface ICatalogOrderRepository
     Task AddZoneAsync(DeliveryZone zone, CancellationToken cancellationToken);
     Task AddRateAsync(DeliveryRate rate, CancellationToken cancellationToken);
     Task AddOrderAsync(Order order, CancellationToken cancellationToken);
+    Task<bool> SaveOrderCreationAsync(Order order, OrderCreationCommand command, CancellationToken cancellationToken);
     Task SaveChangesAsync(CancellationToken cancellationToken);
+}
+
+public interface IOrderCommandSecretProtector
+{
+    string Protect(string secret);
+    string Unprotect(string protectedSecret);
 }
 
 public sealed record ProductOptionView(Guid Id, string Name, decimal PriceDelta, bool IsAvailable);
@@ -46,7 +55,8 @@ public sealed record CreatedOrderLineView(Guid ProductId, string ProductName, de
     IReadOnlyList<SelectedOrderOptionView> Options);
 public sealed record TransferInstructionsView(string RecipientName, string Institution, string AccountReference, string? Instructions);
 
-public sealed class CatalogOrderService(ICatalogOrderRepository repository, Poraqui.Application.Orders.IOrderChangePublisher publisher)
+public sealed class CatalogOrderService(ICatalogOrderRepository repository, Poraqui.Application.Orders.IOrderChangePublisher publisher,
+    IOrderCommandSecretProtector secretProtector)
 {
     public async Task<IReadOnlyList<ProductView>> GetProductsAsync(Guid businessId, CancellationToken cancellationToken)
     {
@@ -229,12 +239,17 @@ public sealed class CatalogOrderService(ICatalogOrderRepository repository, Pora
     }
 
     public async Task<CreatedOrderView> CreateOrderAsync(Guid customerId, Guid businessId, Guid zoneId,
-        string deliveryAddress, IReadOnlyCollection<OrderItemRequest> requestedItems, CancellationToken cancellationToken)
+        Guid commandId, string deliveryAddress, IReadOnlyCollection<OrderItemRequest> requestedItems, CancellationToken cancellationToken)
     {
+        if (commandId == Guid.Empty) throw new ArgumentException("A command ID is required.", nameof(commandId));
         if (requestedItems.Count == 0) throw new ArgumentException("At least one product is required.", nameof(requestedItems));
         if (requestedItems.Any(item => item.Quantity <= 0)) throw new ArgumentException("Quantities must be positive.", nameof(requestedItems));
         if (requestedItems.Select(item => item.ProductId).Distinct().Count() != requestedItems.Count)
             throw new ArgumentException("Each product may appear only once; combine its quantity.", nameof(requestedItems));
+
+        var requestHash = HashOrderRequest(businessId, zoneId, deliveryAddress, requestedItems);
+        var existing = await repository.GetOrderCreationCommandAsync(customerId, commandId, cancellationToken);
+        if (existing is not null) return await ReplayOrderCreation(existing, requestHash, cancellationToken);
 
         var business = await repository.GetBusinessAsync(businessId, cancellationToken);
         if (business is null || !business.IsActive) throw new ArgumentException("Business is unavailable.", nameof(businessId));
@@ -277,12 +292,47 @@ public sealed class CatalogOrderService(ICatalogOrderRepository repository, Pora
         }
         var deliveryCode = OrderAccessCode.Generate();
         order.SetDeliveryCodeHash(OrderAccessCode.Hash(deliveryCode));
-        await repository.AddOrderAsync(order, cancellationToken);
-        await repository.SaveChangesAsync(cancellationToken);
+        var command = new OrderCreationCommand(customerId, commandId, order.Id, requestHash,
+            secretProtector.Protect(deliveryCode), DateTimeOffset.UtcNow);
+        var saved = await repository.SaveOrderCreationAsync(order, command, cancellationToken);
+        if (!saved)
+        {
+            existing = await repository.GetOrderCreationCommandAsync(customerId, commandId, cancellationToken)
+                ?? throw new InvalidOperationException("The order creation command could not be recovered after a concurrent retry.");
+            return await ReplayOrderCreation(existing, requestHash, cancellationToken);
+        }
         var created = order.StatusHistory.Single();
         await publisher.PublishAsync(new Poraqui.Application.Orders.OrderChangeNotice(order.Id, order.BusinessId,
             order.CustomerUserId, order.CourierUserId, order.Status.ToString(), order.Version, created.ChangedAtUtc), cancellationToken);
         return ToView(order, deliveryCode);
+    }
+
+    private async Task<CreatedOrderView> ReplayOrderCreation(OrderCreationCommand command, string requestHash,
+        CancellationToken cancellationToken)
+    {
+        if (!string.Equals(command.RequestHash, requestHash, StringComparison.Ordinal))
+            throw new OrderCreationCommandConflictException();
+        var order = await repository.GetOrderForCreationReplayAsync(command.OrderId, cancellationToken)
+            ?? throw new InvalidOperationException("The order for a stored creation command was not found.");
+        return ToView(order, secretProtector.Unprotect(command.ProtectedDeliveryCode));
+    }
+
+    private static string HashOrderRequest(Guid businessId, Guid zoneId, string deliveryAddress,
+        IReadOnlyCollection<OrderItemRequest> items)
+    {
+        var canonical = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            businessId,
+            zoneId,
+            deliveryAddress = deliveryAddress.Trim(),
+            items = items.OrderBy(item => item.ProductId).Select(item => new
+            {
+                item.ProductId,
+                item.Quantity,
+                optionIds = (item.OptionIds ?? []).Order().ToArray()
+            }).ToArray()
+        });
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(canonical)));
     }
 
     private static ProductView ToView(CatalogProduct product) => new(product.Id, product.BusinessId, product.Name, product.Price,
@@ -307,6 +357,8 @@ public sealed class CatalogOrderService(ICatalogOrderRepository repository, Pora
             item.Options.Select(option => new SelectedOrderOptionView(option.ProductOptionId, option.Name, option.PriceDelta)).ToArray())).ToArray(), deliveryCode,
         new TransferInstructionsView(order.TransferRecipientName!, order.TransferInstitution!, order.TransferAccountReference!, order.TransferInstructions));
 }
+
+public sealed class OrderCreationCommandConflictException : Exception { }
 
 public static class OrderAccessCode
 {

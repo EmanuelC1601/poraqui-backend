@@ -2538,6 +2538,7 @@
       },
       "CreateOrderRequest": {
         "required": [
+          "commandId",
           "businessId",
           "zoneId",
           "deliveryAddress",
@@ -2545,6 +2546,10 @@
         ],
         "type": "object",
         "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "businessId": {
             "type": "string",
             "format": "uuid"
