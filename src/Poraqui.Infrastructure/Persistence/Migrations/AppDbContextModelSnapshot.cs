@@ -452,6 +452,62 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                     b.ToTable("ExternalDeliveryOffers", (string)null);
                 });
 
+            modelBuilder.Entity("Poraqui.Domain.Orders.ManualRefundCase", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<decimal?>("RefundedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("RequestedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("ReviewedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ReviewedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("nvarchar(24)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId")
+                        .IsUnique();
+
+                    b.HasIndex("RequestedByUserId");
+
+                    b.HasIndex("ReviewedByUserId");
+
+                    b.HasIndex("Status", "CreatedAtUtc");
+
+                    b.ToTable("ManualRefundCases", (string)null);
+                });
+
             modelBuilder.Entity("Poraqui.Domain.Orders.OfflineDeliverySyncRecord", b =>
                 {
                     b.Property<Guid>("ActorUserId")
@@ -488,6 +544,16 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("BusinessId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset?>("CancelledAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CancelledByUserId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("ContactChannel")
@@ -575,6 +641,8 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CancelledByUserId");
+
                     b.HasIndex("CourierPaymentReceivedByUserId");
 
                     b.HasIndex("CourierUserId");
@@ -589,6 +657,57 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                     b.HasIndex("BusinessId", "Status", "CreatedAtUtc");
 
                     b.ToTable("Orders", (string)null);
+                });
+
+            modelBuilder.Entity("Poraqui.Domain.Orders.OrderIncident", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ReportedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("ReporterUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Resolution")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTimeOffset?>("ResolvedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ResolverUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReporterUserId");
+
+                    b.HasIndex("ResolverUserId");
+
+                    b.HasIndex("OrderId", "ReportedAtUtc");
+
+                    b.ToTable("OrderIncidents", (string)null);
                 });
 
             modelBuilder.Entity("Poraqui.Domain.Orders.OrderLine", b =>
@@ -944,6 +1063,26 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Poraqui.Domain.Orders.ManualRefundCase", b =>
+                {
+                    b.HasOne("Poraqui.Domain.Orders.Order", null)
+                        .WithOne("RefundCase")
+                        .HasForeignKey("Poraqui.Domain.Orders.ManualRefundCase", "OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Poraqui.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("RequestedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Poraqui.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("Poraqui.Domain.Orders.OfflineDeliverySyncRecord", b =>
                 {
                     b.HasOne("Poraqui.Infrastructure.Identity.ApplicationUser", null)
@@ -969,6 +1108,11 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
 
                     b.HasOne("Poraqui.Infrastructure.Identity.ApplicationUser", null)
                         .WithMany()
+                        .HasForeignKey("CancelledByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Poraqui.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
                         .HasForeignKey("CourierPaymentReceivedByUserId")
                         .OnDelete(DeleteBehavior.Restrict);
 
@@ -988,6 +1132,26 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                         .HasForeignKey("ZoneId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Poraqui.Domain.Orders.OrderIncident", b =>
+                {
+                    b.HasOne("Poraqui.Domain.Orders.Order", null)
+                        .WithMany("Incidents")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Poraqui.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ReporterUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Poraqui.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ResolverUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Poraqui.Domain.Orders.OrderLine", b =>
@@ -1051,7 +1215,11 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Poraqui.Domain.Orders.Order", b =>
                 {
+                    b.Navigation("Incidents");
+
                     b.Navigation("Items");
+
+                    b.Navigation("RefundCase");
 
                     b.Navigation("StatusHistory");
 

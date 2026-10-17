@@ -1,42 +1,36 @@
 # Handoff de desarrollo
 
-## Base y responsabilidad
+## Responsabilidad y flujo
 
-`main` es la base de integración y está en `d39d265` (PR #1–#6). Un responsable mantiene módulos, contratos, `AppDbContext`, migraciones, pruebas y despliegue. OpenCode ya no participa; la asignación inicial de reparto queda como antecedente. Se trabaja en ramas `feature/*` y se integra mediante PR. Una integración en una rama apilada no equivale a integración en `main`.
+Este repositorio tiene un único responsable para todos los módulos: identidad/permisos, comercio, pedidos, pagos manuales, reparto propio/externo, notificaciones, sincronización, métricas, persistencia, migraciones y despliegue. OpenCode ya no participa; se conserva esa asignación anterior únicamente como antecedente. `main` es la base de integración. Trabajar en `feature/*`, mantener PR pequeños, compilar/probar y revisar migraciones antes de integrar. Actualizar `docs/project-status.md`, `docs/api-contracts.md` y este handoff en cada incremento.
 
-## Ramas y PRs
+## Estado de ramas y PR
 
-- PR #7 (sync offline) está integrado en `feature/external-courier-offers` mediante `fe566db`; aún fuera de `main`.
-- PR #8 (SignalR) está integrado en `feature/offline-delivery-sync` mediante `f7b4c20`; aún fuera de `main`.
-- PR #9 (opciones de catálogo) está integrado en `feature/realtime-order-updates` mediante `6a73c9d`; aún fuera de `main`.
-- PR #10 (horarios de negocio) está abierto desde `feature/business-hours`, basado en `feature/catalog-options`.
-- PR #11 (cancelaciones, incidencias y reembolsos) sigue abierto; PR #12 de métricas está integrado solo en su rama.
-- PR #13 (reintentos de reparto), #14 (OTP) y la pila #18–#21 (idempotencia durable) siguen publicados en ramas; #18–#21 están integrados en `feature/phone-verification`, fuera de `main`.
+- `main` integra PR #1–#6 (`d39d265`).
+- PR #7–#9 fueron integrados en sus ramas apiladas.
+- PR #10 se integró en `feature/catalog-options` con merge commit `fc68274` y ya está cerrado como merged.
+- PR #11 (cancelaciones/incidencias/reembolsos) sigue abierto; contiene PR #12 (métricas) ya integrado en su rama.
+- PR #13–#14 y PR #18–#21 se mantienen en ramas apiladas y todavía no están en `main`.
 
 ## SQL Server y migraciones
 
-`ConnectionStrings:DefaultConnection` está presente en User Secrets y EF pudo leer el historial sin revelar la cadena. EF reporta aplicadas las migraciones hasta `BusinessOpeningHours`; la migración es aditiva. La clave `ConnectionStrings:SqlServerTest` no está configurada, por lo que las pruebas concurrentes que limpian datos deben seguir omitidas. Nunca uses la BD compartida para esas pruebas.
+La clave privada `ConnectionStrings:DefaultConnection` está configurada en User Secrets y EF logró consultar la base SQL Server. El historial lista las migraciones hasta `OrderCancellationAuditConstraints`; `migrations has-pending-model-changes` no detecta desajustes. No se aplicaron migraciones en esta sesión. La API no migra al arrancar.
 
-El responsable único genera, revisa y aplica las migraciones. La API no migra al iniciar. No ejecutar borrados, recreaciones ni reinicios de la BD compartida. No guardar credenciales en Git ni usar contraseñas/datos bancarios tomados del chat.
+`ConnectionStrings:SqlServerTest` no está configurada. Añádela en User Secrets de `src/Poraqui.Api` apuntando a una base SQL Server separada para las pruebas que creen, limpien o compitan por datos. No dirigir esas pruebas a la BD compartida ni borrar, recrear o reiniciar sus datos. Mantener secretos fuera de Git, consola y logs.
 
 ## Build y pruebas
 
-En la rama #10, `dotnet build Poraqui.sln` terminó con 0 advertencias/errores y `dotnet test Poraqui.sln` pasó 15/15 con SQLite y archivos temporales. Como la solución apunta a net9 y aquí solo está instalado runtime net10, se usó `DOTNET_ROLL_FORWARD=Major` para el test host. La prueba SQL Server, restricciones vivas y aceptación simultánea siguen pendientes.
+Sobre la rama de PR #11, incluyendo métricas #12: `dotnet build Poraqui.sln --no-restore` pasa con 0 advertencias/errores; `dotnet test Poraqui.sln --no-build --no-restore` pasa 19/19 con SQLite aislada. Una prueba comprueba traducción de la consulta SQL Server sin conectarse a SQL Server. Este host tiene SDK/runtime .NET 10 mientras la solución apunta a net9; para ejecutar test host usar `$env:DOTNET_ROLL_FORWARD='Major'`. No confundir SQLite/traducción con verificación de restricciones o concurrencia SQL Server.
 
-Para ejecutar localmente:
+El recorrido funcional, endpoints y límites están en `docs/order-flow.md`. Contratos vigentes y ledger verificable están en `docs/api-contracts.md` y `docs/project-status.md`. Para OpenAPI en Development, ejecutar `dotnet run --project src/Poraqui.Api` y consultar `/openapi/v1.json`.
 
-```powershell
-dotnet tool restore
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<cadena privada>" --project src/Poraqui.Api
-dotnet run --project src/Poraqui.Api
-```
+## Próximos pasos
 
-No imprimas ni registres el valor del secreto. Consulta `docs/sql` antes de aplicar cambios. Revisa `docs/project-status.md`, `docs/api-contracts.md` y `docs/order-flow.md` para contratos y estado funcional.
-
-## Siguiente trabajo
-
-Revisar PR #10 actualizado, limpiar `git diff --check` y confirmar que su migración solo agrega columnas y una tabla antes de integrarlo en la base declarada. Después revisar PR #11–#14 y la pila #18–#21; incluir pruebas de permisos, importes, estados, códigos e idempotencia. Completar después pruebas SQL aisladas, OpenAPI/recorrido reproducible y despliegue MonsterASP.
+1. Terminar revisión e integrar PR #11 cuando la rama fuente esté sincronizada con `feature/business-hours` y pase el árbol de merge.
+2. Revisar PR #13–#14 y #18–#21 en orden, con foco en permisos cruzados, transiciones, códigos, concurrencia e idempotencia.
+3. Preparar una BD aislada SQL Server para migraciones/restricciones y pruebas concurrentes; nunca hacer pruebas destructivas sobre la BD compartida.
+4. Completar despliegue MonsterASP.NET, almacenamiento privado persistente y recorrido publicado; validar reconexión SignalR con cliente.
 
 ## Antecedente
 
-El plan inicial repartía comercio y reparto entre Codex y OpenCode. La organización cambió a un único responsable antes de integrar PR #1. Los contratos iniciales de reparto se reemplazaron por el flujo propio/externo actual; la autoría anterior no representa una dependencia operativa.
+El plan inicial dividía comercio y reparto entre Codex y OpenCode. El cambio a responsable único ocurrió antes de integrar PR #1. Los contratos iniciales y esa historia se conservan como contexto; no son una dependencia operativa.

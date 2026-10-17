@@ -117,6 +117,56 @@ public sealed class CommerceRulesTests
     }
 
     [Fact]
+    public void Customer_cancellation_is_limited_to_unpaid_orders_and_same_request_is_idempotent()
+    {
+        var order = CreateOrder();
+        Assert.True(order.CancelByCustomer(order.CustomerUserId, "El cliente cambió de opinión"));
+        Assert.Equal(OrderStatus.Cancelled, order.Status);
+        Assert.Equal(2, order.StatusHistory.Count);
+        Assert.False(order.CancelByCustomer(order.CustomerUserId, "El cliente cambió de opinión"));
+        Assert.Equal(2, order.StatusHistory.Count);
+        Assert.Null(order.RefundCase);
+
+        var other = CreateOrder();
+        other.SubmitTransferEvidence("private/test-proof");
+        Assert.Throws<InvalidOperationException>(() => other.CancelByCustomer(other.CustomerUserId, "Cambio de plan"));
+    }
+
+    [Fact]
+    public void Rejection_after_confirmed_transfer_creates_manual_refund_followup()
+    {
+        var order = CreateOrder();
+        var businessUserId = Guid.NewGuid();
+        order.SubmitTransferEvidence("private/test-proof");
+        order.ReviewTransfer(Guid.NewGuid(), approved: true);
+        order.RejectByBusiness(businessUserId, "No se puede preparar");
+
+        Assert.Equal(OrderStatus.Rejected, order.Status);
+        Assert.Equal(ManualRefundStatus.ReviewRequired, order.RefundCase!.Status);
+        Assert.Equal(order.Total, order.RefundCase.RequestedAmount);
+        Assert.True(order.MarkRefunded(businessUserId, 15m, "REF-TEST-001", "Transferencia manual confirmada"));
+        Assert.False(order.MarkRefunded(businessUserId, 15m, "REF-TEST-001", "Transferencia manual confirmada"));
+        Assert.Equal(15m, order.RefundCase.RefundedAmount);
+        Assert.Equal(ManualRefundStatus.Refunded, order.RefundCase.Status);
+    }
+
+    [Fact]
+    public void Incidents_keep_resolution_history_and_support_safe_retry()
+    {
+        var order = CreateOrder();
+        var reporter = Guid.NewGuid();
+        var resolver = Guid.NewGuid();
+        var incident = order.AddIncident(reporter, "LateDelivery", "El pedido tardó más de lo esperado.");
+
+        Assert.Equal(OrderIncidentStatus.Open, incident.Status);
+        Assert.True(order.ResolveIncident(incident.Id, resolver, "Se contactó al cliente y se atendió el caso."));
+        Assert.False(order.ResolveIncident(incident.Id, resolver, "Se contactó al cliente y se atendió el caso."));
+        Assert.Equal(resolver, incident.ResolverUserId);
+        Assert.Equal(OrderIncidentStatus.Resolved, incident.Status);
+        Assert.Throws<ArgumentException>(() => order.AddIncident(reporter, " ", "Descripción"));
+    }
+
+    [Fact]
     public void Order_preparation_requires_confirmed_order()
     {
         var order = CreateOrder();
