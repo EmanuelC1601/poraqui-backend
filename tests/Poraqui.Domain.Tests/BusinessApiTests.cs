@@ -178,6 +178,15 @@ public sealed class BusinessApiTests
             Assert.Equal(customerPhone, customer!.PhoneNumber);
             Assert.True(customer.PhoneNumberConfirmed);
         }
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            using var allowedPhoneRequest = await SendAsync(client, HttpMethod.Post, "api/account/phone/verification", customerToken,
+                JsonContent.Create(new { phoneNumber = customerPhone }));
+            Assert.Equal(HttpStatusCode.Accepted, allowedPhoneRequest.StatusCode);
+        }
+        using (var rateLimitedPhoneRequest = await SendAsync(client, HttpMethod.Post, "api/account/phone/verification", customerToken,
+                   JsonContent.Create(new { phoneNumber = customerPhone })))
+            Assert.Equal(HttpStatusCode.TooManyRequests, rateLimitedPhoneRequest.StatusCode);
         var requestJson = $$"""{"businessId":"{{businessId}}","zoneId":"{{zoneId}}","deliveryAddress":"Calle de prueba","items":[{"productId":"{{productId}}","quantity":2,"unitPrice":0.01}]}""";
         Assert.Equal(HttpStatusCode.BadRequest, (await SendAsync(client, HttpMethod.Post, "api/orders", customerToken,
             new StringContent(requestJson, Encoding.UTF8, "application/json"))).StatusCode);

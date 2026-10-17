@@ -6,7 +6,7 @@
 
 PR #12 de métricas está integrado en la rama de PR #11 (`d04882a`), no en `main`. PR #13 (`feature/delivery-command-retries`, commit inicial `0b9f2a5`) agrega reintentos idempotentes de recogida/entrega con courier y código válidos. Build y 19 pruebas pasan; se ejecutaron 18 pruebas API sobre SQLite aislado y una traducción de proveedor SQL Server sin conexión. Sin cambios de esquema. PR #13 está abierto contra la rama de PR #11.
 
-PR #14 está abierto: rama `feature/phone-verification`, commit `81f2106`, base `feature/delivery-command-retries` (PR #13). Integra Twilio Verify vía HTTPS para iniciar y validar SMS OTP antes de establecer `PhoneNumberConfirmed`; no persiste códigos ni requiere migración. Configuración privada requerida para uso real: `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid`, `TwilioVerify:ApiKeySecret`. Suite 21/21 y build limpio. Las pruebas API usan un proveedor falso y las pruebas del adaptador usan un transporte HTTP falso; el envío con credenciales reales aún no se ha ejecutado.
+PR #14 está abierto: rama `feature/phone-verification`, commits `81f2106` y `7d7130f`, base `feature/delivery-command-retries` (PR #13). Integra Twilio Verify vía HTTPS para iniciar y validar SMS OTP antes de establecer `PhoneNumberConfirmed`; limita ambos endpoints a cinco solicitudes por IP cada diez minutos, no persiste códigos y no requiere migración. Configuración privada requerida para uso real: `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid`, `TwilioVerify:ApiKeySecret`. Suite 21/21 y build limpio. Las pruebas API usan un proveedor falso y las pruebas del adaptador usan un transporte HTTP falso; el envío con credenciales reales aún no se ha ejecutado.
 
 ## Incremento previo: sincronización offline (PR #7)
 

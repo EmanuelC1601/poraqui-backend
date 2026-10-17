@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Poraqui.Application.Accounts;
 using Poraqui.Infrastructure.Identity;
 
@@ -13,6 +14,7 @@ namespace Poraqui.Api.Controllers;
 public sealed class AccountController(UserManager<ApplicationUser> users, IPhoneVerificationProvider phoneVerification) : ControllerBase
 {
     [HttpPost("phone/verification")]
+    [EnableRateLimiting("PhoneVerification")]
     public async Task<IActionResult> StartPhoneVerification(SetPhoneNumberRequest request, CancellationToken cancellationToken)
     {
         var user = await users.GetUserAsync(User);
@@ -30,6 +32,7 @@ public sealed class AccountController(UserManager<ApplicationUser> users, IPhone
     }
 
     [HttpPost("phone/verification/confirm")]
+    [EnableRateLimiting("PhoneVerification")]
     public async Task<IActionResult> ConfirmPhoneVerification(ConfirmPhoneNumberRequest request, CancellationToken cancellationToken)
     {
         var user = await users.GetUserAsync(User);

@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using System.Threading.RateLimiting;
 using Poraqui.Infrastructure.Identity;
 using Poraqui.Application.Accounts;
 using Poraqui.Infrastructure.Persistence;
@@ -14,6 +16,19 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddSignalR();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("PhoneVerification", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 5,
+            Window = TimeSpan.FromMinutes(10),
+            QueueLimit = 0,
+            AutoReplenishment = true
+        }));
+});
 builder.Services.AddScoped<IOrderChangePublisher, SignalROrderChangePublisher>();
 builder.Services.AddHttpClient<IPhoneVerificationProvider, TwilioVerifyPhoneVerificationProvider>();
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -59,6 +74,7 @@ app.UseHttpsRedirection();
 if (identityConfigured)
 {
     app.UseAuthentication();
+    app.UseRateLimiter();
     app.MapGroup("/api/auth").MapIdentityApi<ApplicationUser>();
     app.MapControllers();
     app.MapHub<OrdersHub>("/hubs/orders");
