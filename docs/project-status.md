@@ -1,10 +1,12 @@
 # Estado verificable del proyecto
 
+La rama de migración de runtime `feature/net10-lts` parte de `feature/phone-verification`. En esta rama, todos los proyectos usan `net10.0`, EF Core y `dotnet-ef` 10.0.13; compilación correcta con 0 advertencias/errores, 24 pruebas aprobadas y 1 prueba SQL Server omitida por falta de `ConnectionStrings__SqlServerTest`. No hay cambios pendientes del modelo ni migración nueva. Este cambio todavía no está publicado en PR. La validación de la aplicación y migraciones contra SQL Server continúa bloqueada por falta de `ConnectionStrings:DefaultConnection` privada.
+
 Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167` y es la base de integración. PR #6 (reparto externo), #7 (sincronización offline), #8 (SignalR), #9 (opciones de catálogo), #10 (horarios) y #11 (cancelaciones/incidencias/reembolsos) están abiertos y apilados en ese orden. PR #12 (métricas) fue integrado en la rama de PR #11 mediante `d04882a`; no está todavía en `main`. El desarrollo tiene un único responsable; las asignaciones previas a OpenCode se conservan como antecedente, sin dependencia operativa.
 
 ## Implementado en `main`
 
-- Solución .NET 9 compilable: Domain, Application, Infrastructure y Api; EF Core SQL Server e Identity con GUID.
+- Solución .NET 9 compilable en `main`; la rama `feature/net10-lts` actualiza Domain, Application, Infrastructure y Api a .NET 10 / EF Core 10.
 - Identity API, roles y policies; negocio con permisos por propietario/recurso.
 - Catálogo básico, zonas, tarifas y pedido con importes calculados por el servidor.
 - Datos de transferencia del negocio y snapshot por pedido; comprobante privado y revisión manual.
