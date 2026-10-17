@@ -82,9 +82,9 @@ Rama `feature/workflow-idempotency`, PR #15: https://github.com/EmanuelC1601/por
 
 Verificado en la rama: `dotnet build Poraqui.sln --no-restore` (0 advertencias/errores), `dotnet test Poraqui.sln` (24/24; base API SQLite temporal, dominio sin BD) y `git diff --check`. No valida concurrencia sobre SQL Server.
 
-## Rama actual: prueba optativa de concurrencia SQL Server
+## Incremento integrado en la rama de PR #14: concurrencia SQL Server
 
-Rama `feature/order-command-idempotency`, basada en `feature/phone-verification` tras integrar PR #15. Añade una prueba de integración que fuerza dos aceptaciones de ofertas a llegar simultáneamente a `SaveChanges`, verifica que solo una asigna al pedido y responde conflicto para la otra. Solo corre cuando `ConnectionStrings__SqlServerTest` apunta a la BD aislada `PoraquiIntegrationTests`; aplica las migraciones en esa base y limpia únicamente los registros con GUID generados por la prueba. El endpoint traduce conflictos de escritura de aceptación a HTTP 409.
+PR #16, rama `feature/order-command-idempotency`, se integró en la rama del PR #14 mediante `5f464c7`; permanece fuera de `main`. Añade una prueba de integración que fuerza dos aceptaciones de ofertas a llegar simultáneamente a `SaveChanges`, verifica que solo una asigna al pedido y responde conflicto para la otra. Solo corre cuando `ConnectionStrings__SqlServerTest` apunta a la BD aislada `PoraquiIntegrationTests`; aplica las migraciones en esa base y limpia únicamente los registros con GUID generados por la prueba. El endpoint traduce conflictos de escritura de aceptación a HTTP 409.
 
 Verificado localmente: `dotnet build Poraqui.sln` (0 advertencias/errores), `dotnet test Poraqui.sln` (24 aprobadas, 1 omitida porque no está configurada `ConnectionStrings__SqlServerTest`), `git diff --check`. Todavía no se ha ejecutado la prueba contra SQL Server.
 

@@ -10,7 +10,7 @@ PR #14 está abierto: rama `feature/phone-verification`, commits `81f2106`, `7d7
 
 PR #15 se integró en `feature/phone-verification` mediante `700355a`; sigue fuera de `main`. Agrega reintentos seguros a decisiones de pago/negocio, preparación, inicio de recorrido y rechazo de oferta. Reintentos aceptados no duplican historial, versión ni evento SignalR; no modifica el esquema.
 
-La rama actual `feature/order-command-idempotency` añade una prueba SQL Server optativa de aceptación simultánea de ofertas. Configura `ConnectionStrings__SqlServerTest` solo con una base aislada `PoraquiIntegrationTests`; la prueba aplica migraciones y limpia solo sus filas propias. Sin la variable, xUnit la reporta omitida. La suite local actual está en 24 aprobadas/1 omitida; el build tiene 0 advertencias/errores. No hay resultado de ejecución contra SQL Server todavía. Los comandos con resultados secretos/creación de recursos aún necesitan clave idempotente durable.
+PR #16 (`feature/order-command-idempotency`) se integró en `feature/phone-verification` mediante `5f464c7`, todavía fuera de `main`. Añade una prueba SQL Server optativa de aceptación simultánea de ofertas. Configura `ConnectionStrings__SqlServerTest` solo con una base aislada `PoraquiIntegrationTests`; la prueba aplica migraciones y limpia solo sus filas propias. Sin la variable, xUnit la reporta omitida. La suite local actual está en 24 aprobadas/1 omitida; el build tiene 0 advertencias/errores. No hay resultado de ejecución contra SQL Server todavía. Los comandos con resultados secretos/creación de recursos aún necesitan clave idempotente durable.
 
 ## Incremento previo: sincronización offline (PR #7)
 
