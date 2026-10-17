@@ -1,4 +1,5 @@
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Poraqui.Application.Commerce;
@@ -17,9 +18,6 @@ public sealed class SqlServerExternalOfferConcurrencyTests
     public async Task Concurrent_acceptance_assigns_the_order_to_exactly_one_external_courier()
     {
         var connectionString = Environment.GetEnvironmentVariable(SqlServerIntegrationFactAttribute.ConnectionStringEnvironmentVariable)!;
-        var connection = new SqlConnectionStringBuilder(connectionString);
-        Assert.Equal(SqlServerIntegrationFactAttribute.RequiredDatabaseName, connection.InitialCatalog,
-            ignoreCase: true);
 
         var setupOptions = new DbContextOptionsBuilder<AppDbContext>().UseSqlServer(connectionString).Options;
         await using var setup = new AppDbContext(setupOptions);
@@ -131,26 +129,34 @@ public sealed class SqlServerExternalOfferConcurrencyTests
 public sealed class SqlServerIntegrationFactAttribute : FactAttribute
 {
     public const string ConnectionStringEnvironmentVariable = "ConnectionStrings__SqlServerTest";
-    public const string RequiredDatabaseName = "PoraquiIntegrationTests";
 
     public SqlServerIntegrationFactAttribute()
     {
         var connectionString = Environment.GetEnvironmentVariable(ConnectionStringEnvironmentVariable);
-        if (string.IsNullOrWhiteSpace(connectionString))
-        {
-            Skip = $"Set {ConnectionStringEnvironmentVariable} to a private connection string for an isolated {RequiredDatabaseName} database.";
-            return;
-        }
+        var sharedConnectionString = new ConfigurationBuilder()
+            .AddUserSecrets<Program>(optional: true)
+            .Build()
+            .GetConnectionString("DefaultConnection");
+        Skip = GetSkipReason(connectionString, sharedConnectionString);
+    }
 
+    internal static string? GetSkipReason(string? connectionString, string? sharedConnectionString)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString))
+            return $"Set {ConnectionStringEnvironmentVariable} to a private connection string for an isolated SQL Server test database.";
+        if (string.IsNullOrWhiteSpace(sharedConnectionString))
+            return "SQL Server integration tests require the private DefaultConnection so the test target can be checked against the shared database.";
         try
         {
-            var builder = new SqlConnectionStringBuilder(connectionString);
-            if (!string.Equals(builder.InitialCatalog, RequiredDatabaseName, StringComparison.OrdinalIgnoreCase))
-                Skip = $"SQL Server integration tests only run against the isolated {RequiredDatabaseName} database.";
+            var testTarget = new SqlConnectionStringBuilder(connectionString);
+            var sharedTarget = new SqlConnectionStringBuilder(sharedConnectionString);
+            if (string.Equals(testTarget.InitialCatalog, sharedTarget.InitialCatalog, StringComparison.OrdinalIgnoreCase))
+                return "SQL Server integration tests cannot target the configured shared development database.";
+            return null;
         }
         catch (ArgumentException)
         {
-            Skip = $"{ConnectionStringEnvironmentVariable} is not a valid SQL Server connection string.";
+            return $"{ConnectionStringEnvironmentVariable} is not a valid SQL Server connection string.";
         }
     }
 }
