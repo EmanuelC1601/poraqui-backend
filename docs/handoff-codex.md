@@ -2,7 +2,7 @@
 
 ## Base, ramas y responsabilidad
 
-`main` contiene PR #1–#5 hasta `d677167` y es la base de integración. PR #6 agrega reparto externo; PR #7 sincronización offline está apilado sobre #6; PR #8 SignalR está apilado sobre #7; PR #9 opciones de catálogo se apila sobre #8; `feature/business-hours` continúa desde PR #9. Un solo responsable mantiene todos los módulos, contratos, `AppDbContext` y migraciones. OpenCode ya no participa; su anterior asignación de reparto se conserva como antecedente.
+`main` contiene PR #1–#5 hasta `d677167` y es la base de integración. PR #6 agrega reparto externo; PR #7 sincronización offline está apilado sobre #6; PR #8 SignalR está apilado sobre #7; PR #9 opciones de catálogo se apila sobre #8; PR #10 horarios se apila sobre #9. Un solo responsable mantiene todos los módulos, contratos, `AppDbContext` y migraciones. OpenCode ya no participa; su anterior asignación de reparto se conserva como antecedente.
 
 ## Incremento previo: sincronización offline (PR #7)
 
@@ -32,7 +32,7 @@ Migración `CatalogProductOptions` crea `ProductOptionGroups`, `ProductOptions` 
 
 ## Incremento actual: horarios del negocio
 
-Rama `feature/business-hours`, continuada desde PR #9. Configura siete días y una zona horaria mediante `PUT /api/businesses/{businessId}/opening-hours`; consulta horario y disponibilidad con `GET /api/businesses/{businessId}/opening-hours`. Los pedidos se rechazan fuera del horario local. Los negocios sin horario conservan temporalmente el comportamiento abierto previo. Migración `BusinessOpeningHours` y script `docs/sql/BusinessOpeningHours.sql`; es aditiva y no aplicada. `dotnet build Poraqui.sln` y `dotnet test Poraqui.sln` pasan (15/15, SQLite temporal); la migración no tiene cambios pendientes del modelo. Falta publicar el PR y validar el script/tipos en SQL Server.
+Rama `feature/business-hours`, commit `d25e64f`, PR #10: https://github.com/EmanuelC1601/poraqui-backend/pull/10. Configura siete días y una zona horaria mediante `PUT /api/businesses/{businessId}/opening-hours`; consulta horario y disponibilidad con `GET /api/businesses/{businessId}/opening-hours`. Los pedidos se rechazan fuera del horario local. Los negocios sin horario conservan temporalmente el comportamiento abierto previo. Migración `BusinessOpeningHours` y script `docs/sql/BusinessOpeningHours.sql`; es aditiva y no aplicada. `dotnet build Poraqui.sln` y `dotnet test Poraqui.sln` pasan (15/15, SQLite temporal); la migración no tiene cambios pendientes del modelo. Falta validación SQL Server.
 
 ## Siguiente trabajo
 

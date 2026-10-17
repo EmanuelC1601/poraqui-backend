@@ -1,6 +1,6 @@
 # Estado verificable del proyecto
 
-Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167`. PR #6 (reparto externo), #7 (sincronización offline), #8 (SignalR) y #9 (opciones de catálogo) están abiertos y apilados sobre `main`. `feature/business-hours` parte de PR #9. `main` es la base de integración. El desarrollo tiene un único responsable; las asignaciones previas a OpenCode se conservan como antecedente, sin dependencia operativa.
+Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167`. PR #6 (reparto externo), #7 (sincronización offline), #8 (SignalR) y #9 (opciones de catálogo) están abiertos y apilados sobre `main`. PR #10 (horarios) se apila sobre #9. `main` es la base de integración. El desarrollo tiene un único responsable; las asignaciones previas a OpenCode se conservan como antecedente, sin dependencia operativa.
 
 ## Implementado en `main`
 
@@ -58,7 +58,7 @@ Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167`. PR #6 (repa
 - PR #9: `feature/catalog-options` en commit `084acb3`, publicado en https://github.com/EmanuelC1601/poraqui-backend/pull/9.
 - Idempotencia para creación de pedidos, pagos y demás operaciones que aún no la tienen.
 - OTP, cancelación del pedido, incidencias y seguimiento completo de reembolsos manuales.
-- El incremento `feature/business-hours` requiere verificaciones finales, publicación de PR y validación SQL Server.
+- PR #10: `feature/business-hours`, commit `d25e64f`, publicado en https://github.com/EmanuelC1601/poraqui-backend/pull/10. Requiere validación SQL Server antes de integrar.
 - Métricas del piloto, instrucciones finales de despliegue en MonsterASP.NET y recorrido SQL Server reproducible.
 
 ## Bloqueado por configuración privada
