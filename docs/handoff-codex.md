@@ -2,22 +2,23 @@
 
 ## Base integrada
 
-`main` es la base de integración y apunta al merge commit `a38ed4e` (PR #2); PR #1 (`e346995`) aportó la arquitectura inicial, entidades de comercio/pedido y mapeos EF. La rama `feature/clean-architecture-foundation` se conserva como antecedente. El flujo actual tiene un único responsable; OpenCode ya no tiene entregas asignadas.
+`main` es la base de integración y apunta al merge commit `962e74a` (PR #3); PR #2 (`a38ed4e`) integró Identity/negocio y PR #1 (`e346995`) aportó arquitectura inicial y entidades/mapeos de comercio/pedido. La rama `feature/clean-architecture-foundation` se conserva como antecedente. El flujo actual tiene un único responsable; OpenCode ya no tiene entregas asignadas.
 
 ## Incremento en curso
 
-PR #2 integró Identity API, roles/policies y registro/configuración/consulta pública de negocios. Los propietarios solo pueden consultar y modificar sus negocios; el test de API cubre denegación entre propietarios. El bootstrap del primer administrador requiere `Bootstrap:AdminKey` privado. `feature/catalog-pricing`, basada en el nuevo `main`, agrega CRUD básico de productos/zonas/tarifas y creación de pedido con precios calculados desde DB. El incremento está en implementación local, aún sin commit/PR. No hay migraciones creadas ni aplicadas.
+PR #2 integró Identity API/negocio (`a38ed4e`); PR #3 integró catálogo básico y pedidos a precios del servidor (`962e74a`). `feature/order-lifecycle`, basada en ese `main`, implementa comprobante privado, revisión manual, decisión de negocio, preparación, courier interno, pago recibido al recoger, contacto autorizado, códigos e historial. Incluye recorrido API completo y prueba de decisión concurrente en SQLite. Rama local sin commit/PR. Se generó la migración EF revisable `InitialCommerceAndIdentity` y el script SQL idempotente; `has-pending-model-changes` reporta modelo sincronizado. No se aplicó. Bootstrap admin requiere `Bootstrap:AdminKey` privado.
 
 ## Verificaciones
 
-El PR #2 pasó `dotnet build Poraqui.sln` (0 advertencias/errores) y `dotnet test Poraqui.sln` (10/10, SQLite en memoria aislado); GitHub reportó cero check runs y el PR se integró como `a38ed4e`. En la rama actual `dotnet build Poraqui.sln` pasa (0 advertencias/errores) y `dotnet test Poraqui.sln` pasa 11/11 (SQLite aislado), incluyendo precios autoritativos y permiso por recurso de catálogo. Estas pruebas no sustituyen SQL Server. No hay migraciones creadas ni aplicadas. El portal MonsterASP respondió a consulta de solo lectura y reportó cero tablas de usuario.
+PR #2 pasó build (0 advertencias/errores) y 10/10 pruebas aisladas; PR #3 pasó build y 11/11 pruebas aisladas. GitHub no tenía check runs configurados; ambos PRs quedaron integrados en main. En la rama actual `dotnet build Poraqui.sln` pasa sin advertencias/errores y `dotnet test Poraqui.sln` pasa 13/13 en SQLite en memoria, con comprobantes en directorio temporal aislado. `dotnet ef migrations has-pending-model-changes` confirma snapshot alineado y script generado desde código con CREATE de esquema nuevo, sin operaciones destructivas en Up. No hay conexión de la aplicación a SQL Server ni migración aplicada. El portal MonsterASP respondió a consulta de solo lectura y reportó cero tablas de usuario.
 
 ## Configuración SQL privada
 
 La aplicación requiere `ConnectionStrings:DefaultConnection` (variable `ConnectionStrings__DefaultConnection`). Está ausente en la configuración privada local comprobada. Configurar sin compartir el valor:
 
+El `UserSecretsId` local del proyecto ya está declarado; agrega la clave sin imprimirla ni compartirla:
+
 ```powershell
-dotnet user-secrets init --project src/Poraqui.Api
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<cadena privada>" --project src/Poraqui.Api
 ```
 
@@ -25,7 +26,7 @@ No usar valores del chat. La API no ejecuta migraciones al arrancar. Cuando est�
 
 ## Pendientes inmediatos
 
-Opciones de producto y horarios; consulta/historial de pedidos y transiciones; aceptación/rechazo del negocio; revisión manual de transferencias y evidencia privada; reparto propio y externo; notificaciones, sincronización, incidencias, métricas, despliegue y recorrido reproducible. El ledger verificable está en `docs/project-status.md`.
+Opciones de producto y horarios; datos de transferencia del negocio; reparto externo; notificaciones SignalR, sincronización/idempotencia, incidencias/reembolsos, métricas y despliegue. El estado verificable está en `docs/project-status.md`; el recorrido API está en `docs/order-flow.md`.
 
 ## Actualización para la siguiente persona/entorno
 

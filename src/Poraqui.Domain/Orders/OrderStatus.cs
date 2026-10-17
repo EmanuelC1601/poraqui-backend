@@ -4,6 +4,7 @@ public enum OrderStatus
 {
     PendingPayment,
     AwaitingPaymentReview,
+    AwaitingBusinessDecision,
     Confirmed,
     Preparing,
     ReadyForPickup,

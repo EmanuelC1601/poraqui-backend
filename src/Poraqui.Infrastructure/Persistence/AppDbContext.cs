@@ -68,6 +68,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(x => x.DeliveryFee).HasPrecision(18, 2);
             entity.Property(x => x.Total).HasPrecision(18, 2);
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(40);
+            entity.Property(x => x.Version).IsConcurrencyToken();
+            entity.Property(x => x.PickupCodeHash).HasMaxLength(128);
+            entity.Property(x => x.DeliveryCodeHash).HasMaxLength(128);
+            entity.Property(x => x.ContactChannel).HasMaxLength(20);
+            entity.Property(x => x.CourierPaymentAmount).HasPrecision(18, 2);
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CourierUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CourierPaymentReceivedByUserId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CustomerUserId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Business>().WithMany().HasForeignKey(x => x.BusinessId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<DeliveryZone>().WithMany().HasForeignKey(x => x.ZoneId).OnDelete(DeleteBehavior.Restrict);
@@ -75,6 +82,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasMany(x => x.TransferReviews).WithOne().HasForeignKey("OrderId").OnDelete(DeleteBehavior.Cascade);
             entity.Navigation(x => x.Items).HasField("_items").UsePropertyAccessMode(PropertyAccessMode.Field);
             entity.Navigation(x => x.TransferReviews).HasField("_transferReviews").UsePropertyAccessMode(PropertyAccessMode.Field);
+            entity.HasMany(x => x.StatusHistory).WithOne().HasForeignKey("OrderId").OnDelete(DeleteBehavior.Cascade);
+            entity.Navigation(x => x.StatusHistory).HasField("_statusHistory").UsePropertyAccessMode(PropertyAccessMode.Field);
             entity.HasIndex(x => new { x.CustomerUserId, x.CreatedAtUtc });
             entity.HasIndex(x => new { x.BusinessId, x.Status, x.CreatedAtUtc });
         });
@@ -96,6 +105,16 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(x => x.Decision).HasConversion<string>().HasMaxLength(20);
             entity.Property(x => x.Note).HasMaxLength(1000);
             entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ReviewerUserId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<OrderStatusChange>(entity =>
+        {
+            entity.ToTable("OrderStatusHistory");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(40);
+            entity.Property(x => x.Reason).HasMaxLength(500).IsRequired();
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActorUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex("OrderId", nameof(OrderStatusChange.ChangedAtUtc));
         });
     }
 }

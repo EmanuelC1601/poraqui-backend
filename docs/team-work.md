@@ -6,13 +6,13 @@ Una persona mantiene todos los módulos: identidad y permisos, comercio, pedidos
 
 ## Archivos y contratos
 
-- `src/Poraqui.Domain/Orders/OrderStatus.cs` y `src/Poraqui.Application/Delivery/DeliveryOrderContracts.cs` son contratos provisionales; mantenerlos alineados con la máquina de estados y casos de uso implementados.
+- `src/Poraqui.Domain/Orders/OrderStatus.cs` y `src/Poraqui.Application/Orders/OrderWorkflowService.cs` definen el flujo operativo implementado; mantener API, mapeos, pruebas y docs sincronizados. El contrato de reparto inicial fue sustituido al implementar el recorrido propio.
 - `src/Poraqui.Infrastructure/Persistence/AppDbContext.cs`, configuración de DI y `src/Poraqui.Infrastructure/Persistence/Migrations/` pertenecen al responsable único del backend.
 - `docs/api-contracts.md` y `docs/project-status.md` son la fuente de estado actual y contratos.
 
 ## Ramas y base de datos
 
-`main` es la base de integración. Trabajar en incrementos pequeños `feature/*`, con PR revisado, `dotnet build Poraqui.sln`, `dotnet test Poraqui.sln` y los chequeos SQL Server pertinentes antes de integrar. Actualizar `docs/project-status.md` y `docs/handoff-codex.md` por incremento. PR #1 está integrado; el ledger detalla qué tiene verificaciones y qué no.
+`main` es la base de integración. Trabajar en incrementos pequeños `feature/*`, con PR revisado, `dotnet build Poraqui.sln`, `dotnet test Poraqui.sln` y los chequeos SQL Server pertinentes antes de integrar. Actualizar `docs/project-status.md`, `docs/handoff-codex.md` y `docs/api-contracts.md` por incremento. PR #1, #2 y #3 están integrados; el ledger detalla verificaciones y pendientes.
 
 Las pruebas que creen o limpien datos usan bases aisladas. La BD de desarrollo puede recibir solo registros identificables de prueba. No borrar ni recrear datos ni reiniciar la BD compartida. No incluir credenciales en Git; usar User Secrets localmente y la configuración privada del hosting en despliegue. La API no aplica migraciones al arrancar.
 
