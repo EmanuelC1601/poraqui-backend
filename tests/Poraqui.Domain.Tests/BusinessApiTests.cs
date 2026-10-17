@@ -3,10 +3,12 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Net.WebSockets;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Poraqui.Application.Security;
+using Poraqui.Application.Orders;
 using Poraqui.Infrastructure.Identity;
 
 namespace Poraqui.Domain.Tests;
@@ -117,6 +119,19 @@ public sealed class BusinessApiTests
         var customerDeliveryCode = orderJson.RootElement.GetProperty("customerDeliveryCode").GetString()!;
         Assert.Equal(6, customerDeliveryCode.Length);
         var orderId = orderJson.RootElement.GetProperty("id").GetGuid();
+        using var realtimeSocket = await ConnectOrdersHubAsync(factory, client, customerToken, orderId);
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await client.PostAsync("hubs/orders/negotiate?negotiateVersion=1", null)).StatusCode);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var customer = await userManager.FindByEmailAsync("customer@example.test");
+            var workflow = scope.ServiceProvider.GetRequiredService<OrderWorkflowService>();
+            var snapshot = await workflow.GetRealtimeSnapshotAsync(orderId, customer!.Id, false, CancellationToken.None);
+            Assert.Equal("PendingPayment", snapshot.Snapshot.Status);
+            Assert.Equal(1, snapshot.Snapshot.Version);
+            Assert.Equal("customer", snapshot.Audience);
+        }
         using (var changedDetails = await SendAsync(client, HttpMethod.Put,
                    $"api/businesses/{businessId}/transfer-details", merchantToken,
                    JsonContent.Create(new { recipientName = "Mercado Poraqui", institution = "Banco de prueba", accountReference = "CLABE-TEST-CHANGED", instructions = "Nueva cuenta." })))
@@ -133,6 +148,18 @@ public sealed class BusinessApiTests
             Assert.True(proofResponse.StatusCode == HttpStatusCode.Accepted,
                 $"Evidence submission returned {(int)proofResponse.StatusCode}: {await proofResponse.Content.ReadAsStringAsync()}");
         }
+        using (var orderChanged = JsonDocument.Parse(await ReceiveSignalRFrameAsync(realtimeSocket)))
+        {
+            Assert.Equal(1, orderChanged.RootElement.GetProperty("type").GetInt32());
+            Assert.Equal("OrderChanged", orderChanged.RootElement.GetProperty("target").GetString());
+            Assert.Equal("AwaitingPaymentReview", orderChanged.RootElement.GetProperty("arguments")[0].GetProperty("status").GetString());
+            Assert.Equal(2, orderChanged.RootElement.GetProperty("arguments")[0].GetProperty("version").GetInt64());
+        }
+        using (var persistedOrder = await SendAsync(client, HttpMethod.Get, $"api/orders/{orderId}", customerToken))
+        {
+            using var persistedJson = JsonDocument.Parse(await persistedOrder.Content.ReadAsStringAsync());
+            Assert.Equal("AwaitingPaymentReview", persistedJson.RootElement.GetProperty("status").GetString());
+        }
         using (var evidence = await SendAsync(client, HttpMethod.Get,
                    $"api/businesses/{businessId}/orders/{orderId}/transfer-evidence", merchantToken))
         {
@@ -146,10 +173,27 @@ public sealed class BusinessApiTests
         otherMerchantToken = await LoginAsync(client, "other-merchant@example.test");
         Assert.Equal(HttpStatusCode.Forbidden, (await SendAsync(client, HttpMethod.Get,
             $"api/businesses/{otherBusinessId}/orders/{orderId}/transfer-evidence", otherMerchantToken)).StatusCode);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var otherMerchant = await userManager.FindByEmailAsync("other-merchant@example.test");
+            var workflow = scope.ServiceProvider.GetRequiredService<OrderWorkflowService>();
+            await Assert.ThrowsAsync<OrderResourceForbiddenException>(() =>
+                workflow.GetRealtimeSnapshotAsync(orderId, otherMerchant!.Id, false, CancellationToken.None));
+        }
 
         Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Post,
             $"api/businesses/{businessId}/orders/{orderId}/payment-review", merchantToken,
             JsonContent.Create(new { approved = true, note = "Transferencia localizada" }))).StatusCode);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var merchant = await userManager.FindByEmailAsync("merchant@example.test");
+            var workflow = scope.ServiceProvider.GetRequiredService<OrderWorkflowService>();
+            var snapshot = await workflow.GetRealtimeSnapshotAsync(orderId, merchant!.Id, false, CancellationToken.None);
+            Assert.Equal("AwaitingBusinessDecision", snapshot.Snapshot.Status);
+            Assert.Equal("business", snapshot.Audience);
+        }
         Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(client, HttpMethod.Post,
             $"api/businesses/{businessId}/orders/{orderId}/payment-review", merchantToken,
             JsonContent.Create(new { approved = true, note = "Reintento" }))).StatusCode);
@@ -357,5 +401,47 @@ public sealed class BusinessApiTests
         using var request = new HttpRequestMessage(method, path) { Content = content };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return await client.SendAsync(request);
+    }
+
+    private static async Task<WebSocket> ConnectOrdersHubAsync(ApiTestHost factory, HttpClient client, string accessToken, Guid orderId)
+    {
+        var negotiateUrl = $"hubs/orders/negotiate?negotiateVersion=1&access_token={Uri.EscapeDataString(accessToken)}";
+        using var negotiate = await client.PostAsync(negotiateUrl, null);
+        Assert.Equal(HttpStatusCode.OK, negotiate.StatusCode);
+        using var negotiateJson = JsonDocument.Parse(await negotiate.Content.ReadAsStringAsync());
+        var connectionToken = negotiateJson.RootElement.GetProperty("connectionToken").GetString()!;
+        var socketClient = factory.Server.CreateWebSocketClient();
+        var socketUri = new Uri($"ws://localhost/hubs/orders?id={Uri.EscapeDataString(connectionToken)}&access_token={Uri.EscapeDataString(accessToken)}");
+        var socket = await socketClient.ConnectAsync(socketUri, CancellationToken.None);
+        await SendSignalRFrameAsync(socket, "{\"protocol\":\"json\",\"version\":1}");
+        using (var handshake = JsonDocument.Parse(await ReceiveSignalRFrameAsync(socket)))
+            Assert.False(handshake.RootElement.TryGetProperty("error", out _));
+        await SendSignalRFrameAsync(socket,
+            $"{{\"type\":1,\"invocationId\":\"subscribe-1\",\"target\":\"SubscribeOrder\",\"arguments\":[\"{orderId}\"]}}");
+        using var subscription = JsonDocument.Parse(await ReceiveSignalRFrameAsync(socket));
+        Assert.Equal("subscribe-1", subscription.RootElement.GetProperty("invocationId").GetString());
+        Assert.Equal("PendingPayment", subscription.RootElement.GetProperty("result").GetProperty("status").GetString());
+        return socket;
+    }
+
+    private static async Task SendSignalRFrameAsync(WebSocket socket, string json)
+    {
+        var bytes = Encoding.UTF8.GetBytes(json + "\u001e");
+        await socket.SendAsync(bytes, WebSocketMessageType.Text, true, CancellationToken.None);
+    }
+
+    private static async Task<string> ReceiveSignalRFrameAsync(WebSocket socket)
+    {
+        var buffer = new byte[4096];
+        using var message = new MemoryStream();
+        while (true)
+        {
+            var received = await socket.ReceiveAsync(buffer, CancellationToken.None);
+            if (received.MessageType == WebSocketMessageType.Close) throw new InvalidOperationException("SignalR socket closed before a frame arrived.");
+            message.Write(buffer, 0, received.Count);
+            var content = Encoding.UTF8.GetString(message.GetBuffer(), 0, checked((int)message.Length));
+            var separator = content.IndexOf('\u001e');
+            if (separator >= 0) return content[..separator];
+        }
     }
 }

@@ -24,10 +24,16 @@ Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167`. PR #6 (`fea
 - Reintento igual reproduce la aceptación guardada sin duplicar historial; mismo ID con payload/orden distinto da conflicto. Código inválido no consume el ID.
 - Registro idempotente y transición de pedido se guardan en la misma transacción; la migración agrega una tabla nueva.
 
+## Rama actual apilada: SignalR de pedidos
+
+- Hub autenticado `/hubs/orders`; la negociación acepta `access_token` únicamente en la ruta del hub.
+- `SubscribeOrder` comprueba la relación de usuario con el pedido y devuelve una instantánea persistida con estado y versión. Los eventos `OrderChanged` salen después del guardado, solo a los grupos autorizados por pedido y sin datos personales.
+- Al reconectar, el cliente vuelve a suscribirse y recibe el estado vigente. El fallo de publicación se registra y no cambia la respuesta de una transición ya persistida.
+
 ## Verificaciones actuales
 
-- Build: `dotnet build Poraqui.sln`, 0 advertencias y 0 errores después de implementar sync.
-- Pruebas: `dotnet test Poraqui.sln`, 14/14; SQLite en memoria y archivos temporales. Incluye recorrido de pago/reparto, autorización del courier asignado, código inválido, reintento sin duplicar historial y colisión de clave idempotente.
+- Build: `dotnet build Poraqui.sln`, 0 advertencias y 0 errores después del incremento SignalR.
+- Pruebas: `dotnet test Poraqui.sln`, 14/14 con SQLite en memoria y archivos temporales. El recorrido incluye WebSocket SignalR real en TestServer: el cliente autorizado recibe `OrderChanged` después del guardado y luego lee el estado persistido. También cubre negociación anónima rechazada y otro negocio sin acceso a la instantánea.
 - Migraciones `ExternalCourierOffers` y `OfflineDeliveryCommandSync` tienen scripts revisables. `has-pending-model-changes` se verificó después de crear migración de sync y no indicó cambios del modelo.
 - Portal MonsterASP, solo lectura: `dbo` aparece sin tablas. Esto informa el esquema actual; no verifica conexión EF ni restricciones/carreras SQL Server.
 
@@ -35,7 +41,7 @@ Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167`. PR #6 (`fea
 
 - Verificar migraciones, restricciones y aceptación simultánea en SQL Server antes de integrar PR #6/#7.
 - Prueba de aceptación simultánea de ofertas y ejecución/revisión de migraciones en SQL Server.
-- SignalR tras persistencia, destinatarios autorizados y lectura de estado al reconectar.
+- Probar reconexión SignalR en cliente real; la suscripción ya devuelve instantánea persistida al reconectar.
 - Idempotencia para creación de pedidos, pagos y demás operaciones que aún no la tienen.
 - Catálogo de opciones, horarios, OTP, cancelación del pedido, incidencias y seguimiento completo de reembolsos manuales.
 - Métricas del piloto, instrucciones finales de despliegue en MonsterASP.NET y recorrido SQL Server reproducible.
