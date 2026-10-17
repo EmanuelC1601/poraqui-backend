@@ -13,7 +13,7 @@ Estado: `main` es la base única de integración. Este documento describe los co
 
 ## Pedido, pago y entrega
 
-- Cliente crea con `POST /api/orders`. Requiere `commandId` GUID estable por intento lógico. Repetir ID con mismo payload devuelve mismo pedido y código; payload distinto con el mismo ID da 409. La migración aditiva `OrderCreationCommandIdempotency` está integrada en PR #29; no se ejecutó en SQL Server.
+- Cliente crea con `POST /api/orders`. Requiere `commandId` GUID estable por intento lógico. Repetir ID con mismo payload devuelve mismo pedido y código; payload distinto con el mismo ID da 409. La migración aditiva `OrderCreationCommandIdempotency` está integrada en PR #29.
 - Cliente sube comprobante privado a `POST /api/orders/{id}/transfer-evidence` como multipart `commandId` + `file`. PR #30 requiere `commandId` en multipart, devuelve replay con el mismo ID/hash y 409 si contenido/orden difiere; migración aditiva integrada. Negocio revisa pago manualmente, acepta/rechaza, inicia preparación y marca listo.
 - Reparto propio: admin habilita rol y negocio asigna con monto pagadero al recoger. `POST /api/orders/{id}/pickup` valida el código y registra pago negocio→repartidor por separado del pago cliente→negocio.
 - Reparto externo: admin habilita perfil; courier marca disponibilidad/zona; negocio publica oferta con origen, destino, condiciones y remuneración; courier acepta/rechaza. La asignación acepta solo un ganador y cancela/vence ofertas según flujo persistido.
@@ -28,4 +28,4 @@ Hub autenticado `/hubs/orders`; `SubscribeOrder(orderId)` valida cliente, negoci
 
 ## Operación y límites
 
-No se ejecuta migración al iniciar la API. Migraciones y scripts revisables están bajo `src/Poraqui.Infrastructure/Persistence/Migrations` y `docs/sql`. `ConnectionStrings:SqlServerTest` debe apuntar a una base aislada para verificar SQL Server. Sin GPS ni distancia inferida; no hay llamadas automáticas de WhatsApp, OTP productivo ni pagos bancarios automáticos.
+No se ejecuta migración al iniciar la API. Migraciones y scripts revisables están bajo `src/Poraqui.Infrastructure/Persistence/Migrations` y `docs/sql`. Una consulta de solo lectura al historial SQL Server del 2026-10-17 confirmó que todas las migraciones actuales están aplicadas. `ConnectionStrings:SqlServerTest` debe apuntar a una base aislada para verificar concurrencia. Sin GPS ni distancia inferida; no hay llamadas automáticas de WhatsApp, OTP productivo ni pagos bancarios automáticos.

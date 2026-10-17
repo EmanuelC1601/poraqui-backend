@@ -14,8 +14,8 @@ Actualizado: 2026-10-17. `main` es la base de integración y tiene un único res
 | Integrado | Idempotencia de asignación de courier propio y persistencia protegida del código de recogida | PR #31, merge `cf3da9f`; prueba API de replay y conflictos |
 | Integrado | Pruebas guardadas de concurrencia SQL Server para aceptación simultánea de oferta externa y asignación interna; conflicto concurrente de oferta responde 409 | PR #32, merge `22cec11`; ambos casos requieren la conexión aislada indicada abajo |
 | Integrado | `GET /api/admin/metrics/pilot`, limitado a PlatformAdmin; agrega pedidos por intervalo UTC, importe bruto, estados, tiempo medio, incidencias abiertas y reembolsos por revisar | PR #33, merge `bddc081`; prueba de permiso/rango/valores y traducción de consultas comprobada con proveedor SQL Server sin abrir conexión |
-| Pendiente | OTP con proveedor real; aplicar migraciones en SQL Server compartido tras reconciliar historial; ejecutar carreras SQL de concurrencia; prueba de reconexión SignalR con cliente real; despliegue MonsterASP.NET | No integrado o no verificado en SQL Server |
-| Bloqueado por configuración | Ejecutar carreras y verificar índices/restricciones/migraciones con SQL Server | Falta `ConnectionStrings__SqlServerTest` apuntando a la base aislada `PoraquiIntegrationTests`; no se ejecutaron migraciones |
+| Pendiente | OTP con proveedor real; ejecutar carreras SQL de concurrencia; prueba de reconexión SignalR con cliente real; despliegue MonsterASP.NET | No integrado o no verificado en SQL Server |
+| Bloqueado por configuración | Ejecutar carreras reales en SQL Server | Falta `ConnectionStrings__SqlServerTest` apuntando a la base aislada `PoraquiIntegrationTests`; las pruebas se omiten mientras tanto |
 | Fuera de alcance | GPS, distancias estimadas, transferencias bancarias automáticas y frontend | Se usan zonas/tarifas configuradas y revisión manual |
 
 ## Verificaciones de la rama activa
@@ -24,4 +24,4 @@ PR #29–#33: restore/build (0 advertencias/errores), 22 pruebas SQLite correcta
 
 ## SQL Server privado
 
-`ConnectionStrings:DefaultConnection` existe en User Secrets y una lectura de solo consulta confirmó conexión al servidor y acceso al historial; no imprimir la cadena. `ConnectionStrings:SqlServerTest` falta. Para ejecutar pruebas SQL, configura la variable privada `ConnectionStrings__SqlServerTest` y apunta exclusivamente al catálogo aislado `PoraquiIntegrationTests`. La API nunca migra al iniciar. Revisar y conciliar el historial completo antes de aplicar nuevas migraciones a la BD compartida.
+`ConnectionStrings:DefaultConnection` existe en User Secrets. El 2026-10-17, `dotnet ef migrations list` conectó en modo de consulta y devolvió las 12 migraciones de `main`, sin entradas pendientes. Ninguna migración se ejecutó durante esta revisión. `ConnectionStrings:SqlServerTest` falta; configura esa clave privada exclusivamente para una BD aislada cuyo catálogo sea `PoraquiIntegrationTests`. La API nunca migra al iniciar. Antes de una futura aplicación en la BD compartida, revisa el SQL generado y concilia el historial; no usar pruebas concurrentes ni limpieza en esa BD.
