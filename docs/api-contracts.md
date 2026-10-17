@@ -76,7 +76,7 @@ Cada transición de pedido incrementa `Order.Version`; la persistencia detecta e
 - `POST /api/orders` rechaza nuevos pedidos cuando el negocio está cerrado según su zona horaria. Los negocios sin horario configurado mantienen temporalmente su disponibilidad actual.
 - Migración `BusinessOpeningHours` añade `Businesses.TimeZoneId`, `Businesses.HasConfiguredOpeningHours` y una tabla con clave primaria `(BusinessId, Day)`. `docs/sql/BusinessOpeningHours.sql` es aditivo y no aplicado. Pruebas actuales con SQLite; falta verificar migración y tipo `time` en SQL Server.
 
-## En desarrollo: cancelaciones, incidencias y reembolsos manuales (`feature/order-cancellations-refunds-incidents`, basada en PR #10)
+## PR #11 abierto: cancelaciones, incidencias y reembolsos manuales (`feature/order-cancellations-refunds-incidents`, basada en PR #10)
 
 - Cliente cancela con `POST /api/orders/{id}/cancel` solo antes de enviar comprobante; propietario/admin usa `POST /api/businesses/{businessId}/orders/{orderId}/cancel` antes de asignar courier. Si hay ofertas externas abiertas, se cancelan en el mismo guardado. Reintentar con el mismo actor y motivo no duplica historial.
 - Cancelar un pedido con comprobante enviado o pago confirmado crea un caso `ReviewRequired`; rechazo del negocio después del pago aprobado también lo crea. El cliente ve solo `refundStatus` en su consulta de pedido. Negocio/admin revisa el caso en `GET .../refund` y registra el resultado manualmente con `POST .../refund-review` (`refunded`, `amount`, `reference`, `note`); el importe se limita al total. No se inicia una transferencia bancaria.

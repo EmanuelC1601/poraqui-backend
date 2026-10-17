@@ -1,6 +1,6 @@
 # Estado verificable del proyecto
 
-Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167`. PR #6 (reparto externo), #7 (sincronización offline), #8 (SignalR), #9 (opciones de catálogo) y #10 (horarios) están abiertos y apilados. `feature/order-cancellations-refunds-incidents` continúa desde PR #10. `main` es la base de integración. El desarrollo tiene un único responsable; las asignaciones previas a OpenCode se conservan como antecedente, sin dependencia operativa.
+Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167` y es la base de integración. PR #6 (reparto externo), #7 (sincronización offline), #8 (SignalR), #9 (opciones de catálogo), #10 (horarios) y #11 (cancelaciones/incidencias/reembolsos) están abiertos y apilados en ese orden. El desarrollo tiene un único responsable; las asignaciones previas a OpenCode se conservan como antecedente, sin dependencia operativa.
 
 ## Implementado en `main`
 
@@ -42,7 +42,9 @@ Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167`. PR #6 (repa
 - La creación valida la hora local del negocio. El comportamiento previo sigue hasta que el comercio configura su horario.
 - Migración aditiva `BusinessOpeningHours` y script `docs/sql/BusinessOpeningHours.sql`; no aplicado. Pruebas nuevas cubren horario local, cierre, rango y permisos entre negocios.
 
-## Rama actual: cancelaciones, incidencias y reembolsos manuales
+## PR #11 abierto: cancelaciones, incidencias y reembolsos manuales
+
+Rama `feature/order-cancellations-refunds-incidents`, commit `1347648`, PR https://github.com/EmanuelC1601/poraqui-backend/pull/11, basado en PR #10.
 
 - Cliente cancela solo antes de enviar comprobante; negocio/admin puede cancelar antes de asignar courier. Las ofertas externas abiertas se cancelan junto con el pedido. La repetición del mismo comando de cancelación no duplica historial.
 - Si hay evidencia de transferencia enviada o el pago fue aprobado, se crea un caso de revisión manual. Rechazar un pedido con transferencia aprobada también crea el caso. El negocio registra si reembolsó manualmente, el importe y referencia; el cliente ve solo el estado del caso.
@@ -65,7 +67,7 @@ Actualizado: 2026-10-17. `main` contiene PR #1–#5 hasta `d677167`. PR #6 (repa
 - PR #9: `feature/catalog-options` en commit `084acb3`, publicado en https://github.com/EmanuelC1601/poraqui-backend/pull/9.
 - OTP e idempotencia general de operaciones que aún no la tienen.
 - PR #10: `feature/business-hours`, commit `d25e64f`, publicado en https://github.com/EmanuelC1601/poraqui-backend/pull/10. Requiere validación SQL Server antes de integrar.
-- El incremento de cancelaciones/incidencias/reembolsos está en `feature/order-cancellations-refunds-incidents`; falta verificar migraciones en SQL Server y publicar PR.
+- El incremento de cancelaciones/incidencias/reembolsos está en PR #11; falta verificar migraciones en SQL Server antes de integrar.
 - Métricas del piloto, instrucciones finales de despliegue en MonsterASP.NET y recorrido SQL Server reproducible.
 
 ## Bloqueado por configuración privada

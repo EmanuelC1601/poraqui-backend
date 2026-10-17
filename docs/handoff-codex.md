@@ -2,7 +2,7 @@
 
 ## Base, ramas y responsabilidad
 
-`main` contiene PR #1–#5 hasta `d677167` y es la base de integración. PR #6 agrega reparto externo; PR #7 sincronización offline está apilado sobre #6; PR #8 SignalR está apilado sobre #7; PR #9 opciones de catálogo se apila sobre #8; PR #10 horarios se apila sobre #9; la rama actual de cancelaciones/incidencias/reembolsos continúa desde #10. Un solo responsable mantiene todos los módulos, contratos, `AppDbContext` y migraciones. OpenCode ya no participa; su anterior asignación de reparto se conserva como antecedente.
+`main` contiene PR #1–#5 hasta `d677167` y es la base de integración. PR #6 agrega reparto externo; PR #7 sincronización offline está apilado sobre #6; PR #8 SignalR está apilado sobre #7; PR #9 opciones de catálogo se apila sobre #8; PR #10 horarios se apila sobre #9; PR #11 cancelaciones/incidencias/reembolsos continúa desde #10. Un solo responsable mantiene todos los módulos, contratos, `AppDbContext` y migraciones. OpenCode ya no participa; su anterior asignación de reparto se conserva como antecedente.
 
 ## Incremento previo: sincronización offline (PR #7)
 
@@ -36,10 +36,10 @@ Rama `feature/business-hours`, commit `d25e64f`, PR #10: https://github.com/Eman
 
 ## Incremento actual: cancelaciones, incidencias y reembolsos manuales
 
-La rama `feature/order-cancellations-refunds-incidents` implementa cancelación del cliente antes del comprobante y cancelación del negocio antes de asignar courier. Las ofertas externas abiertas se cancelan en el mismo guardado. Evidencia enviada o pago aprobado crea seguimiento manual; rechazo del negocio tras aprobación también lo crea. El negocio registra resolución/refund de forma manual, el cliente consulta estado. Los participantes autorizados reportan incidencias y el negocio/admin resuelve. Cambios se guardan en historial/versionado y notifican después de persistir.
+Rama `feature/order-cancellations-refunds-incidents`, commit `1347648`, PR #11: https://github.com/EmanuelC1601/poraqui-backend/pull/11, basado en PR #10. Implementa cancelación del cliente antes del comprobante y cancelación del negocio antes de asignar courier. Las ofertas externas abiertas se cancelan en el mismo guardado. Evidencia enviada o pago aprobado crea seguimiento manual; rechazo del negocio tras aprobación también lo crea. El negocio registra resolución/refund de forma manual, el cliente consulta estado. Los participantes autorizados reportan incidencias y el negocio/admin resuelve. Cambios se guardan en historial/versionado y notifican después de persistir.
 
-Migraciones `OrderCancellationRefundsIncidents` y `OrderCancellationAuditConstraints`; script `docs/sql/OrderCancellationRefundsIncidents.sql`, no aplicados. `dotnet test Poraqui.sln` pasa 18/18 con SQLite temporal; se debe verificar migración SQL Server y concurrencia antes de integrar. PR todavía pendiente.
+Migraciones `OrderCancellationRefundsIncidents` y `OrderCancellationAuditConstraints`; script `docs/sql/OrderCancellationRefundsIncidents.sql`, no aplicados. `dotnet build Poraqui.sln` pasa sin advertencias/errores y `dotnet test Poraqui.sln --no-build` pasa 18/18 con SQLite temporal; EF no detecta cambios pendientes del modelo. Se debe verificar migración SQL Server y concurrencia antes de integrar PR #11.
 
 ## Siguiente trabajo
 
-Completar OTP, idempotencia de los comandos restantes, métricas y despliegue. Reconexión SignalR de cliente real y pruebas SQL Server siguen pendientes. Los PR #6–#10 están publicados pero no integrados porque sus cambios incluyen migraciones sin validar en la BD configurada. Ver contratos y ledger en `docs/api-contracts.md` y `docs/project-status.md`.
+Completar OTP, idempotencia de los comandos restantes, métricas y despliegue. Reconexión SignalR de cliente real y pruebas SQL Server siguen pendientes. Los PR #6–#11 están publicados pero no integrados porque sus cambios incluyen migraciones sin validar en la BD configurada. Ver contratos y ledger en `docs/api-contracts.md` y `docs/project-status.md`.
