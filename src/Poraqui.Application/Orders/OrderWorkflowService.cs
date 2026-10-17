@@ -12,6 +12,7 @@ public interface IOrderWorkflowRepository
     Task<bool> BusinessBelongsToAsync(Guid businessId, Guid ownerUserId, CancellationToken cancellationToken);
     Task<string?> GetCustomerPhoneAsync(Guid customerUserId, CancellationToken cancellationToken);
     Task<OfflineDeliverySyncRecord?> GetOfflineDeliveryCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken);
+    Task CancelOpenExternalOffersForOrderAsync(Guid orderId, CancellationToken cancellationToken);
     void AddOfflineDeliveryCommand(OfflineDeliverySyncRecord command);
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }
@@ -30,10 +31,15 @@ public sealed record OrderWorkflowView(Guid Id, string OrderNumber, Guid Custome
     Guid? CourierUserId, string DeliveryAddress, decimal Subtotal, decimal DeliveryFee, decimal Total,
     decimal? CourierPaymentAmount, bool CourierPaymentReceived, string Status, DateTimeOffset CreatedAtUtc,
     DateTimeOffset? DeliveryStartedAtUtc, DateTimeOffset? DeliveredAtUtc, IReadOnlyList<OrderWorkflowLine> Items,
-    IReadOnlyList<OrderWorkflowHistory> History, TransferInstructionsView? TransferInstructions);
+    IReadOnlyList<OrderWorkflowHistory> History, TransferInstructionsView? TransferInstructions, string? RefundStatus = null);
 public sealed record CourierAssignment(string PickupCode, decimal PaymentAmount, OrderWorkflowView Order);
 public sealed record CustomerContact(string? PhoneNumber, string WhatsAppDialString, string Channel);
 public sealed record OfflineDeliverySyncResult(Guid CommandId, Guid OrderId, string Status, DateTimeOffset AcceptedAtUtc, bool Replayed);
+public sealed record OrderIncidentView(Guid Id, Guid ReporterUserId, string Category, string Description,
+    string Status, DateTimeOffset ReportedAtUtc, Guid? ResolverUserId, string? Resolution, DateTimeOffset? ResolvedAtUtc);
+public sealed record ManualRefundView(Guid Id, Guid OrderId, decimal RequestedAmount, string Status, decimal? RefundedAmount,
+    string? Reference, string? Note, Guid RequestedByUserId, DateTimeOffset CreatedAtUtc,
+    Guid? ReviewedByUserId, DateTimeOffset? ReviewedAtUtc);
 public sealed record OrderRealtimeSnapshot(Guid OrderId, string Status, long Version, DateTimeOffset ChangedAtUtc);
 public sealed record OrderRealtimeSubscription(OrderRealtimeSnapshot Snapshot, string Audience);
 
@@ -69,7 +75,8 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IO
             CourierPaymentAmount = null,
             CourierPaymentReceived = false,
             TransferInstructions = order.TransferRecipientName is null ? null : new TransferInstructionsView(
-                order.TransferRecipientName, order.TransferInstitution!, order.TransferAccountReference!, order.TransferInstructions)
+                order.TransferRecipientName, order.TransferInstitution!, order.TransferAccountReference!, order.TransferInstructions),
+            RefundStatus = order.RefundCase?.Status.ToString()
         };
     }
 
@@ -89,6 +96,103 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IO
         EnsureCourier(order, courierId);
         var address = await repository.GetBusinessAddressAsync(order.BusinessId, cancellationToken) ?? string.Empty;
         return ToView(order, address);
+    }
+
+    public async Task<OrderWorkflowView?> CancelForCustomerAsync(Guid orderId, Guid customerId, string reason,
+        CancellationToken cancellationToken)
+    {
+        var order = await repository.GetOrderAsync(orderId, cancellationToken);
+        if (order is null) return null;
+        if (order.CustomerUserId != customerId) throw new OrderResourceForbiddenException();
+        if (order.CancelByCustomer(customerId, reason))
+        {
+            await repository.SaveChangesAsync(cancellationToken);
+            await PublishChange(order, cancellationToken);
+        }
+        return ToView(order, await repository.GetBusinessAddressAsync(order.BusinessId, cancellationToken) ?? string.Empty);
+    }
+
+    public async Task<OrderWorkflowView?> CancelForBusinessAsync(Guid businessId, Guid orderId, Guid actorId,
+        bool isAdmin, string reason, CancellationToken cancellationToken)
+    {
+        var order = await repository.GetOrderAsync(orderId, cancellationToken);
+        if (order is null || order.BusinessId != businessId) return null;
+        await EnsureBusinessAccess(businessId, actorId, isAdmin, cancellationToken);
+        if (order.CancelByBusiness(actorId, reason))
+        {
+            await repository.CancelOpenExternalOffersForOrderAsync(orderId, cancellationToken);
+            await repository.SaveChangesAsync(cancellationToken);
+            await PublishChange(order, cancellationToken);
+        }
+        return ToView(order, await repository.GetBusinessAddressAsync(order.BusinessId, cancellationToken) ?? string.Empty);
+    }
+
+    public async Task<IReadOnlyList<OrderIncidentView>> GetIncidentsAsync(Guid orderId, Guid actorId, bool isAdmin,
+        CancellationToken cancellationToken)
+    {
+        var order = await RequiredOrder(orderId, cancellationToken);
+        await EnsureOrderParticipant(order, actorId, isAdmin, cancellationToken);
+        return order.Incidents.OrderBy(incident => incident.ReportedAtUtc).Select(ToView).ToArray();
+    }
+
+    public async Task<OrderIncidentView> ReportIncidentAsync(Guid orderId, Guid actorId, bool isAdmin,
+        string category, string description, CancellationToken cancellationToken)
+    {
+        var order = await RequiredOrder(orderId, cancellationToken);
+        await EnsureOrderParticipant(order, actorId, isAdmin, cancellationToken);
+        var incident = order.AddIncident(actorId, category, description);
+        await repository.SaveChangesAsync(cancellationToken);
+        await PublishChange(order, cancellationToken);
+        return ToView(incident);
+    }
+
+    public async Task<OrderIncidentView?> ResolveIncidentAsync(Guid businessId, Guid orderId, Guid incidentId,
+        Guid actorId, bool isAdmin, string resolution, CancellationToken cancellationToken)
+    {
+        var order = await repository.GetOrderAsync(orderId, cancellationToken);
+        if (order is null || order.BusinessId != businessId) return null;
+        await EnsureBusinessAccess(businessId, actorId, isAdmin, cancellationToken);
+        var changed = order.ResolveIncident(incidentId, actorId, resolution);
+        if (changed)
+        {
+            await repository.SaveChangesAsync(cancellationToken);
+            await PublishChange(order, cancellationToken);
+        }
+        return order.Incidents.SingleOrDefault(item => item.Id == incidentId) is { } incident ? ToView(incident) : null;
+    }
+
+    public async Task<ManualRefundView?> GetRefundCaseAsync(Guid businessId, Guid orderId, Guid actorId, bool isAdmin,
+        CancellationToken cancellationToken)
+    {
+        var order = await repository.GetOrderAsync(orderId, cancellationToken);
+        if (order is null || order.BusinessId != businessId) return null;
+        await EnsureBusinessAccess(businessId, actorId, isAdmin, cancellationToken);
+        return order.RefundCase is null ? null : ToView(order.RefundCase);
+    }
+
+    public async Task<ManualRefundView?> ReviewRefundCaseAsync(Guid businessId, Guid orderId, Guid actorId, bool isAdmin,
+        bool refunded, decimal? amount, string? reference, string? note, CancellationToken cancellationToken)
+    {
+        var order = await repository.GetOrderAsync(orderId, cancellationToken);
+        if (order is null || order.BusinessId != businessId) return null;
+        await EnsureBusinessAccess(businessId, actorId, isAdmin, cancellationToken);
+        var changed = refunded
+            ? order.MarkRefunded(actorId, amount ?? throw new ArgumentException("Refund amount is required.", nameof(amount)),
+                reference ?? throw new ArgumentException("Refund reference is required.", nameof(reference)), note)
+            : order.MarkRefundNotRequired(actorId, note ?? throw new ArgumentException("A review reason is required.", nameof(note)));
+        if (changed)
+        {
+            await repository.SaveChangesAsync(cancellationToken);
+            await PublishChange(order, cancellationToken);
+        }
+        return ToView(order.RefundCase!);
+    }
+
+    private async Task EnsureOrderParticipant(Order order, Guid actorId, bool isAdmin, CancellationToken cancellationToken)
+    {
+        if (!isAdmin && order.CustomerUserId != actorId && order.CourierUserId != actorId &&
+            !await repository.BusinessBelongsToAsync(order.BusinessId, actorId, cancellationToken))
+            throw new OrderResourceForbiddenException();
     }
 
     public async Task<OrderRealtimeSubscription> GetRealtimeSnapshotAsync(Guid orderId, Guid actorId, bool isAdmin,
@@ -256,6 +360,14 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IO
             item.Options.Select(option => new SelectedOrderOptionView(option.ProductOptionId, option.Name, option.PriceDelta)).ToArray())).ToArray(),
         order.StatusHistory.OrderBy(entry => entry.ChangedAtUtc)
             .Select(entry => new OrderWorkflowHistory(entry.ActorUserId, entry.Status.ToString(), entry.ChangedAtUtc, entry.Reason)).ToArray(), null);
+
+    private static OrderIncidentView ToView(OrderIncident incident) => new(incident.Id, incident.ReporterUserId,
+        incident.Category, incident.Description, incident.Status.ToString(), incident.ReportedAtUtc,
+        incident.ResolverUserId, incident.Resolution, incident.ResolvedAtUtc);
+
+    private static ManualRefundView ToView(ManualRefundCase refund) => new(refund.Id, refund.OrderId,
+        refund.RequestedAmount, refund.Status.ToString(), refund.RefundedAmount, refund.Reference, refund.Note,
+        refund.RequestedByUserId, refund.CreatedAtUtc, refund.ReviewedByUserId, refund.ReviewedAtUtc);
 }
 
 public sealed class OrderResourceForbiddenException : Exception { }

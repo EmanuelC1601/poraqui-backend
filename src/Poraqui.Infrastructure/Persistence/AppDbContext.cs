@@ -105,6 +105,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(x => x.OrderNumber).HasMaxLength(40).IsRequired();
             entity.HasIndex(x => x.OrderNumber).IsUnique();
             entity.Property(x => x.DeliveryAddress).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.CancellationReason).HasMaxLength(500);
             entity.Property(x => x.DeliveryFee).HasPrecision(18, 2);
             entity.Property(x => x.Total).HasPrecision(18, 2);
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(40);
@@ -120,6 +121,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CourierUserId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CourierPaymentReceivedByUserId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CustomerUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CancelledByUserId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Business>().WithMany().HasForeignKey(x => x.BusinessId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<DeliveryZone>().WithMany().HasForeignKey(x => x.ZoneId).OnDelete(DeleteBehavior.Restrict);
             entity.HasMany(x => x.Items).WithOne().HasForeignKey("OrderId").OnDelete(DeleteBehavior.Cascade);
@@ -128,6 +130,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Navigation(x => x.TransferReviews).HasField("_transferReviews").UsePropertyAccessMode(PropertyAccessMode.Field);
             entity.HasMany(x => x.StatusHistory).WithOne().HasForeignKey("OrderId").OnDelete(DeleteBehavior.Cascade);
             entity.Navigation(x => x.StatusHistory).HasField("_statusHistory").UsePropertyAccessMode(PropertyAccessMode.Field);
+            entity.HasMany(x => x.Incidents).WithOne().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Cascade);
+            entity.Navigation(x => x.Incidents).HasField("_incidents").UsePropertyAccessMode(PropertyAccessMode.Field);
+            entity.HasOne(x => x.RefundCase).WithOne().HasForeignKey<ManualRefundCase>(x => x.OrderId).OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(x => new { x.CustomerUserId, x.CreatedAtUtc });
             entity.HasIndex(x => new { x.BusinessId, x.Status, x.CreatedAtUtc });
         });
@@ -149,6 +154,34 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Name).HasMaxLength(120).IsRequired();
             entity.Property(x => x.PriceDelta).HasPrecision(18, 2);
+        });
+
+        builder.Entity<OrderIncident>(entity =>
+        {
+            entity.ToTable("OrderIncidents");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Category).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(2000).IsRequired();
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            entity.Property(x => x.Resolution).HasMaxLength(2000);
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ReporterUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ResolverUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => new { x.OrderId, x.ReportedAtUtc });
+        });
+
+        builder.Entity<ManualRefundCase>(entity =>
+        {
+            entity.ToTable("ManualRefundCases");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.RequestedAmount).HasPrecision(18, 2);
+            entity.Property(x => x.RefundedAmount).HasPrecision(18, 2);
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(24);
+            entity.Property(x => x.Reference).HasMaxLength(160);
+            entity.Property(x => x.Note).HasMaxLength(1000);
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.RequestedByUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ReviewedByUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.OrderId).IsUnique();
+            entity.HasIndex(x => new { x.Status, x.CreatedAtUtc });
         });
 
         builder.Entity<TransferReview>(entity =>
