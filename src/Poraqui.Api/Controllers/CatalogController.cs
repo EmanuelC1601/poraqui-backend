@@ -45,6 +45,50 @@ public sealed class CatalogController(CatalogOrderService catalog, UserManager<A
         catch (ArgumentException exception) { return BadRequest(new { error = exception.Message }); }
     }
 
+    [Authorize(Policy = ApplicationPolicies.ManageBusiness)]
+    [HttpPost("products/{productId:guid}/option-groups")]
+    public async Task<IActionResult> AddOptionGroup(Guid productId, OptionGroupRequest request, CancellationToken cancellationToken)
+    {
+        if (!TryGetActor(out var actorId, out var isAdmin)) return Unauthorized();
+        try
+        {
+            var group = await catalog.AddOptionGroupAsync(productId, actorId, isAdmin, request, cancellationToken);
+            return group is null ? NotFound() : Created($"/api/option-groups/{group.Id}", group);
+        }
+        catch (BusinessAuthorizationException) { return Forbid(); }
+        catch (ArgumentException exception) { return BadRequest(new { error = exception.Message }); }
+    }
+
+    [Authorize(Policy = ApplicationPolicies.ManageBusiness)]
+    [HttpPut("option-groups/{optionGroupId:guid}/availability")]
+    public async Task<IActionResult> SetOptionGroupAvailability(Guid optionGroupId, AvailabilityRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetActor(out var actorId, out var isAdmin)) return Unauthorized();
+        try
+        {
+            var group = await catalog.SetOptionGroupAvailabilityAsync(optionGroupId, actorId, isAdmin,
+                request.IsAvailable, cancellationToken);
+            return group is null ? NotFound() : Ok(group);
+        }
+        catch (BusinessAuthorizationException) { return Forbid(); }
+    }
+
+    [Authorize(Policy = ApplicationPolicies.ManageBusiness)]
+    [HttpPut("product-options/{optionId:guid}/availability")]
+    public async Task<IActionResult> SetOptionAvailability(Guid optionId, AvailabilityRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetActor(out var actorId, out var isAdmin)) return Unauthorized();
+        try
+        {
+            var option = await catalog.SetOptionAvailabilityAsync(optionId, actorId, isAdmin,
+                request.IsAvailable, cancellationToken);
+            return option is null ? NotFound() : Ok(option);
+        }
+        catch (BusinessAuthorizationException) { return Forbid(); }
+    }
+
     [AllowAnonymous]
     [HttpGet("delivery-zones/active")]
     public async Task<IActionResult> GetZones(CancellationToken cancellationToken) => Ok(await catalog.GetZonesAsync(cancellationToken));
