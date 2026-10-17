@@ -46,9 +46,11 @@ public sealed class ExternalDeliveryOffer
     public DateTimeOffset? RespondedAtUtc { get; private set; }
     public ExternalDeliveryOfferStatus Status { get; private set; }
     public long Version { get; private set; } = 1;
-    public void Reject(DateTimeOffset now)
+    public bool Reject(DateTimeOffset now)
     {
+        if (Status == ExternalDeliveryOfferStatus.Rejected) return false;
         EnsureOpen(now); Status = ExternalDeliveryOfferStatus.Rejected; RespondedAtUtc = now; Version++;
+        return true;
     }
     public void Accept(DateTimeOffset now)
     {

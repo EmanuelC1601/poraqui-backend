@@ -161,8 +161,32 @@ public sealed class BusinessApiTests
 
         await RegisterAsync(client, "customer@example.test");
         var customerToken = await LoginAsync(client, "customer@example.test");
-        Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put, "api/account/phone", customerToken,
-            JsonContent.Create(new { phoneNumber = "+52 55 1234 5678" }))).StatusCode);
+        const string customerPhone = "+525512345678";
+        using (var startPhoneVerification = await SendAsync(client, HttpMethod.Post, "api/account/phone/verification", customerToken,
+                   JsonContent.Create(new { phoneNumber = customerPhone })))
+            Assert.Equal(HttpStatusCode.Accepted, startPhoneVerification.StatusCode);
+        using (var rejectedPhoneCode = await SendAsync(client, HttpMethod.Post, "api/account/phone/verification/confirm", customerToken,
+                   JsonContent.Create(new { phoneNumber = customerPhone, code = "000000" })))
+            Assert.Equal(HttpStatusCode.BadRequest, rejectedPhoneCode.StatusCode);
+        using (var confirmPhoneVerification = await SendAsync(client, HttpMethod.Post, "api/account/phone/verification/confirm", customerToken,
+                   JsonContent.Create(new { phoneNumber = customerPhone, code = "123456" })))
+            Assert.Equal(HttpStatusCode.NoContent, confirmPhoneVerification.StatusCode);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var customer = await users.FindByEmailAsync("customer@example.test");
+            Assert.Equal(customerPhone, customer!.PhoneNumber);
+            Assert.True(customer.PhoneNumberConfirmed);
+        }
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            using var allowedPhoneRequest = await SendAsync(client, HttpMethod.Post, "api/account/phone/verification", customerToken,
+                JsonContent.Create(new { phoneNumber = customerPhone }));
+            Assert.Equal(HttpStatusCode.Accepted, allowedPhoneRequest.StatusCode);
+        }
+        using (var rateLimitedPhoneRequest = await SendAsync(client, HttpMethod.Post, "api/account/phone/verification", customerToken,
+                   JsonContent.Create(new { phoneNumber = customerPhone })))
+            Assert.Equal(HttpStatusCode.TooManyRequests, rateLimitedPhoneRequest.StatusCode);
         var requestJson = $$"""{"businessId":"{{businessId}}","zoneId":"{{zoneId}}","deliveryAddress":"Calle de prueba","items":[{"productId":"{{productId}}","quantity":2,"unitPrice":0.01}]}""";
         Assert.Equal(HttpStatusCode.BadRequest, (await SendAsync(client, HttpMethod.Post, "api/orders", customerToken,
             new StringContent(requestJson, Encoding.UTF8, "application/json"))).StatusCode);
@@ -260,11 +284,25 @@ public sealed class BusinessApiTests
         Assert.Equal(HttpStatusCode.Forbidden, (await SendAsync(client, HttpMethod.Put,
             $"api/option-groups/{optionGroupId}/availability", otherMerchantToken,
             JsonContent.Create(new { isAvailable = false }))).StatusCode);
+        var incidentCommandId = Guid.NewGuid();
+        var incidentRequest = new { commandId = incidentCommandId, category = "OrderQuestion", description = "El cliente solicita una actualización." };
         using var reportedIncidentResponse = await SendAsync(client, HttpMethod.Post, $"api/orders/{orderId}/incidents", customerToken,
-            JsonContent.Create(new { category = "OrderQuestion", description = "El cliente solicita una actualización." }));
+            JsonContent.Create(incidentRequest));
         Assert.Equal(HttpStatusCode.OK, reportedIncidentResponse.StatusCode);
         using var reportedIncidentJson = JsonDocument.Parse(await reportedIncidentResponse.Content.ReadAsStringAsync());
         var incidentId = reportedIncidentJson.RootElement.GetProperty("id").GetGuid();
+        using (var replayedIncidentResponse = await SendAsync(client, HttpMethod.Post, $"api/orders/{orderId}/incidents", customerToken,
+                   JsonContent.Create(incidentRequest)))
+        {
+            using var replayedIncidentJson = JsonDocument.Parse(await replayedIncidentResponse.Content.ReadAsStringAsync());
+            Assert.Equal(HttpStatusCode.OK, replayedIncidentResponse.StatusCode);
+            Assert.Equal(incidentId, replayedIncidentJson.RootElement.GetProperty("id").GetGuid());
+        }
+        Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(client, HttpMethod.Post, $"api/orders/{orderId}/incidents", customerToken,
+            JsonContent.Create(new { commandId = incidentCommandId, category = "OrderQuestion", description = "Otro contenido" }))).StatusCode);
+        using (var incidentList = await SendAsync(client, HttpMethod.Get, $"api/orders/{orderId}/incidents", customerToken))
+        using (var incidentListJson = JsonDocument.Parse(await incidentList.Content.ReadAsStringAsync()))
+            Assert.Single(incidentListJson.RootElement.EnumerateArray());
         Assert.Equal(HttpStatusCode.Forbidden, (await SendAsync(client, HttpMethod.Get,
             $"api/orders/{orderId}/incidents", otherMerchantToken)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await SendAsync(client, HttpMethod.Post,
@@ -351,13 +389,16 @@ public sealed class BusinessApiTests
             Assert.Equal("AwaitingBusinessDecision", snapshot.Snapshot.Status);
             Assert.Equal("business", snapshot.Audience);
         }
+        Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Post,
+            $"api/businesses/{businessId}/orders/{orderId}/payment-review", merchantToken,
+            JsonContent.Create(new { approved = true, note = "Transferencia localizada" }))).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(client, HttpMethod.Post,
             $"api/businesses/{businessId}/orders/{orderId}/payment-review", merchantToken,
-            JsonContent.Create(new { approved = true, note = "Reintento" }))).StatusCode);
+            JsonContent.Create(new { approved = true, note = "Nota distinta" }))).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Post,
             $"api/businesses/{businessId}/orders/{orderId}/decision", merchantToken,
             JsonContent.Create(new { accept = true, reason = "" }))).StatusCode);
-        Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(client, HttpMethod.Post,
+        Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Post,
             $"api/businesses/{businessId}/orders/{orderId}/decision", merchantToken,
             JsonContent.Create(new { accept = true, reason = "" }))).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Post,

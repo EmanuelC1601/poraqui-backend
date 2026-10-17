@@ -1,35 +1,34 @@
 # Estado verificable del proyecto
 
-Actualizado: 2026-10-17. `main` integra PR #1–#6. PR #7–#13 se han integrado en ramas de trabajo apiladas, todavía fuera de `main`. PR #10 se integró en `feature/catalog-options` (`fc68274`), PR #11/#12 en `feature/business-hours` (`efa53d9`) y PR #13 en `feature/order-cancellations-refunds-incidents` (`634590c`). PR #14 y #18–#21 siguen en sus pilas, fuera de `main`. El equipo trabaja con un único responsable; OpenCode ya no participa.
+Actualizado: 2026-10-17. `main` integra PR #1–#6 (`d39d265`). PR #7–#13 están integrados en ramas apiladas, todavía fuera de `main`: PR #10 quedó en `feature/catalog-options` (`fc68274`), PR #11/#12 en `feature/business-hours` (`efa53d9`) y PR #13 en `feature/order-cancellations-refunds-incidents` (`634590c`). PR #14 está abierto desde `feature/phone-verification`; esa rama también contiene los PR #15–#18 ya integrados dentro de la pila. PR #19–#21 siguen en ramas posteriores. Hay un solo responsable; OpenCode ya no participa.
 
-## Implementado
+## Implementado en el código disponible
 
-- En `main` (PR #1–#6): Clean Architecture compilable; Identity, roles y autorización por recurso; alta/configuración de comercio, catálogo básico, zonas/tarifas y pedidos calculados por el servidor; transferencia manual, comprobante privado, revisión, preparación, repartidor propio, códigos, estados e historial; reparto externo con ofertas, disponibilidad, expiración, cancelación y aceptación exclusiva.
-- En ramas apiladas #7–#10: sincronización offline de entrega con validación/idempotencia; SignalR con audiencias autorizadas y snapshot; opciones/precios del catálogo con snapshots; horarios y zona horaria local.
-- En ramas apiladas: cancelación, auditoría, reembolsos, incidencias y métricas (PR #11–#12); reintento seguro de recogida/entrega con el mismo código (PR #13).
-- La API no migra al iniciar. No se borraron ni recrearon datos compartidos.
+- Clean Architecture, ASP.NET Core Web API, EF Core SQL Server e Identity con roles/permisos por negocio y recurso.
+- Registro/configuración del negocio, catálogo, opciones, disponibilidad, zonas, tarifas y pedidos con importes calculados en servidor.
+- Datos de transferencia por negocio y snapshot por pedido; comprobante privado y revisión manual; aceptación/rechazo del negocio, preparación explícita y auditoría.
+- Courier propio y externo: oferta con origen/destino/condiciones/remuneración, disponibilidad, expiración, rechazo/cancelación y asignación única; pago del courier registrado al recoger, códigos de recogida/entrega, contacto autorizado y estados/historial.
+- Horarios locales; cancelaciones, incidencias, reembolsos manuales y métricas protegidas; SignalR autorizado con snapshot actual; confirmación offline validada e idempotencia de varios comandos.
+- Verificación de teléfono con Twilio Verify y límite de solicitudes; idempotencia durable de reportes de incidencias.
 
-## Pendiente o bloqueado
+## Estado de integración y pendientes
 
-| Función | Estado verificable |
-|---|---|
-| Integrar PR #7–#13 hasta `main` | Pendiente; #7–#13 están integrados en ramas apiladas, fuera de `main`. |
-| OTP de teléfono | PR #14 en pila; proveedor/configuración real pendientes. |
-| Reintentos/idempotencia durable para comandos y altas | PR #13 añade repetición segura de recogida/entrega. OTP/idempotencia durable y asignación siguen en PR #14 y #18–#21; verificar e integrar en orden. |
-| Revisión SQL Server de restricciones y aceptación/asignación concurrente | Bloqueada para pruebas automatizadas aisladas por falta de `ConnectionStrings:SqlServerTest`. La conexión privada `DefaultConnection` sí permite consultar historial. |
-| Prueba de reconexión SignalR con cliente real | Pendiente; el hub devuelve snapshot persistido al suscribirse. |
-| Despliegue MonsterASP.NET, almacenamiento privado persistente y recorrido publicado | Pendiente. |
-| GPS/distancias automáticas, transferencias bancarias automáticas y frontend | Fuera de alcance. |
+| Módulo | Estado | Pendiente verificable |
+|---|---|---|
+| PR #1–#6, incluido flujo comercio/pedido y reparto externo | Integrado en `main` | Persistencia de comprobantes en hosting y prueba SQL Server de concurrencia. |
+| PR #7–#13, sync offline, SignalR, opciones, horarios, cancelación/métricas y reintentos de recogida/entrega | Integrados en ramas de trabajo | Llevar la pila a `main`; probar SQL Server aislado y reconexión con cliente real. |
+| PR #14, SMS OTP, junto con PR #15–#18 apilados | En `feature/phone-verification`; PR #14 abierto | Configurar Twilio privado y hacer envío SMS real. PR #18 tiene migración aplicada, faltan carreras SQL Server para comandos duplicados. |
+| PR #19–#21, idempotencia de creación de pedidos, comprobantes y asignación | Ramas apiladas posteriores | Revisar e integrar en orden; verificar concurrencia y reintentos. |
+| MonsterASP.NET | Pendiente | Variables privadas, ruta persistente de archivos, WebSockets y recorrido publicado. |
+| GPS/distancias automáticas, transferencias bancarias automáticas y frontend | Fuera de alcance | Se usan zonas y tarifas configuradas. |
 
-## Verificación de este incremento
+## Verificación de la rama actual
 
-- Rama probada: `feature/delivery-command-retries`, luego integrada en `feature/order-cancellations-refunds-incidents`.
-- `dotnet build Poraqui.sln --no-restore`: correcto, 0 advertencias y 0 errores; tests net9 requieren `DOTNET_ROLL_FORWARD=Major` en este host con runtime .NET 10.
-- `dotnet test Poraqui.sln --no-build --no-restore`: 19/19 con SQLite aislada (incluye una prueba de traducción SQL Server, sin conexión SQL). PR #13 añade repetición de recogida/entrega sin nuevo historial ni versión.
-- `git diff --check`: limpio antes de este cambio documental.
-- EF Core contra la configuración privada `ConnectionStrings:DefaultConnection` lista las migraciones hasta `OrderCancellationAuditConstraints` y `has-pending-model-changes` confirma que el modelo coincide. Esto confirma conectividad e historial, no ejecuta una prueba de bloqueo/concurrencia. No se aplicó una migración en esta sesión.
-- `ConnectionStrings:SqlServerTest` no está configurada; no ejecutar pruebas con borrado/limpieza en la BD compartida.
+- Rama: `feature/phone-verification`; código incluye PR #14 y PR #15–#18 integrados en esta pila.
+- `dotnet restore Poraqui.sln`, `dotnet build Poraqui.sln --no-restore`: correctos; build 0 advertencias y 0 errores, SDK/runtime .NET 10.
+- `dotnet test Poraqui.sln --no-build --no-restore`: 24 aprobadas, 1 omitida. La omitida es la prueba de aceptación concurrente que requiere `ConnectionStrings__SqlServerTest` con una base aislada llamada `PoraquiIntegrationTests`. El resto usa SQLite local aislada o dominio sin BD.
+- `git diff --check`: limpio antes del ajuste documental.
+- EF Core conectó usando `ConnectionStrings:DefaultConnection` privada: muestra las nueve migraciones registradas hasta `IncidentCommandIdempotency`; `migrations has-pending-model-changes` no encuentra diferencias. Esta revisión no aplicó migraciones ni ejecutó la carrera SQL.
+- La clave `ConnectionStrings:SqlServerTest` no está configurada. No dirigir pruebas con limpieza a la base compartida.
 
-PR #13 no agrega migraciones.
-
-Para configurar una copia local, establece `ConnectionStrings:DefaultConnection` con User Secrets del proyecto `src/Poraqui.Api`. Para pruebas SQL aisladas, configura además `ConnectionStrings:SqlServerTest` apuntando a una base separada. Nunca incluyas los valores en Git o logs.
+Para otra copia local, configura `ConnectionStrings:DefaultConnection` con User Secrets de `src/Poraqui.Api`; no compartas la cadena ni la guardes en Git. Para pruebas SQL Server destructivas o concurrentes, configura además `ConnectionStrings:SqlServerTest` con una instancia/base separada `PoraquiIntegrationTests`.

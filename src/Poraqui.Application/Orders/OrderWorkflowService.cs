@@ -12,6 +12,7 @@ public interface IOrderWorkflowRepository
     Task<bool> BusinessBelongsToAsync(Guid businessId, Guid ownerUserId, CancellationToken cancellationToken);
     Task<string?> GetCustomerPhoneAsync(Guid customerUserId, CancellationToken cancellationToken);
     Task<OfflineDeliverySyncRecord?> GetOfflineDeliveryCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken);
+    Task<OrderIncident?> GetIncidentCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken);
     Task CancelOpenExternalOffersForOrderAsync(Guid orderId, CancellationToken cancellationToken);
     void AddOfflineDeliveryCommand(OfflineDeliverySyncRecord command);
     Task SaveChangesAsync(CancellationToken cancellationToken);
@@ -136,11 +137,19 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IO
     }
 
     public async Task<OrderIncidentView> ReportIncidentAsync(Guid orderId, Guid actorId, bool isAdmin,
-        string category, string description, CancellationToken cancellationToken)
+        Guid commandId, string category, string description, CancellationToken cancellationToken)
     {
+        if (commandId == Guid.Empty) throw new ArgumentException("A command ID is required.", nameof(commandId));
         var order = await RequiredOrder(orderId, cancellationToken);
         await EnsureOrderParticipant(order, actorId, isAdmin, cancellationToken);
-        var incident = order.AddIncident(actorId, category, description);
+        var existing = await repository.GetIncidentCommandAsync(actorId, commandId, cancellationToken);
+        if (existing is not null)
+        {
+            if (existing.OrderId != orderId || existing.Category != category.Trim() || existing.Description != description.Trim())
+                throw new IncidentCommandConflictException();
+            return ToView(existing);
+        }
+        var incident = order.AddIncident(actorId, category, description, commandId);
         await repository.SaveChangesAsync(cancellationToken);
         await PublishChange(order, cancellationToken);
         return ToView(incident);
@@ -233,7 +242,7 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IO
     {
         var order = await RequiredOrder(orderId, cancellationToken);
         await EnsureBusinessAccess(order.BusinessId, actorId, isAdmin, cancellationToken);
-        order.ReviewTransfer(actorId, approved, note);
+        if (!order.ReviewTransfer(actorId, approved, note)) return;
         await repository.SaveChangesAsync(cancellationToken);
         await PublishChange(order, cancellationToken);
     }
@@ -243,8 +252,10 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IO
     {
         var order = await RequiredOrder(orderId, cancellationToken);
         await EnsureBusinessAccess(order.BusinessId, actorId, false, cancellationToken);
-        if (accept) order.AcceptByBusiness(actorId);
-        else order.RejectByBusiness(actorId, reason ?? string.Empty);
+        var changed = accept
+            ? order.AcceptByBusiness(actorId)
+            : order.RejectByBusiness(actorId, reason ?? string.Empty);
+        if (!changed) return;
         await repository.SaveChangesAsync(cancellationToken);
         await PublishChange(order, cancellationToken);
     }
@@ -253,8 +264,8 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IO
     {
         var order = await RequiredOrder(orderId, cancellationToken);
         await EnsureBusinessAccess(order.BusinessId, actorId, false, cancellationToken);
-        if (ready) order.MarkReadyForPickup(actorId);
-        else order.BeginPreparation(actorId);
+        var changed = ready ? order.MarkReadyForPickup(actorId) : order.BeginPreparation(actorId);
+        if (!changed) return;
         await repository.SaveChangesAsync(cancellationToken);
         await PublishChange(order, cancellationToken);
     }
@@ -285,12 +296,15 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IO
     {
         var order = await RequiredOrder(orderId, cancellationToken);
         EnsureCourier(order, courierId);
-        order.BeginDelivery(courierId, channel);
+        var changed = order.BeginDelivery(courierId, channel);
         var phone = await repository.GetCustomerPhoneAsync(order.CustomerUserId, cancellationToken);
         if (string.IsNullOrWhiteSpace(phone))
             throw new InvalidOperationException("Customer has no phone number available for delivery contact.");
-        await repository.SaveChangesAsync(cancellationToken);
-        await PublishChange(order, cancellationToken);
+        if (changed)
+        {
+            await repository.SaveChangesAsync(cancellationToken);
+            await PublishChange(order, cancellationToken);
+        }
         return new CustomerContact(phone, NormalizePhone(phone), channel.ToLowerInvariant());
     }
 
@@ -372,3 +386,4 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IO
 
 public sealed class OrderResourceForbiddenException : Exception { }
 public sealed class OfflineDeliveryCommandConflictException : Exception { }
+public sealed class IncidentCommandConflictException : Exception { }

@@ -1,36 +1,45 @@
 # Handoff de desarrollo
 
-## Responsabilidad y flujo
+## Responsabilidad y base
 
-Este repositorio tiene un único responsable para todos los módulos: identidad/permisos, comercio, pedidos, pagos manuales, reparto propio/externo, notificaciones, sincronización, métricas, persistencia, migraciones y despliegue. OpenCode ya no participa; se conserva esa asignación anterior únicamente como antecedente. `main` es la base de integración. Trabajar en `feature/*`, mantener PR pequeños, compilar/probar y revisar migraciones antes de integrar. Actualizar `docs/project-status.md`, `docs/api-contracts.md` y este handoff en cada incremento.
+Un responsable mantiene todos los módulos, contratos, `AppDbContext`, migraciones, pruebas y despliegue. `main` es la base de integración. Trabaja en ramas `feature/*`, con PR por incremento; actualiza este handoff, `docs/project-status.md` y `docs/api-contracts.md`. OpenCode ya no participa; la asignación previa se conserva como antecedente.
 
-## Estado de ramas y PR
+## Estado Git
 
 - `main` integra PR #1–#6 (`d39d265`).
-- PR #7–#9 fueron integrados en sus ramas apiladas.
-- PR #10 se integró en `feature/catalog-options` con merge commit `fc68274` y ya está cerrado como merged.
-- PR #11 (cancelaciones/incidencias/reembolsos), que contiene PR #12 (métricas), se integró en `feature/business-hours` con `efa53d9`; aún no está en `main`.
-- PR #13 (`feature/delivery-command-retries`) está integrado en `feature/order-cancellations-refunds-incidents` (`634590c`); build y 19/19 pruebas SQLite pasaron. PR #14 y #18–#21 siguen en ramas apiladas fuera de `main`.
+- PR #7–#13 están integrados en ramas apiladas, fuera de `main`: #10 `fc68274`, #11/#12 `efa53d9`, #13 `634590c`.
+- PR #14 está abierto desde `feature/phone-verification`; su pila contiene PR #15–#18 integrados en dicha rama. PR #19–#21 siguen después en ramas apiladas.
+- Para mantener los PR encadenados, sincroniza primero cada rama base y revisa el diff efectivo del PR, no solo sus commits nuevos.
 
 ## SQL Server y migraciones
 
-La clave privada `ConnectionStrings:DefaultConnection` está configurada en User Secrets y EF logró consultar la base SQL Server. El historial lista las migraciones hasta `OrderCancellationAuditConstraints`; `migrations has-pending-model-changes` no detecta desajustes. No se aplicaron migraciones en esta sesión. La API no migra al arrancar.
+`ConnectionStrings:DefaultConnection` existe en User Secrets. Con `dotnet-ef 10.0.13`, EF conectó al SQL Server y encontró aplicadas nueve migraciones, la última `IncidentCommandIdempotency`; el modelo coincide con el snapshot. No se aplicaron migraciones en esta sesión. La API no migra al arrancar.
 
-`ConnectionStrings:SqlServerTest` no está configurada. Añádela en User Secrets de `src/Poraqui.Api` apuntando a una base SQL Server separada para las pruebas que creen, limpien o compitan por datos. No dirigir esas pruebas a la BD compartida ni borrar, recrear o reiniciar sus datos. Mantener secretos fuera de Git, consola y logs.
+`ConnectionStrings:SqlServerTest` no está configurada. La prueba optativa de aceptación concurrente exige una base aislada llamada exactamente `PoraquiIntegrationTests`; crea y borra únicamente sus GUID de prueba. Configura la cadena solo para esa base separada. Nunca ejecutes esas pruebas contra la BD compartida ni borres, recrees o reinicies datos de desarrollo. Mantén secretos fuera de Git, consola y logs.
 
-## Build y pruebas
+La rama incorpora `IncidentCommandIdempotency`, migración aditiva de una columna nullable e índice único filtrado. El historial EF muestra que ya está aplicada. No regenerar/aplicar migraciones sin revisar primero el historial de destino.
 
-Sobre `feature/delivery-command-retries`, con PR #11/#12 como base: `dotnet build Poraqui.sln --no-restore` pasa con 0 advertencias/errores; `dotnet test Poraqui.sln --no-build --no-restore` pasa 19/19 con SQLite aislada. Se prueba reintento de recogida/entrega con código correcto y no duplicación de versión/historial, además de permisos, importes, transiciones, métricas y recorrido. Una prueba comprueba traducción SQL Server sin conectarse a SQL Server. Este host tiene SDK/runtime .NET 10 mientras la solución apunta a net9; para ejecutar test host usar `$env:DOTNET_ROLL_FORWARD='Major'`. No confundir SQLite/traducción con verificación de restricciones o concurrencia SQL Server.
+## Build, pruebas y configuración funcional
 
-El recorrido funcional, endpoints y límites están en `docs/order-flow.md`. Contratos vigentes y ledger verificable están en `docs/api-contracts.md` y `docs/project-status.md`. Para OpenAPI en Development, ejecutar `dotnet run --project src/Poraqui.Api` y consultar `/openapi/v1.json`.
+La rama actual usa .NET 10 / EF Core 10. Restaurar y verificar con:
+
+```powershell
+dotnet restore Poraqui.sln
+dotnet build Poraqui.sln --no-restore
+dotnet test Poraqui.sln --no-build --no-restore
+```
+
+Resultado actual: build 0 advertencias/errores; 24 pruebas aprobadas y una omitida porque falta `ConnectionStrings__SqlServerTest`. Las pruebas SQLite son aisladas y una comprueba traducción de SQL Server sin conexión real. La omisión impide afirmar que la aceptación simultánea ya esté verificada en SQL Server.
+
+OTP usa las claves privadas `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid` y `TwilioVerify:ApiKeySecret`. La suite reemplaza Twilio por un provider falso; no ha enviado SMS real. Ver OpenAPI de Development en `/openapi/v1.json` y el recorrido HTTP en `docs/order-flow.md`.
 
 ## Próximos pasos
 
-1. Revisar e integrar PR #14 sobre la base actualizada de PR #13.
-2. Revisar PR #18–#21 en orden, con foco en permisos cruzados, transiciones, códigos, concurrencia e idempotencia.
-3. Preparar una BD aislada SQL Server para migraciones/restricciones y pruebas concurrentes; nunca hacer pruebas destructivas sobre la BD compartida.
-4. Completar despliegue MonsterASP.NET, almacenamiento privado persistente y recorrido publicado; validar reconexión SignalR con cliente.
+1. Sincronizar `feature/phone-verification` con la base actualizada de PR #13, resolver únicamente estados/documentación en conflicto y revisar PR #14.
+2. Confirmar con build/test el cambio de OTP e idempotencia de flujo; resolver carreras de claves duplicadas de incidencias y validar con SQL Server aislado.
+3. Revisar PR #19–#21 en orden y llevar la pila funcional completa a `main` por incrementos.
+4. Probar migraciones/restricciones y carreras en `PoraquiIntegrationTests`, configurar Twilio si se probará SMS real, terminar almacenamiento privado y despliegue MonsterASP.NET.
 
 ## Antecedente
 
-El plan inicial dividía comercio y reparto entre Codex y OpenCode. El cambio a responsable único ocurrió antes de integrar PR #1. Los contratos iniciales y esa historia se conservan como contexto; no son una dependencia operativa.
+La organización inicial asignó el reparto a OpenCode. La decisión vigente es responsable único; no hay dependencia operativa con otro agente.

@@ -11,7 +11,7 @@ dotnet user-secrets set "PrivateFiles:Root" "<ruta privada fuera del web root>" 
 dotnet run --project src/Poraqui.Api
 ```
 
-El `UserSecretsId` ya está configurado. Las migraciones revisables incluyen `InitialCommerceAndIdentity`, `BusinessTransferInstructionsSnapshot`, `ExternalCourierOffers`, `OfflineDeliveryCommandSync`, `CatalogProductOptions`, `BusinessOpeningHours`, `OrderCancellationRefundsIncidents` y `OrderCancellationAuditConstraints`. La API no migra al iniciar. Antes de aplicar migraciones, configura la clave privada, revisa que el esquema y los datos actuales coincidan y usa `dotnet tool run dotnet-ef database update --project src/Poraqui.Infrastructure --startup-project src/Poraqui.Api`. Las migraciones tienen scripts revisables en `docs/sql/`. En Development se publica OpenAPI en `/openapi/v1.json`.
+El `UserSecretsId` ya está configurado. Las migraciones revisables incluyen `InitialCommerceAndIdentity`, `BusinessTransferInstructionsSnapshot`, `ExternalCourierOffers`, `OfflineDeliveryCommandSync`, `CatalogProductOptions`, `BusinessOpeningHours`, `OrderCancellationRefundsIncidents`, `OrderCancellationAuditConstraints` e `IncidentCommandIdempotency`. La API no migra al iniciar. Antes de aplicar migraciones, configura la clave privada, revisa el historial y esquema actuales y usa `dotnet tool run dotnet-ef database update --project src/Poraqui.Infrastructure --startup-project src/Poraqui.Api`. Las migraciones tienen scripts revisables en `docs/sql/`. En Development se publica OpenAPI en `/openapi/v1.json`.
 
 ## Secuencia
 
@@ -19,7 +19,7 @@ El `UserSecretsId` ya está configurado. Las migraciones revisables incluyen `In
 2. Registra una cuenta de negocio, inicia sesión, crea negocio con `POST /api/businesses`, actívalo como admin con `PUT /api/businesses/{id}/active` y configura transferencia con `PUT /api/businesses/{id}/transfer-details`.
 3. El admin crea una zona con `POST /api/delivery-zones`. El negocio registra productos con `POST /api/businesses/{id}/products`, configura grupos de variantes con `POST /api/products/{productId}/option-groups` y tarifa con `POST /api/businesses/{id}/delivery-rates`. El negocio puede cambiar la disponibilidad de grupos/opciones con sus rutas `.../availability`.
    Antes de aceptar pedidos con horario, el propietario configura su zona y semana en `PUT /api/businesses/{id}/opening-hours`; la consulta pública `GET` muestra horario y disponibilidad actual.
-4. Cliente registra teléfono con `PUT /api/account/phone` y crea pedido con `POST /api/orders`:
+4. Cliente verifica teléfono con `POST /api/account/phone/verification` y confirma el OTP recibido mediante `POST /api/account/phone/verification/confirm`. En una prueba automatizada el provider Twilio se reemplaza; para SMS real se necesitan claves privadas Twilio. Luego crea pedido con `POST /api/orders`:
 
    ```json
    {
@@ -45,8 +45,8 @@ El `UserSecretsId` ya está configurado. Las migraciones revisables incluyen `In
 
 ## Verificaciones actuales
 
-La suite suma 19 pruebas: 18 de API con SQLite en memoria/carpeta temporal (opciones obligatorias/no disponibles, permisos, importes y snapshots, comprobante, revisión manual, configuración y snapshot de transferencia, oferta/cancelación/ausencia de repartidores/rechazo/aceptación externa, cancelación con reembolso manual, incidencias, métricas, códigos, pago al recoger, sincronización idempotente, entrega y evento SignalR) y una de traducción de las consultas de métricas con el proveedor SQL Server sin conexión. SQLite y la generación de SQL no sustituyen la prueba de migraciones, restricciones y aceptación simultánea contra SQL Server real.
+La rama actual tiene 24 pruebas aprobadas y 1 omitida. Las pruebas funcionales usan SQLite aislada y provider OTP falso. La omitida es la aceptación simultánea de ofertas con SQL Server; requiere `ConnectionStrings__SqlServerTest` en la base separada `PoraquiIntegrationTests`. SQLite y la traducción SQL no sustituyen la prueba de migraciones, restricciones y aceptación simultánea contra SQL Server real.
 
 ## Límites
 
-WhatsApp/llamada se hace fuera de la API; esta registra canal y entrega datos autorizados. Las tarifas se basan en zonas configuradas; no hay GPS ni distancias inventadas. Métricas del piloto ya están en la pila #11. Falta OTP, reconexión SignalR en cliente real, idempotencia en otros comandos, despliegue y validación aislada de SQL Server. La cancelación del negocio está disponible hasta antes de asignar courier.
+WhatsApp/llamada se hace fuera de la API; esta registra canal y entrega datos autorizados. Las tarifas se basan en zonas configuradas; no hay GPS ni distancias inventadas. OTP se implementa con Twilio Verify, aunque falta probarlo con credenciales/SMS reales. Siguen pendientes reconexión SignalR en cliente real, idempotencia durable de creación de pedido/comprobante/asignación, despliegue y pruebas SQL Server. La cancelación del negocio está disponible hasta antes de asignar courier.
