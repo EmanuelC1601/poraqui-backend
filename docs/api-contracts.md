@@ -1,6 +1,6 @@
 # Contratos API y entre módulos
 
-## Integrado en `main` (PR #1–#5)
+## Integrado en `main` (PR #1–#6)
 
 ### Identidad, permisos y negocio
 
@@ -14,11 +14,8 @@
 ### Catálogo, tarifa y pedido
 
 - `GET/POST /api/businesses/{id}/products`; `PUT /api/products/{productId}`.
-- El negocio agrega grupos de opciones con `POST /api/products/{productId}/option-groups` (`name`, `minSelections`, `maxSelections`, `options[{name,priceDelta}]`); cambia disponibilidad con `PUT /api/option-groups/{id}/availability` y `PUT /api/product-options/{id}/availability`. Requiere propietario del producto o administrador.
-- `GET /api/businesses/{id}/products` incluye solo grupos y opciones disponibles con límites y diferencias de precio. Al crear pedido, `items[]` puede incluir `optionIds[]`. El servidor comprueba opciones disponibles y límites de cada grupo, calcula `precio base + diferencias` y guarda snapshots de nombres/precios seleccionados en cada línea. El cliente no envía importes.
 - `GET /api/delivery-zones/active`; admins administran zonas con `POST/PUT /api/delivery-zones`.
 - Negocio/admin administra tarifas por zona con `GET/POST /api/businesses/{id}/delivery-rates` y `PUT /api/businesses/{id}/delivery-rates/{zoneId}`.
-- Negocio/admin configura la semana y zona horaria con `PUT /api/businesses/{id}/opening-hours` (`timeZoneId`, siete `days` con `day`, `isClosed`, `opensAt`, `closesAt`). Consulta pública `GET /api/businesses/{id}/opening-hours` devuelve horario y `isAcceptingOrders`. Los pedidos se rechazan fuera del horario local configurado. Hasta configurar el horario, el negocio conserva la disponibilidad previa.
 - `GET/PUT /api/businesses/{businessId}/transfer-details`: propietario/admin configura destinatario, institución, referencia e instrucciones.
 - `POST /api/orders`: cliente envía negocio, zona, dirección, producto IDs y cantidades. El servidor obtiene precios y tarifa activos; no acepta importes del cliente. El pedido guarda snapshot de instrucciones de transferencia que solo ve el cliente del pedido.
 
@@ -37,7 +34,7 @@
 
 Cada transición de pedido incrementa `Order.Version`; la persistencia detecta escrituras obsoletas. Los códigos son de seis dígitos y se guardan hasheados; el código de recepción se entrega al cliente al crear el pedido y el código de recogida se entrega una vez al asignar.
 
-## En desarrollo: reparto externo (`feature/external-courier-offers`)
+## Integrado en `main`: reparto externo (PR #6)
 
 - Admin habilita/deshabilita perfil externo con `PUT /api/admin/users/{id}/external-courier` (`isExternalCourier`).
 - Courier establece disponibilidad y zona con `PUT /api/courier/external/availability` (`isAvailable`, `zoneId`).
@@ -46,40 +43,40 @@ Cada transición de pedido incrementa `Order.Version`; la persistencia detecta e
 - Courier rechaza o acepta con `POST /api/courier/external/offers/{offerId}/reject` y `/accept`. Aceptar guarda oferta y asignación del pedido en una transacción y devuelve una vez el código de recogida. Al recoger se conserva el registro existente de pago del negocio.
 - Negocio cancela ofertas abiertas con `POST /api/businesses/{businessId}/orders/{orderId}/external-offers/cancel`. Al listar o aceptar, las ofertas vencidas se marcan como expiradas.
 - `ExternalDeliveryOffer.Version`, `Order.Version` y un índice único filtrado por pedido aceptado protegen frente a respuestas concurrentes. Falta ejecutar la carrera en SQL Server.
-- Migración `ExternalCourierOffers` y script SQL revisables en `src/Poraqui.Infrastructure/Persistence/Migrations/` y `docs/sql/20261017191548_ExternalCourierOffers.sql`; no aplicados.
+- Migración `ExternalCourierOffers` y script SQL están en `src/Poraqui.Infrastructure/Persistence/Migrations/` y `docs/sql/20261017191548_ExternalCourierOffers.sql`; EF reporta aplicada la migración en desarrollo. La carrera concurrente sobre SQL Server aislado sigue pendiente.
 
-## En desarrollo: sincronización de entrega (`feature/offline-delivery-sync`, basada en PR #6)
+## Implementado en rama apilada: sincronización offline de entrega (PR #7)
 
 - Courier asignado sube una confirmación capturada sin conexión con `POST /api/orders/{orderId}/sync/delivery-confirmation`, con `commandId`, `code` y `clientCapturedAtUtc`.
 - El servidor no confía en el resultado local: valida autorización del courier, asignación vigente, estado y código antes de persistir la entrega. La hora local se conserva solo como dato de auditoría; el servidor registra la hora de aceptación.
 - Repetir el mismo ID, orden y payload devuelve el resultado previamente persistido con `replayed: true` y no agrega otra transición al historial. Reutilizar ID para otro payload/orden responde 409. Código incorrecto no registra el comando y puede reintentarse con el mismo ID.
-- El cambio de estado y el registro idempotente se guardan en la misma transacción EF. Migración `OfflineDeliveryCommandSync` crea tabla de claves de comando; script revisable `docs/sql/20261017192726_OfflineDeliveryCommandSync.sql`. No aplicado ni validado en SQL Server.
+- El cambio de estado y el registro idempotente se guardan en la misma transacción EF. Migración `OfflineDeliveryCommandSync` crea tabla de claves de comando; script revisable `docs/sql/20261017192726_OfflineDeliveryCommandSync.sql`. PR #7 está integrado en `feature/external-courier-offers`, aún fuera de `main`; EF reporta aplicada la migración en desarrollo.
 
-## En desarrollo: actualizaciones en tiempo real (`feature/realtime-order-updates`, basada en PR #7)
+## Implementado en rama apilada: actualizaciones en tiempo real (PR #8)
 
 - Hub autenticado en `/hubs/orders`. Los clientes SignalR envían el bearer de Identity en `access_token` al negociar/conectar; el servidor acepta ese parámetro solo en esta ruta.
 - Tras conectar, invocar `SubscribeOrder(orderId)`. El servidor valida la relación con el pedido: cliente propietario, negocio propio, courier asignado o administrador. Devuelve una instantánea actual `{ orderId, status, version, changedAtUtc }` y agrega la conexión al grupo de ese pedido autorizado.
 - Los cambios se notifican como `OrderChanged` después de guardar la transición. Payload: `{ orderId, status, version, changedAtUtc }`; no incluye dirección, teléfono, comprobante ni códigos.
 - Invocar `UnsubscribeOrder(orderId)` al salir de la pantalla. Después de una reconexión, volver a invocar `SubscribeOrder` para recuperar la versión/estado persistidos y recibir eventos futuros.
 - Un fallo de SignalR no revierte la transición guardada; se registra y el cliente puede consultar `GET /api/orders/{id}`, `GET /api/businesses/{businessId}/orders/{orderId}` o `GET /api/courier/orders/{orderId}` con su permiso. Las notificaciones no son una cola durable.
-- Pruebas: conexión WebSocket SignalR real en TestServer/SQLite temporal; el cliente recibe `OrderChanged` después del envío del comprobante y la consulta confirma el estado persistido. También se verifica negociación anónima rechazada y acceso cruzado de otro negocio denegado. SQL Server sigue sin comprobar.
+- Pruebas: WebSocket SignalR real en TestServer/SQLite temporal; se verifica el evento tras persistir, negociación anónima rechazada y acceso cruzado de otro negocio denegado. PR #8 está integrado en `feature/offline-delivery-sync`, aún fuera de `main`. El cliente debe volver a invocar `SubscribeOrder` tras reconectar.
 
-## En desarrollo: opciones de catálogo (`feature/catalog-options`, basada en PR #8)
+## Implementado en rama apilada: opciones de catálogo (PR #9)
 
 - Grupos con selección mínima/máxima y variantes con diferencia de precio no negativa. Grupo/variante se puede poner no disponible; la lectura pública oculta los no disponibles y el servidor rechaza su selección.
 - El precio unitario de línea refleja las opciones y el pedido guarda una copia de nombre/importe para conservar el recibo si el negocio cambia el catálogo después.
-- Migración `CatalogProductOptions` y `docs/sql/CatalogProductOptions.sql` crean tres tablas e índices aditivos. No elimina datos ni está aplicada. La suite pasa en SQLite; SQL Server aún no se ha validado.
+- Migración `CatalogProductOptions` y `docs/sql/CatalogProductOptions.sql` crean tres tablas e índices aditivos; EF reporta aplicada la migración en desarrollo. PR #9 está integrado en `feature/realtime-order-updates`, aún fuera de `main`.
 
-## En desarrollo: horarios del negocio (`feature/business-hours`, basada en PR #9)
+## En PR abierto: horarios del negocio (PR #10 sobre PR #9)
 
 - El propietario o admin configura los siete días y zona horaria; la API rechaza días duplicados/incompletos, zona inválida, horas ausentes y rangos invertidos. `GET /api/businesses/{id}/opening-hours` expone horario y disponibilidad actual.
 - `POST /api/orders` rechaza nuevos pedidos cuando el negocio está cerrado según su zona horaria. Los negocios sin horario configurado mantienen temporalmente su disponibilidad actual.
-- Migración `BusinessOpeningHours` añade `Businesses.TimeZoneId`, `Businesses.HasConfiguredOpeningHours` y una tabla con clave primaria `(BusinessId, Day)`. `docs/sql/BusinessOpeningHours.sql` es aditivo y no aplicado. Pruebas actuales con SQLite; falta verificar migración y tipo `time` en SQL Server.
+- Migración `BusinessOpeningHours` añade `Businesses.TimeZoneId`, `Businesses.HasConfiguredOpeningHours` y una tabla con clave primaria `(BusinessId, Day)`. `docs/sql/BusinessOpeningHours.sql` es aditivo; EF reporta aplicada la migración en desarrollo. La función permanece en PR #10, no en `main`.
 
 ## Validación, antecedentes y pendientes
 
-`dotnet test Poraqui.sln` ejercita un recorrido aislado SQLite con importes, permisos, transferencia, comprobante, oferta externa, cancelación, ausencia de repartidores, rechazo, aceptación, códigos, pago al recoger y entrega. SQLite no verifica por sí solo los bloqueos, índices y concurrencia de SQL Server.
+`dotnet test Poraqui.sln` en la rama #10 ejercita un recorrido aislado SQLite con importes, permisos, transferencia, comprobante, opciones, horarios, oferta externa, cancelación, ausencia de repartidores, rechazo, aceptación, códigos, pago al recoger, sync offline y SignalR. SQLite no verifica por sí solo los bloqueos, índices y concurrencia de SQL Server. `ConnectionStrings:DefaultConnection` existe en User Secrets; `ConnectionStrings:SqlServerTest` aislada sigue ausente.
 
 El contrato provisional `src/Poraqui.Application/Delivery/DeliveryOrderContracts.cs` se eliminó en PR #4 al implementar reparto propio. La asignación previa a OpenCode se conserva como antecedente; hay un solo responsable.
 
-Pendiente: OTP, cancelación de pedido, incidencias/reembolsos completos, idempotencia general para otros comandos, métricas, despliegue y verificación SQL Server incluyendo carreras simultáneas. No hay GPS, distancias inferidas ni transferencias bancarias automáticas.
+PR #18–#21 implementan idempotencia durable para incidencias, creación de pedidos, comprobantes y asignación de courier propio; están integrados en `feature/phone-verification`, fuera de `main`. Pendiente: integrar la pila en `main`, OTP configurado, cancelaciones/incidencias/reembolsos completos, métricas, despliegue y carreras SQL aisladas. No hay GPS, distancias inferidas ni transferencias bancarias automáticas.
