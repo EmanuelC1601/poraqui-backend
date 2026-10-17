@@ -1,19 +1,19 @@
 # Estado verificable del proyecto
 
-Actualizado: 2026-10-17. `main` es la base de integración. PR #22 (sync offline), #23 (SignalR) y #24 (opciones de catálogo) están integrados hasta `59bcde2`, junto con la base inicial. Hay un solo responsable; OpenCode ya no participa. Los siguientes incrementos se crean desde `main` en ramas `feature/*` y se integran por PR después de revisión y verificación.
+Actualizado: 2026-10-17. `main` es la base de integración; PR #25 (horarios comerciales) quedó integrado en `c372018`. Hay un solo responsable; OpenCode ya no participa. Cada incremento se crea desde `main` en `feature/*` y se integra por PR después de revisión y verificación.
 
 ## Ledger de funciones
 
 | Estado | Función | Evidencia / pendiente |
 |---|---|---|
-| En `main` | Arquitectura, Identity y permisos por recurso, negocio, catálogo con opciones, zonas/tarifas, precio por servidor, transferencia/revisión manual, reparto propio/externo inicial, sync offline idempotente y SignalR con autorización por pedido | Base inicial y PR #22–#24; `59bcde2` |
-| En rama activa | Horario semanal y zona horaria por negocio; consulta pública, escritura por dueño/admin y bloqueo de pedidos fuera de horario | `feature/business-hours-main`, `0bd8ba3`; build 0 warnings/errores y 15/15 pruebas SQLite; migración aditiva revisable no aplicada |
-| Pendiente | OTP real, cancelaciones/incidencias/reembolsos, idempotencia restante, métricas, despliegue MonsterASP.NET y reconexión SignalR desde cliente real | Código previo en ramas apiladas, aún no integrado; revalidar antes de cada PR |
+| En `main` | Arquitectura, Identity y permisos por recurso, negocio, catálogo con opciones, zonas/tarifas, precio por servidor, transferencia/revisión manual, reparto propio/externo inicial, sync offline idempotente, SignalR con autorización por pedido y horarios semanales | Base inicial y PR #22–#25; `c372018` |
+| En rama activa | Cancelación de pedidos, registro/resolución de incidencias y seguimiento de reembolsos manuales | `feature/order-incidents-refunds`, commit `912c0eb`; build 0 advertencias/errores y 18/18 pruebas SQLite; PR pendiente |
+| Pendiente | OTP real, idempotencia adicional, métricas, despliegue MonsterASP.NET y reconexión SignalR desde cliente real | Hay commits previos en ramas locales/remotas; deben auditarse y verificarse antes de integrar |
 | Pendiente | Aceptación simultánea de oferta y asignación simultánea de courier comprobadas en SQL Server | Falta `ConnectionStrings:SqlServerTest` para `PoraquiIntegrationTests` |
 | Pendiente | SMS real, reconexión SignalR desde cliente real, almacenamiento persistente y publicación MonsterASP.NET | Configuración externa no probada |
 | Fuera de alcance | GPS, distancias calculadas, transferencias bancarias automáticas y frontend | Usar zonas/tarifas configuradas y revisión manual |
 
-## Verificación del último incremento integrado
+## Verificación de incrementos integrados
 
 - Rama: `feature/offline-sync-main`; PR #22, merge `8ed5cb3`.
 - `dotnet restore Poraqui.sln`: correcto.
@@ -29,8 +29,12 @@ SignalR de pedidos se integró en PR #23. En `main`, sus pruebas cubren evento W
 
 Horarios comerciales pasan restore/build (0 warnings/errores) y 15/15 pruebas SQLite en la rama activa. `BusinessOpeningHours` agrega columnas con defaults y una tabla semanal; script `docs/sql/BusinessOpeningHours.sql`. No se aplicó en SQL Server.
 
+Horarios comerciales quedaron integrados en PR #25 (`c372018`): configuración semanal y zona horaria, lectura pública, permisos de propietario/admin y bloqueo de nuevos pedidos fuera del horario configurado. La migración es aditiva y está en `docs/sql/BusinessOpeningHours.sql`.
+
+Cancelaciones, incidencias y reembolsos manuales están en la rama activa. El cliente cancela solo antes de enviar comprobante; negocio/admin puede cancelar antes de recogida. Se crea seguimiento de reembolso cuando hay transferencia aprobada o pendiente. Los participantes autorizados consultan/reportan incidencias; negocio propietario/admin las resuelve y revisa el caso de reembolso.
+
 ## SQL Server
 
-`ConnectionStrings:DefaultConnection` existe en User Secrets y EF se conectó desde la rama completa de integración. EF confirmó 12 migraciones aplicadas hasta `CourierAssignmentCommandIdempotency` y ningún cambio pendiente del modelo. No se aplicaron migraciones durante esta revisión. `ConnectionStrings:SqlServerTest` no existe; no dirigir pruebas que limpian datos hacia la BD compartida.
+`ConnectionStrings:DefaultConnection` existe en User Secrets y la conexión de lectura a SQL Server se verificó desde esa configuración. El historial `dbo.__EFMigrationsHistory` contiene 12 registros hasta `CourierAssignmentCommandIdempotency`. El checkout `main` contiene solo la cadena hasta `BusinessOpeningHours`; las migraciones registradas posteriores aún deben reconciliarse con sus entidades/código antes de generar o aplicar otras migraciones. No se aplicaron migraciones durante esta revisión. `ConnectionStrings:SqlServerTest` no existe; no dirigir pruebas que limpian datos hacia la BD compartida.
 
 Configura `ConnectionStrings:DefaultConnection` en User Secrets (`src/Poraqui.Api`) o configuración privada del hosting; nunca guardes cadenas en Git. Las carreras SQL Server requieren otra base, `PoraquiIntegrationTests`. La API no migra automáticamente al iniciar.

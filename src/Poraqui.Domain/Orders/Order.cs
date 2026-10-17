@@ -4,6 +4,7 @@ public sealed class Order
 {
     private readonly List<OrderLine> _items = [];
     private readonly List<OrderStatusChange> _statusHistory = [];
+    private readonly List<OrderIncident> _incidents = [];
     private Order() { }
 
     public Order(Guid customerUserId, Guid businessId, Guid zoneId, string deliveryAddress, decimal deliveryFee,
@@ -62,6 +63,10 @@ public sealed class Order
     public string? ContactChannel { get; private set; }
     public DateTimeOffset? DeliveryStartedAtUtc { get; private set; }
     public DateTimeOffset? DeliveredAtUtc { get; private set; }
+    public DateTimeOffset? CancelledAtUtc { get; private set; }
+    public Guid? CancelledByUserId { get; private set; }
+    public string? CancellationReason { get; private set; }
+    public ManualRefundCase? RefundCase { get; private set; }
     public string? TransferRecipientName { get; private set; }
     public string? TransferInstitution { get; private set; }
     public string? TransferAccountReference { get; private set; }
@@ -69,6 +74,7 @@ public sealed class Order
     public IReadOnlyCollection<OrderLine> Items => _items.AsReadOnly();
     public IReadOnlyCollection<TransferReview> TransferReviews => _transferReviews.AsReadOnly();
     public IReadOnlyCollection<OrderStatusChange> StatusHistory => _statusHistory.AsReadOnly();
+    public IReadOnlyCollection<OrderIncident> Incidents => _incidents.AsReadOnly();
     private readonly List<TransferReview> _transferReviews = [];
 
     public void SubmitTransferEvidence(string evidenceReference, Guid? actorUserId = null)
@@ -104,6 +110,55 @@ public sealed class Order
         EnsureStatus(OrderStatus.AwaitingBusinessDecision);
         if (string.IsNullOrWhiteSpace(reason)) throw new ArgumentException("A rejection reason is required.", nameof(reason));
         ChangeStatus(OrderStatus.Rejected, businessUserId, reason.Trim(), DateTimeOffset.UtcNow);
+        EnsureRefundFollowUp(businessUserId);
+    }
+
+    public bool CancelByCustomer(Guid customerUserId, string reason)
+    {
+        if (customerUserId != CustomerUserId) throw new InvalidOperationException("Only the customer can cancel this order.");
+        return Cancel(customerUserId, reason, [OrderStatus.PendingPayment]);
+    }
+
+    public bool CancelByBusiness(Guid businessUserId, string reason)
+    {
+        EnsureActor(businessUserId);
+        return Cancel(businessUserId, reason,
+            [OrderStatus.PendingPayment, OrderStatus.AwaitingPaymentReview, OrderStatus.AwaitingBusinessDecision,
+                OrderStatus.Confirmed, OrderStatus.Preparing, OrderStatus.ReadyForPickup]);
+    }
+
+    public OrderIncident AddIncident(Guid reporterUserId, string category, string description)
+    {
+        if (reporterUserId == Guid.Empty) throw new ArgumentException("An incident reporter is required.", nameof(reporterUserId));
+        var incident = new OrderIncident(Id, reporterUserId, category, description, DateTimeOffset.UtcNow);
+        _incidents.Add(incident);
+        RecordActivity(reporterUserId, $"Incident reported: {incident.Category}", incident.ReportedAtUtc);
+        return incident;
+    }
+
+    public bool ResolveIncident(Guid incidentId, Guid resolverUserId, string resolution)
+    {
+        var incident = _incidents.SingleOrDefault(item => item.Id == incidentId)
+            ?? throw new KeyNotFoundException("Incident was not found.");
+        var changed = incident.Resolve(resolverUserId, resolution, DateTimeOffset.UtcNow);
+        if (changed) RecordActivity(resolverUserId, "Incident resolved", incident.ResolvedAtUtc!.Value);
+        return changed;
+    }
+
+    public bool MarkRefunded(Guid reviewerUserId, decimal amount, string reference, string? note)
+    {
+        var changed = (RefundCase ?? throw new InvalidOperationException("Order has no refund follow-up."))
+            .MarkRefunded(reviewerUserId, amount, reference, note, DateTimeOffset.UtcNow, Total);
+        if (changed) RecordActivity(reviewerUserId, "Manual refund marked complete", RefundCase!.ReviewedAtUtc!.Value);
+        return changed;
+    }
+
+    public bool MarkRefundNotRequired(Guid reviewerUserId, string reason)
+    {
+        var changed = (RefundCase ?? throw new InvalidOperationException("Order has no refund follow-up."))
+            .MarkNotRequired(reviewerUserId, reason, DateTimeOffset.UtcNow);
+        if (changed) RecordActivity(reviewerUserId, "Manual refund reviewed: not required", RefundCase!.ReviewedAtUtc!.Value);
+        return changed;
     }
 
     public void BeginPreparation(Guid businessUserId)
@@ -189,6 +244,28 @@ public sealed class Order
             throw new InvalidOperationException("Only the assigned courier can perform this operation.");
     }
 
+    private bool Cancel(Guid actorUserId, string reason, OrderStatus[] allowedStatuses)
+    {
+        var normalizedReason = string.IsNullOrWhiteSpace(reason) ? string.Empty : reason.Trim();
+        if (Status == OrderStatus.Cancelled && CancelledByUserId == actorUserId && CancellationReason == normalizedReason)
+            return false;
+        if (normalizedReason.Length is < 3 or > 500) throw new ArgumentException("Cancellation reason must be between 3 and 500 characters.", nameof(reason));
+        if (!allowedStatuses.Contains(Status)) throw new InvalidOperationException("Order cannot be cancelled in its current state.");
+        var now = DateTimeOffset.UtcNow;
+        CancelledAtUtc = now;
+        CancelledByUserId = actorUserId;
+        CancellationReason = normalizedReason;
+        ChangeStatus(OrderStatus.Cancelled, actorUserId, normalizedReason, now);
+        EnsureRefundFollowUp(actorUserId);
+        return true;
+    }
+
+    private void EnsureRefundFollowUp(Guid requestedByUserId)
+    {
+        if (_transferReviews.Any(review => review.Decision == TransferDecision.Approved || review.Decision is null))
+            RefundCase ??= ManualRefundCase.Create(Id, Total, requestedByUserId, DateTimeOffset.UtcNow);
+    }
+
     private void EnsureActor(Guid actorUserId)
     {
         if (actorUserId == Guid.Empty) throw new ArgumentException("An actor is required.", nameof(actorUserId));
@@ -212,6 +289,12 @@ public sealed class Order
         Status = status;
         Version++;
         _statusHistory.Add(new OrderStatusChange(Guid.NewGuid(), actorUserId, status, changedAtUtc, reason));
+    }
+
+    private void RecordActivity(Guid actorUserId, string reason, DateTimeOffset changedAtUtc)
+    {
+        Version++;
+        _statusHistory.Add(new OrderStatusChange(Guid.NewGuid(), actorUserId, Status, changedAtUtc, reason));
     }
 
     private static string RequiredText(string? value, string parameter) => string.IsNullOrWhiteSpace(value)

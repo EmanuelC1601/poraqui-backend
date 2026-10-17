@@ -42,8 +42,8 @@ El `UserSecretsId` ya está configurado. Las migraciones revisables incluyen `In
 
 ## Verificaciones actuales
 
-La suite de API usa SQLite en memoria y carpeta temporal para comprobantes. Cubre opciones obligatorias/no disponibles, permisos, importes y snapshots, comprobante, revisión manual, configuración y snapshot de transferencia, oferta/cancelación/ausencia de repartidores/rechazo/aceptación externa, códigos, pago al recoger, sincronización idempotente, entrega y evento SignalR. SQLite no sustituye la prueba de migraciones, índices y aceptación simultánea en SQL Server.
+La suite de API usa SQLite en memoria y carpeta temporal para comprobantes. Cubre opciones obligatorias/no disponibles, permisos, importes y snapshots, comprobante, revisión manual, configuración y snapshot de transferencia, oferta/cancelación/ausencia de repartidores/rechazo/aceptación externa, códigos, pago al recoger, sincronización idempotente, entrega y evento SignalR. La rama actual también prueba horarios, cancelación, incidencias y reembolsos. SQLite no sustituye la prueba de migraciones, índices y aceptación simultánea en SQL Server.
 
 ## Límites
 
-WhatsApp/llamada se hace fuera de la API; esta registra canal y entrega datos autorizados. Las tarifas se basan en zonas configuradas; no hay GPS ni distancias inventadas. Horarios comerciales están implementados en `feature/business-hours-main`, pendiente de integración. Falta OTP, cancelación del pedido e incidencias/reembolsos completos, reconexión SignalR en cliente real, idempotencia en otros comandos, métricas, despliegue y validación SQL Server.
+WhatsApp/llamada se hace fuera de la API; esta registra canal y entrega datos autorizados. Las tarifas se basan en zonas configuradas; no hay GPS ni distancias inventadas. Horarios comerciales están en `main` desde PR #25. Cancelación, incidencias y seguimiento de reembolsos manuales están en `feature/order-incidents-refunds`, todavía pendiente de PR. Falta OTP real, idempotencia en otros comandos, métricas, despliegue y validación SQL Server aislada.
