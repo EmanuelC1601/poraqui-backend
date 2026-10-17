@@ -1,5 +1,13 @@
 # Handoff de desarrollo
 
+## Estado actual (2026-10-17): comprobantes idempotentes
+
+Desarrollo de un solo responsable: OpenCode ya no participa; la asignación histórica de reparto se conserva como antecedente. `main` es la base de integración y PR #18/#19 siguen apilados fuera de ella. La rama de trabajo actual `feature/transfer-proof-idempotency` parte de la cabeza de PR #19. Añade `commandId` obligatorio a `POST /api/orders/{id}/transfer-evidence`; repetir mismo actor/clave/orden/hash devuelve la operación guardada, mientras una colisión de contenido responde 409. El incremento todavía está sin commit/PR.
+
+Migración `20261017212343_TransferEvidenceCommandIdempotency`: columnas nullable e índice único filtrado; no cambia la nulabilidad preexistente de `OrderId` ni elimina datos. Script revisable: `docs/sql/20261017212343_TransferEvidenceCommandIdempotency.sql`. Aplicada explícitamente en SQL Server de desarrollo. La conexión privada `ConnectionStrings:DefaultConnection` está en User Secrets. No se migrará al iniciar la API.
+
+Verificación previa de código: build limpio; 24 pruebas aprobadas y una optativa omitida por ausencia de `ConnectionStrings__SqlServerTest`; pruebas funcionales en SQLite aislado. La prueba de concurrencia SQL Server aún no se ejecuta. La asignación propia con reintento durable es pendiente. Antes de publicar este incremento, repetir build, pruebas y `git diff --check`.
+
 ## Estado actual: idempotencia de incidencias
 
 La rama `feature/command-idempotency-increment` agrega `commandId` durable a `POST /api/orders/{id}/incidents`. Un reintento con el mismo actor, pedido y contenido devuelve la incidencia persistida; una clave reutilizada con contenido distinto responde 409. La notificación no se vuelve a publicar en el reintento. La migración `20261017210748_IncidentCommandIdempotency` ya se generó, se revisó y se aplicó explícitamente a la BD compartida; agrega una columna nullable y un índice único filtrado, sin borrar filas o columnas. EF lista diez migraciones aplicadas y no encuentra cambios pendientes del modelo.

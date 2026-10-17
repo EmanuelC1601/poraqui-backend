@@ -850,6 +850,13 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("CommandId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ContentHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
                     b.Property<string>("Decision")
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
@@ -875,11 +882,18 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("SubmittedAtUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<Guid?>("SubmittedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
 
                     b.HasIndex("OrderId");
 
                     b.HasIndex("ReviewerUserId");
+
+                    b.HasIndex("SubmittedByUserId", "CommandId")
+                        .IsUnique()
+                        .HasFilter("[CommandId] IS NOT NULL");
 
                     b.ToTable("TransferReviews", (string)null);
                 });
@@ -1247,6 +1261,11 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                     b.HasOne("Poraqui.Infrastructure.Identity.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("ReviewerUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Poraqui.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("SubmittedByUserId")
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
