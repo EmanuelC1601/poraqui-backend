@@ -28,3 +28,5 @@ La API no ejecuta migraciones al iniciar. Revisa scripts SQL y aplica migracione
 La verificación telefónica usa Twilio Verify. Configura en User Secrets o el gestor privado de secretos `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid` y `TwilioVerify:ApiKeySecret`. La API limita los endpoints de inicio y confirmación a cinco solicitudes por IP cada diez minutos. Nunca guardes esos valores en archivos versionados.
 
 Consulta [arquitectura](docs/architecture.md), [contratos](docs/api-contracts.md), [estado](docs/project-status.md), [flujo reproducible](docs/order-flow.md) y [flujo de desarrollo](docs/team-work.md).
+
+Preparación de hosting: [MonsterASP.NET](docs/deployment-monsterasp.md). La guía aún no representa una publicación realizada.

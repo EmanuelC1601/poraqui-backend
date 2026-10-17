@@ -31,7 +31,7 @@ PR #33 integra `GET /api/admin/metrics/pilot`, restringido a PlatformAdmin, con 
 
 1. Configurar la cadena privada SQL Server de pruebas aisladas y ejecutar las dos carreras concurrentes; conservar la BD y verificar las restricciones afectadas.
 2. Para cambios futuros del modelo, generar y revisar la migración; revisar el historial de nuevo antes de aplicar cualquier migración compartida.
-3. Completar configuración/documentación de despliegue MonsterASP.NET.
+3. Seguir `docs/deployment-monsterasp.md` para preparar el sitio, secretos, almacenamiento y publicación; verificar health, SignalR y comprobantes en el hosting.
 4. Configurar privadamente `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid` y `TwilioVerify:ApiKeySecret`, y verificar un SMS de extremo a extremo con un número autorizado.
 
 La rama `feature/signalr-reconnect-snapshot` añade prueba del cliente SignalR que se reconecta y consulta el snapshot actual. El ledger vigente de implementado, pendiente y bloqueado está en `docs/project-status.md`; ejecución reproducible del recorrido está en `docs/order-flow.md`.
