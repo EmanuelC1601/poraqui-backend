@@ -56,6 +56,7 @@ public sealed class ExternalCourierController(ExternalCourierService couriers, I
         catch (KeyNotFoundException) { return NotFound(); }
         catch (InvalidOperationException exception) { return Conflict(new { error = exception.Message }); }
         catch (DbUpdateConcurrencyException) { return Conflict(new { error = "Order offer was accepted or changed concurrently; reload offers." }); }
+        catch (DbUpdateException) { return Conflict(new { error = "Order offer could not be accepted because its assignment changed concurrently; reload offers." }); }
     }
 
     [Authorize(Policy = ApplicationPolicies.ManageBusiness)]
