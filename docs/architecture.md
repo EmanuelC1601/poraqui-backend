@@ -1,6 +1,6 @@
 # Arquitectura
 
-La solución usa .NET 9 y Clean Architecture. `main` es la rama predeterminada y base de integración. El backend tiene un responsable único; cada incremento se desarrolla en una rama `feature/*` y se integra mediante PR. Proyectos en `src/`:
+La solución usa .NET 10 LTS y Clean Architecture. `main` es la rama predeterminada y base de integración. El backend tiene un responsable único; cada incremento se desarrolla en una rama `feature/*` y se integra mediante PR. Proyectos en `src/`:
 
 - **Poraqui.Domain**: conceptos y reglas del dominio; no depende de otros proyectos.
 - **Poraqui.Application**: casos de uso y contratos; depende de Domain.
@@ -15,4 +15,4 @@ EF tooling se fija en `.config/dotnet-tools.json`; ejecutar `dotnet tool restore
 
 ## Publicación
 
-MonsterASP.NET debe ejecutar `src/Poraqui.Api/Poraqui.Api.csproj` con runtime .NET 9 y recibir `ConnectionStrings__DefaultConnection` desde configuración segura del hosting. Sigue [la guía de despliegue](deployment-monsterasp.md) para runtime, variables privadas, almacenamiento y publicación. Aún no se ha publicado.
+MonsterASP.NET debe ejecutar `src/Poraqui.Api/Poraqui.Api.csproj` con runtime ASP.NET Core compatible con .NET 10 y recibir `ConnectionStrings__DefaultConnection` desde configuración segura del hosting. Sigue [la guía de despliegue](deployment-monsterasp.md) para runtime, variables privadas, almacenamiento y publicación. Aún no se ha publicado.
