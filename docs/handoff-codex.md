@@ -118,3 +118,5 @@ El paquete IIS fue publicado localmente en `work/publish`: contiene la API y `we
 ## Readiness para despliegues
 
 PR #84 quedó integrado en `main` como `a38ee0a`. `GET /health/ready` comprueba conexión SQL sin autenticación, devuelve HTTP 200/503 sin exponer detalles y no aplica migraciones. `GET /health/live` conserva su función de comprobar el proceso. Pruebas focalizadas Release: 3/3; suite Release completa: 53/53, incluidas ocho pruebas SQL Server en `db74230`. CI pasó antes de integrar. MonsterASP no se ha configurado ni verificado.
+
+La rama actual `feature/ci-publish-iis-artifact` agrega al workflow CI un paquete IIS descargable después de los tests en cada push exitoso a `main`, con retención de 14 días. La publicación local Release generó `web.config` InProcess. Suite completa: 53/53. PR/CI pendientes; el sitio MonsterASP aún no se ha configurado.
