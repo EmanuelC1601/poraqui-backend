@@ -56,3 +56,11 @@ PR #62 se integró en `main` como merge `7ac25f8`: agrega una carrera SQL Server
 PR #64 se integró en `main` como merge `fe37ce7`, con un recorrido API de reparto externo probado contra SQL Server aislado.
 
 PR #65 se integró en `main` como merge `be7da78`; verifica entrega offline, validación del código en servidor, replay idempotente y conflicto por payload diferente. Build Release pasó con 0 advertencias/errores; antes del merge, suite Release completa pasó 37/37 con cinco pruebas SQL Server. No cambia esquema ni accede a la BD compartida. La copia local actual no tiene la clave de SQL de prueba, así que una reejecución local pasó 32 tests y omitió cinco SQL; la compilación Release pasó. Guarda `ConnectionStrings:SqlServerTest` en User Secrets para habilitarlas.
+
+## Incremento de replay concurrente de comandos
+
+Rama actual: `feature/sql-idempotent-command-replays`, basada en `main` (`552dfba`). Implementa recuperación del resultado al chocar solicitudes idénticas de reporte de incidencia y confirmación de entrega offline; payload distinto conserva respuesta de conflicto. Las pruebas SQL sincronizan ambas solicitudes antes de guardar y verifican resultado repetible y un solo historial/registro. No hay cambios de modelo ni migraciones.
+
+La cadena `ConnectionStrings:SqlServerTest` está disponible en User Secrets de esta copia y apunta a `db74230`; no se imprimió ni versionó. `dotnet build Poraqui.sln --configuration Release --no-restore` pasó con 0 advertencias/errores. La suite Release completa pasó 39/39 (32 pruebas SQLite y siete pruebas SQL Server); la base aislada recibió las operaciones de los tests, sin cambios en la BD compartida. `git diff --check` debe volver a ejecutarse después de cerrar el diff.
+
+Estado siguiente: abrir PR desde esta rama, esperar checks, integrar si pasan y actualizar `main`. La lógica comercial descrita arriba tiene cobertura de flujo, pero despliegue en MonsterASP, entrega Twilio real y otras brechas anotadas en `docs/project-status.md` siguen pendientes.
