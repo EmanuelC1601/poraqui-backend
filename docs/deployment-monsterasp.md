@@ -1,12 +1,14 @@
 # Despliegue en MonsterASP.NET
 
-Estado: instrucciones preparadas; la API aún no se ha publicado en un sitio MonsterASP.NET. El proyecto apunta a .NET 10 LTS. La documentación actual del proveedor admite versiones modernas de ASP.NET Core; selecciona el runtime moderno compatible con .NET 10 en Scripting antes de publicar. [Soporte de tecnologías](https://help.monsterasp.net/getting-started/first-steps/supported-technologies) · [Selección de runtime](https://help.monsterasp.net/websites/configuration/scripting).
+Estado: el paquete Release se generó y revisó localmente; la API aún no se ha publicado en un sitio MonsterASP.NET. El proyecto apunta a .NET 10 LTS. La documentación actual del proveedor admite versiones modernas de ASP.NET Core; selecciona el runtime moderno compatible con .NET 10 en Scripting antes de publicar. [Soporte de tecnologías](https://help.monsterasp.net/getting-started/first-steps/supported-technologies) · [Selección de runtime](https://help.monsterasp.net/websites/configuration/scripting).
 
 ## Preparación del sitio
 
 1. Crea o selecciona el sitio web y la base SQL Server desde el panel de MonsterASP.NET. Para producción, usa una base de datos destino independiente de la BD compartida de desarrollo y confirma que el sitio y la base pertenecen al mismo plan/entorno.
 2. Usa Git Deploy con tipo **Build .NET app** y selecciona `src/Poraqui.Api/Poraqui.Api.csproj`, o publica la carpeta de salida de ese proyecto con Web Deploy/FTP. No elijas **Static** para la API.
 3. Habilita `ASPNETCORE_ENVIRONMENT=Production` en **Websites → sitio → Scripting → Environment variables**.
+
+También se puede compilar en GitHub Actions con el workflow `.github/workflows/ci.yml`, que fija `ubuntu-24.04` y usa `actions/checkout@v5` y `actions/setup-dotnet@v5`. El workflow restaura, compila en Release y ejecuta la suite; las pruebas SQL Server se omiten en CI si no se configura un catálogo aislado privado. La alternativa del panel MonsterASP.NET es Git Deploy con tipo **Build .NET app**, el repositorio público, rama `main` y el proyecto `src/Poraqui.Api/Poraqui.Api.csproj`. El proveedor compila y publica el output, sin exponer la carpeta de fuentes al sitio.
 
 MonsterASP.NET corre ASP.NET Core detrás de IIS y permite WebSockets/SignalR. El hosting `InProcess` es el recomendado; no configures arranque como EXE combinado con `OutOfProcess`.
 
@@ -40,6 +42,16 @@ No ejecutes pruebas que inserten y limpien datos sobre la base compartida de des
 - Valida WebSockets y el hub autenticado `/hubs/orders` desde un cliente autorizado.
 - Configura Twilio Verify y valida un SMS con un número autorizado. Las pruebas automatizadas con proveedor simulado no prueban entrega real.
 - OpenAPI solo se publica en Development; el snapshot local está versionado en `docs/openapi.json`.
+
+## Comprobación local del artefacto
+
+Se verificó con SDK .NET 10.0.402:
+
+```powershell
+dotnet publish src/Poraqui.Api/Poraqui.Api.csproj --configuration Release --no-restore --output work/publish
+```
+
+El output contiene `Poraqui.Api.dll`, `web.config`, `.deps.json` y `.runtimeconfig.json`. `work/publish` está ignorado por Git. Esta compilación comprueba el paquete ASP.NET Core, pero no acredita el arranque en IIS, el runtime asignado al sitio, sus rutas persistentes ni el acceso a las variables privadas del hosting.
 
 ## Guías oficiales consultadas
 
