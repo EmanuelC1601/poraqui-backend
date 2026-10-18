@@ -92,3 +92,9 @@ Rama activa `feature/sql-domain-invariants` agrega diez `CHECK` revisables para 
 Antes de modificar `db74183`, consultas read-only de conteos agregados verificaron cero filas incompatibles. Los scripts inspeccionados no borran ni actualizan datos; el primero agrega checks y el segundo reemplaza solo una expresión de check. Ambas migraciones se aplicaron explícitamente; después se confirmaron 15 filas de historial y las diez restricciones en `sys.check_constraints`. No se aplicaron al iniciar la API.
 
 Validación local actual con SDK .NET 10.0.402: build Release 0 advertencias/errores; suite Release **49/49** con las siete pruebas SQL Server contra `db74230`; `SqlServerDomainInvariantTests` también prueba que SQL Server rechaza violaciones. La base compartida no fue destino de tests.
+
+## Cancelación de cliente antes de aceptación (PR #73)
+
+Integrado en `main` como `6e269c6`. Cancelar después de enviar comprobante o de aprobar el pago, antes de que el negocio acepte, crea seguimiento manual de reembolso. La API devuelve `refundStatus` en la respuesta de cancelación; los reintentos idénticos no agregan cambios y la cancelación después de aceptar se rechaza. No requiere migración. Pruebas locales: 49/49 Release con SQLite y SQL Server aislado; CI del PR pasó.
+
+La conexión SQL aislada se consume desde User Secrets solo en el proceso de test. No se imprimió ni versionó. El usuario pidió dejar para más adelante cualquier configuración privada adicional desde el panel del hosting.
