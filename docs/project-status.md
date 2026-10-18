@@ -59,3 +59,11 @@ La concurrencia con SQL Server deja de estar pendiente. Siguen pendientes la pub
 ## Preparación de build y publicación
 
 Se agregó `.github/workflows/ci.yml` para restaurar, compilar Release y ejecutar pruebas en push/PR contra `main`. Sin secretos SQL en CI, las dos pruebas de concurrencia se omiten por diseño; se verificaron por separado en la BD aislada. El build/test Release local pasó con 0 advertencias, 0 errores, 32 aprobadas y 2 omitidas. `dotnet publish src/Poraqui.Api/Poraqui.Api.csproj --configuration Release --no-restore --output work/publish` produjo el paquete web con `Poraqui.Api.dll`, `web.config`, `.deps.json` y `.runtimeconfig.json`; `work/publish` está ignorado por Git. Esto no prueba ejecución bajo IIS ni publicación real.
+
+## Estado de CI y hosting tras PR #60
+
+PR #60 quedó integrado en `main` con merge `cb11b72` (commits `1480c05` y `47a31f9`). El workflow usa `ubuntu-24.04`, `actions/checkout@v5` y `actions/setup-dotnet@v5`. La ejecución de GitHub Actions `39084197135` finalizó correctamente; el job restauró, compiló y probó la solución. Las pruebas SQL siguen omitidas en CI porque no se exponen secretos de bases de datos al runner.
+
+Reejecución local en Release con SDK .NET 10.0.402 y `ConnectionStrings:SqlServerTest` privada desde User Secrets: `dotnet test Poraqui.sln --configuration Release --no-restore` aprobó las 34 pruebas (0 omitidas), incluidas las dos pruebas SQL Server. Ese proceso usó exclusivamente la base aislada de test; no aplicó cambios a la base compartida.
+
+La prueba SQL aislada continúa verificada con Remote habilitado solo para la BD `db74230`; dos pruebas de concurrencia aprobaron allí. No se modificó la base compartida en esta actualización. El panel MonsterASP lista cuatro sitios existentes, ninguno identificado de forma inequívoca como Poraqui; por eso el backend no se ha publicado. Para continuar el despliegue se necesita elegir el sitio destino y sus variables privadas/ruta persistente. El envío SMS real también requiere la configuración privada Twilio y un teléfono de prueba autorizado.

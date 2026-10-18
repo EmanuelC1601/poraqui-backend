@@ -6,7 +6,7 @@ El backend tiene un único responsable. `main` es la base de integración; cada 
 
 ## Cambios integrados
 
-PR #1 y PR #22–#59 están integrados. El código incluye identidad y permisos por rol/recurso, comercio y catálogo, pedidos con precios del servidor, comprobantes privados y revisión manual, estados de preparación, reparto interno y externo, ofertas, expiración/cancelación, códigos, contacto autorizado, historial, idempotencia, sync offline, SignalR, incidencias, reembolsos manuales, OTP y métricas piloto. La prueba amplia usa SQLite aislado; las carreras SQL Server ya se verificaron por separado contra una base aislada. Esto no acredita servicios externos reales. Ver [ledger](project-status.md) y [recorrido reproducible](order-flow.md).
+PR #1 y PR #22–#60 están integrados. El código incluye identidad y permisos por rol/recurso, comercio y catálogo, pedidos con precios del servidor, comprobantes privados y revisión manual, estados de preparación, reparto interno y externo, ofertas, expiración/cancelación, códigos, contacto autorizado, historial, idempotencia, sync offline, SignalR, incidencias, reembolsos manuales, OTP y métricas piloto. La prueba amplia usa SQLite aislado; las carreras SQL Server ya se verificaron por separado contra una base aislada. Esto no acredita servicios externos reales. Ver [ledger](project-status.md) y [recorrido reproducible](order-flow.md).
 
 Las 13 migraciones integradas están aplicadas en la BD compartida de desarrollo. `dotnet-ef migrations list` se ejecutó el 2026-10-17 con `ConnectionStrings:DefaultConnection` de User Secrets y mostró todas las migraciones sin pendientes. No se aplica migración desde el arranque de la API.
 
@@ -46,3 +46,7 @@ Verificado localmente con SDK .NET 10.0.402: `dotnet test Poraqui.sln --no-resto
 ## Preparación de publicación y CI
 
 Se agregó `.github/workflows/ci.yml` para restaurar, compilar Release y ejecutar pruebas en cambios a `main`. En un runner sin configuración SQL privada, los dos tests SQL se omiten intencionalmente; no se conecta la BD compartida a CI. Build y tests Release pasaron localmente (0 advertencias/errores, 32 aprobadas y 2 omitidas). `dotnet publish` generó el output IIS esperado (`web.config`, ensamblado, `.deps.json` y `.runtimeconfig.json`). El paquete no se publicó: hace falta elegir el sitio web destino y configurar sus variables privadas y ruta persistente desde el panel. La documentación oficial de MonsterASP.NET admite .NET moderno y su opción Git Deploy **Build .NET app** para `.csproj`.
+
+PR #60 se integró como merge `cb11b72`. GitHub Actions `39084197135` pasó en `ubuntu-24.04` con checkout/setup-dotnet v5. El panel muestra cuatro sitios activos, pero ninguno identificado como Poraqui; no se publicó sobre sitios no identificados. La prueba de concurrencia SQL corre contra una base aislada con `ConnectionStrings:SqlServerTest` guardada en User Secrets; Remote está habilitado únicamente para esa base. La base compartida permanece fuera de las pruebas mutables.
+
+Revalidación local con SDK .NET 10.0.402 y la conexión aislada desde User Secrets: `dotnet test Poraqui.sln --configuration Release --no-restore` pasó 34/34, incluidas las dos pruebas SQL Server de concurrencia (0 omitidas). La base compartida no recibió cambios.
