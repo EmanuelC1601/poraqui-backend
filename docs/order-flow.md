@@ -12,6 +12,8 @@ dotnet test tests/Poraqui.Domain.Tests/Poraqui.Domain.Tests.csproj --filter "Ful
 
 La ruta principal con persistencia SQL Server real se verifica aparte con `SqlServerOrderFlowApiTests.Sql_server_api_flow_creates_reviews_prepares_assigns_and_delivers_one_order`. Configura `ConnectionStrings:SqlServerTest` en User Secrets con una base vacía/aislada y expón solo esa clave al proceso de pruebas como `ConnectionStrings__SqlServerTest`. El test aplica migraciones revisables únicamente a esa base, ejecuta Identity, creación del negocio y catálogo, precios de servidor, comprobante privado, revisión manual, preparación, asignación interna, pago al courier al recoger, contacto autorizado y entrega con código. Limpia sus filas identificadas al terminar. No usa la BD compartida, Twilio real ni mensajería de WhatsApp.
 
+El recorrido de reparto externo con proveedor SQL Server se verifica con `SqlServerExternalDeliveryFlowApiTests.Sql_server_api_flow_dispatches_accepts_and_delivers_one_external_order`. Comprueba zona de disponibilidad, publicación de oferta, origen, destino, remuneración y condiciones visibles antes de aceptar, aceptación repetible, código de recogida, pago al recoger registrado por el negocio, llamada autorizada y confirmación de entrega. Limpia sus registros identificados en la misma base aislada. Expiración, cancelación, rechazo, ausencia de repartidores y SignalR tienen además cobertura de ruta sobre SQLite; la aceptación simultánea SQL Server se prueba separadamente.
+
 La prueba recorre estos pasos y valida sus respuestas:
 
 1. Crear al administrador inicial, registrar negocio y cliente, y configurar el negocio como activo.
@@ -25,7 +27,7 @@ La prueba recorre estos pasos y valida sus respuestas:
 9. Validar recogida, inicio del recorrido y contacto autorizado por WhatsApp; confirmar entrega directa o validar una confirmación capturada sin conexión antes de aceptarla en el servidor. Consulta estado, historial, incidentes, reembolso manual y métricas.
 10. Comprobar que SignalR entrega cambios persistidos y devuelve el estado actual al reconectar; el cliente y el negocio ajeno no obtienen datos privados del pedido.
 
-El recorrido SQLite cubre también reparto externo, SignalR, sync offline, incidencias, reembolso manual y métricas; la prueba SQL Server cubre el recorrido API de reparto interno y persistencia real. Las pruebas SQL Server de concurrencia cubren creación idempotente y las asignaciones/aceptaciones de couriers. Ninguna prueba equivale a una publicación en MonsterASP.NET o a una entrega Twilio/WhatsApp real.
+El recorrido SQLite cubre también reparto externo, SignalR, sync offline, incidencias, reembolso manual y métricas; dos pruebas API SQL Server cubren los recorridos internos y externos con persistencia real. Las pruebas SQL Server de concurrencia cubren creación idempotente y las asignaciones/aceptaciones de couriers. Ninguna prueba equivale a una publicación en MonsterASP.NET o a una entrega Twilio/WhatsApp real.
 
 ## Ejecución manual de la API
 
