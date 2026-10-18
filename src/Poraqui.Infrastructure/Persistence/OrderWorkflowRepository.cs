@@ -62,7 +62,40 @@ public sealed class OrderWorkflowRepository(AppDbContext db) : IOrderWorkflowRep
         return offers;
     }
 
-    public void AddOfflineDeliveryCommand(OfflineDeliverySyncRecord command) => db.OfflineDeliverySyncRecords.Add(command);
+    public async Task<bool> SaveOfflineDeliveryCommandAsync(OfflineDeliverySyncRecord command, CancellationToken cancellationToken)
+    {
+        db.OfflineDeliverySyncRecords.Add(command);
+        try
+        {
+            await SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateException)
+        {
+            db.ChangeTracker.Clear();
+            if (await db.OfflineDeliverySyncRecords.AnyAsync(existing =>
+                    existing.ActorUserId == command.ActorUserId && existing.Id == command.Id, cancellationToken))
+                return false;
+            throw;
+        }
+    }
+
+    public async Task<bool> SaveIncidentCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateException)
+        {
+            db.ChangeTracker.Clear();
+            if (await db.Set<OrderIncident>().AnyAsync(existing => existing.ReporterUserId == actorUserId &&
+                    existing.CommandId == commandId, cancellationToken))
+                return false;
+            throw;
+        }
+    }
 
     public async Task<bool> SaveTransferEvidenceCommandAsync(Order order, CancellationToken cancellationToken)
     {

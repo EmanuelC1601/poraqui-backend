@@ -18,7 +18,8 @@ public interface IOrderWorkflowRepository
     Task<TransferReview?> GetTransferEvidenceCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken);
     Task<CourierAssignmentCommand?> GetCourierAssignmentCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ExternalDeliveryOffer>> CancelOpenExternalOffersForOrderAsync(Guid orderId, CancellationToken cancellationToken);
-    void AddOfflineDeliveryCommand(OfflineDeliverySyncRecord command);
+    Task<bool> SaveOfflineDeliveryCommandAsync(OfflineDeliverySyncRecord command, CancellationToken cancellationToken);
+    Task<bool> SaveIncidentCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken);
     Task<bool> SaveTransferEvidenceCommandAsync(Order order, CancellationToken cancellationToken);
     Task<bool> SaveCourierAssignmentCommandAsync(Order order, CourierAssignmentCommand command, CancellationToken cancellationToken);
     Task SaveChangesAsync(CancellationToken cancellationToken);
@@ -194,9 +195,21 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IO
             return ToView(existing);
         }
         var incident = order.AddIncident(actorId, category, description, commandId);
-        await repository.SaveChangesAsync(cancellationToken);
+        if (!await repository.SaveIncidentCommandAsync(actorId, commandId, cancellationToken))
+        {
+            existing = await repository.GetIncidentCommandAsync(actorId, commandId, cancellationToken)
+                ?? throw new InvalidOperationException("The incident command could not be recovered after a concurrent retry.");
+            EnsureMatchingIncident(existing, orderId, category, description);
+            return ToView(existing);
+        }
         await PublishChange(order, cancellationToken);
         return ToView(incident);
+    }
+
+    private static void EnsureMatchingIncident(OrderIncident existing, Guid orderId, string category, string description)
+    {
+        if (existing.OrderId != orderId || existing.Category != category.Trim() || existing.Description != description.Trim())
+            throw new IncidentCommandConflictException();
     }
 
     public async Task<OrderIncidentView?> ResolveIncidentAsync(Guid businessId, Guid orderId, Guid incidentId,
@@ -405,9 +418,7 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IO
         var existing = await repository.GetOfflineDeliveryCommandAsync(courierId, commandId, cancellationToken);
         if (existing is not null)
         {
-            if (existing.OrderId != orderId || !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
-                    Convert.FromHexString(existing.PayloadHash), Convert.FromHexString(payloadHash)))
-                throw new OfflineDeliveryCommandConflictException();
+            EnsureMatchingOfflineDeliveryCommand(existing, orderId, payloadHash);
             return new OfflineDeliverySyncResult(commandId, orderId, OrderStatus.Delivered.ToString(), existing.ServerAcceptedAtUtc, true);
         }
 
@@ -415,11 +426,24 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IO
         EnsureCourier(order, courierId);
         var acceptedAt = DateTimeOffset.UtcNow;
         order.MarkDelivered(courierId, OrderAccessCode.Hash(deliveryCode));
-        repository.AddOfflineDeliveryCommand(new OfflineDeliverySyncRecord(commandId, courierId, orderId, payloadHash,
-            clientCapturedAtUtc, acceptedAt));
-        await repository.SaveChangesAsync(cancellationToken);
+        var command = new OfflineDeliverySyncRecord(commandId, courierId, orderId, payloadHash,
+            clientCapturedAtUtc, acceptedAt);
+        if (!await repository.SaveOfflineDeliveryCommandAsync(command, cancellationToken))
+        {
+            existing = await repository.GetOfflineDeliveryCommandAsync(courierId, commandId, cancellationToken)
+                ?? throw new InvalidOperationException("The offline delivery command could not be recovered after a concurrent retry.");
+            EnsureMatchingOfflineDeliveryCommand(existing, orderId, payloadHash);
+            return new OfflineDeliverySyncResult(commandId, orderId, OrderStatus.Delivered.ToString(), existing.ServerAcceptedAtUtc, true);
+        }
         await PublishChange(order, cancellationToken);
         return new OfflineDeliverySyncResult(commandId, orderId, OrderStatus.Delivered.ToString(), acceptedAt, false);
+    }
+
+    private static void EnsureMatchingOfflineDeliveryCommand(OfflineDeliverySyncRecord existing, Guid orderId, string payloadHash)
+    {
+        if (existing.OrderId != orderId || !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                Convert.FromHexString(existing.PayloadHash), Convert.FromHexString(payloadHash)))
+            throw new OfflineDeliveryCommandConflictException();
     }
 
     private async Task<Order> RequiredOrder(Guid id, CancellationToken cancellationToken) =>
