@@ -94,18 +94,21 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IOrderChangePublisher, SignalROrderChangePublisher>();
 builder.Services.AddScoped<IExternalOfferPublisher, SignalRExternalOfferPublisher>();
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var identityConfigured = !string.IsNullOrWhiteSpace(connectionString);
+var webRootPath = builder.Environment.WebRootPath ?? Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
 var dataProtection = builder.Services.AddDataProtection().SetApplicationName("Poraqui");
 var dataProtectionKeysPath = builder.Configuration["DataProtection:KeysPath"];
+if (identityConfigured && builder.Environment.IsProduction())
+    dataProtectionKeysPath = PersistentDataProtectionConfiguration.ValidateProductionPath(dataProtectionKeysPath, webRootPath);
+
 if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
 {
     Directory.CreateDirectory(dataProtectionKeysPath);
     dataProtection.PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
 }
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-var identityConfigured = !string.IsNullOrWhiteSpace(connectionString);
 if (identityConfigured && builder.Environment.IsProduction())
 {
-    var webRootPath = builder.Environment.WebRootPath ?? Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
     PrivateEvidenceStorageConfiguration.ValidateProductionRoot(builder.Configuration["PrivateFiles:Root"], webRootPath);
 }
 

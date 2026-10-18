@@ -71,4 +71,10 @@ Rama `feature/require-private-evidence-storage` añade validación de `PrivateFi
 
 Build Release: 0 advertencias, 0 errores. Pruebas del guard: 4/4. Suite Release completa: 43/43, con siete pruebas SQL Server en la BD aislada `db74230`; no hubo cambios de modelo, migraciones o datos en la BD compartida. El `git diff --check` debe ejecutarse antes del commit.
 
-Configuración local confirmada por nombre de clave, sin mostrar valores: existe `ConnectionStrings:SqlServerTest`; faltan `ConnectionStrings:DefaultConnection`, `PrivateFiles:Root` y `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid`, `TwilioVerify:ApiKeySecret`. Para la cadena compartida de desarrollo, agrega `ConnectionStrings:DefaultConnection` a User Secrets del proyecto API con la cadena Local adecuada; `docs/deployment-monsterasp.md` incluye el comando y las variables de sitio. No hay credenciales de base compartida disponibles en esta copia y no se usaron valores de mensajes.
+Configuración local confirmada por nombre de clave, sin mostrar valores: existe `ConnectionStrings:SqlServerTest`; faltan `ConnectionStrings:DefaultConnection`, `PrivateFiles:Root`, `DataProtection:KeysPath` y `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid`, `TwilioVerify:ApiKeySecret`. Para la cadena compartida de desarrollo, agrega `ConnectionStrings:DefaultConnection` a User Secrets del proyecto API con la cadena Local adecuada; `docs/deployment-monsterasp.md` incluye el comando y las variables de sitio. No hay credenciales de base compartida disponibles en esta copia y no se usaron valores de mensajes.
+
+## Persistencia de claves de Data Protection
+
+Rama `feature/require-persistent-data-protection-keys`: exige `DataProtection:KeysPath` en Production cuando la conexión SQL activa Identity y rechaza una ruta dentro de `wwwroot`. El directorio se crea al inicio; persiste las claves que cifran códigos sensibles, para que los replays de asignación puedan recuperar el código tras un reinicio. En varias instancias, la ruta debe ser almacenamiento compartido. Cinco pruebas cubren clave ausente, path público/privado y descifrado con un segundo proveedor después del reinicio. No hay cambios de modelo ni migraciones.
+
+Build Release: 0 advertencias, 0 errores. La suite Release pasó 48/48, incluidas siete pruebas SQL Server en `db74230`; no se modificó la BD compartida.
