@@ -476,7 +476,8 @@ public sealed class OrderWorkflowService(IOrderWorkflowRepository repository, IO
         order.Items.Select(item => new OrderWorkflowLine(item.ProductId, item.ProductName, item.UnitPrice, item.Quantity, item.LineTotal,
             item.Options.Select(option => new SelectedOrderOptionView(option.ProductOptionId, option.Name, option.PriceDelta)).ToArray())).ToArray(),
         order.StatusHistory.OrderBy(entry => entry.ChangedAtUtc)
-            .Select(entry => new OrderWorkflowHistory(entry.ActorUserId, entry.Status.ToString(), entry.ChangedAtUtc, entry.Reason)).ToArray(), null);
+            .Select(entry => new OrderWorkflowHistory(entry.ActorUserId, entry.Status.ToString(), entry.ChangedAtUtc, entry.Reason)).ToArray(), null,
+        order.RefundCase?.Status.ToString());
 
     private static OrderIncidentView ToView(OrderIncident incident) => new(incident.Id, incident.ReporterUserId,
         incident.Category, incident.Description, incident.Status.ToString(), incident.ReportedAtUtc,

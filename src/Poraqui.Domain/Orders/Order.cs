@@ -132,7 +132,8 @@ public sealed class Order
     public bool CancelByCustomer(Guid customerUserId, string reason)
     {
         if (customerUserId != CustomerUserId) throw new InvalidOperationException("Only the customer can cancel this order.");
-        return Cancel(customerUserId, reason, [OrderStatus.PendingPayment]);
+        return Cancel(customerUserId, reason,
+            [OrderStatus.PendingPayment, OrderStatus.AwaitingPaymentReview, OrderStatus.AwaitingBusinessDecision]);
     }
 
     public bool CancelByBusiness(Guid businessUserId, string reason)

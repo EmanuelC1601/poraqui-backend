@@ -140,7 +140,7 @@ public sealed class CommerceRulesTests
     }
 
     [Fact]
-    public void Customer_cancellation_is_limited_to_unpaid_orders_and_same_request_is_idempotent()
+    public void Customer_can_cancel_before_business_acceptance_and_paid_orders_get_manual_refund_follow_up()
     {
         var order = CreateOrder();
         Assert.True(order.CancelByCustomer(order.CustomerUserId, "El cliente cambió de opinión"));
@@ -150,9 +150,28 @@ public sealed class CommerceRulesTests
         Assert.Equal(2, order.StatusHistory.Count);
         Assert.Null(order.RefundCase);
 
+        var awaitingReview = CreateOrder();
+        awaitingReview.SubmitTransferEvidence("private/test-proof-pending-review");
+        Assert.True(awaitingReview.CancelByCustomer(awaitingReview.CustomerUserId, "El cliente cancela antes de revisar"));
+        Assert.Equal(OrderStatus.Cancelled, awaitingReview.Status);
+        Assert.Equal(ManualRefundStatus.ReviewRequired, awaitingReview.RefundCase!.Status);
+        Assert.False(awaitingReview.CancelByCustomer(awaitingReview.CustomerUserId, "El cliente cancela antes de revisar"));
+        Assert.Single(awaitingReview.StatusHistory, change => change.Status == OrderStatus.Cancelled);
+
+        var awaitingDecision = CreateOrder();
+        awaitingDecision.SubmitTransferEvidence("private/test-proof-approved");
+        awaitingDecision.ReviewTransfer(Guid.NewGuid(), approved: true);
+        Assert.True(awaitingDecision.CancelByCustomer(awaitingDecision.CustomerUserId, "El cliente cancela antes de aceptar"));
+        Assert.Equal(ManualRefundStatus.ReviewRequired, awaitingDecision.RefundCase!.Status);
+
+        var accepted = CreateOrder();
+        accepted.SubmitTransferEvidence("private/test-proof-confirmed");
+        accepted.ReviewTransfer(Guid.NewGuid(), approved: true);
+        accepted.AcceptByBusiness(Guid.NewGuid());
+        Assert.Throws<InvalidOperationException>(() => accepted.CancelByCustomer(accepted.CustomerUserId, "Pedido ya confirmado"));
+
         var other = CreateOrder();
-        other.SubmitTransferEvidence("private/test-proof");
-        Assert.Throws<InvalidOperationException>(() => other.CancelByCustomer(other.CustomerUserId, "Cambio de plan"));
+        Assert.Throws<InvalidOperationException>(() => other.CancelByCustomer(Guid.NewGuid(), "Intento ajeno"));
     }
 
     [Fact]
