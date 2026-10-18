@@ -6,9 +6,9 @@ El backend tiene un único responsable. `main` es la base de integración; cada 
 
 ## Cambios integrados
 
-PR #1 y PR #22–#67 están integrados. El código incluye identidad y permisos por rol/recurso, comercio y catálogo, pedidos con precios del servidor, comprobantes privados y revisión manual, estados de preparación, reparto interno y externo, ofertas, expiración/cancelación, códigos, contacto autorizado, historial, idempotencia, sincronización offline validada por el servidor, SignalR, incidencias, reembolsos manuales, OTP y métricas piloto. La suite Release completa pasó 39/39 con SQL Server aislado `db74230` y SQLite. Esto no acredita servicios externos reales. Ver [ledger](project-status.md) y [recorrido reproducible](order-flow.md).
+PR #1 y los incrementos posteriores están integrados en `main`. El código contiene identidad y permisos por rol/recurso, comercio y catálogo, pedidos con precios del servidor, comprobantes privados y revisión manual, estados de preparación, reparto interno y externo, ofertas, expiración/cancelación, códigos, contacto autorizado, historial, idempotencia, sincronización offline validada por el servidor, SignalR, incidencias, reembolsos manuales, OTP y métricas piloto. La última suite Release local aprobó **50/50**, con SQLite y ocho pruebas SQL Server en la base aislada `db74230`; esto no acredita servicios externos ni hosting reales. Ver [ledger](project-status.md) y [recorrido reproducible](order-flow.md).
 
-Las 13 migraciones integradas están aplicadas en la BD compartida de desarrollo. `dotnet-ef migrations list` se ejecutó el 2026-10-17 con `ConnectionStrings:DefaultConnection` de User Secrets y mostró todas las migraciones sin pendientes. No se aplica migración desde el arranque de la API.
+El proyecto contiene 15 migraciones EF. La verificación de modelo más reciente indicó que no hay cambios pendientes de migración; las pruebas SQL Release migran solo su base aislada. Los registros históricos de integración y despliegue de este documento conservan los conteos que eran vigentes cuando se ejecutaron. No se aplica migración desde el arranque de la API.
 
 PR #49 documenta el test integral reproducible y sus límites. PR #50 distingue su configuración aislada de la configuración privada requerida para ejecutar la API manualmente. PR #52 (`edac6bf`) registra la integración de .NET 10 y mantiene explícitos los pendientes.
 
@@ -107,7 +107,7 @@ PR #76 (`e91298d`) documenta en OpenAPI la respuesta y los errores de cancelaci�
 
 PR #79, integrado en `main` como `96f31a0`, asegura en el flujo API que reintentar la cancelación del mismo cliente conserva el número de entradas de historial y una sola transición `Cancelled`. Prueba SQLite enfocada 1/1; CI pasó. No hay migración.
 
-La última ejecución local completa de la suite Release en esta copia fue **42 aprobadas y 8 omitidas, de 50**; los PR #77 y #79 después de esa ejecución solo fortalecieron assertions dentro de pruebas existentes y pasaron CI. Las omitidas son las pruebas SQL Server que requieren `ConnectionStrings:SqlServerTest`; la configuración adicional quedó pendiente por indicación del usuario. Los checks de GitHub pasan con SQLite y omiten esas pruebas SQL por diseño.
+En la ejecución anterior sin `ConnectionStrings:SqlServerTest`, 42 pruebas pasaron y ocho SQL Server se omitieron. La ejecución local completa más reciente cargó la conexión de la base aislada desde User Secrets solo en el proceso y pasó **50/50**, incluidas esas ocho pruebas. El detalle y la fecha de ambas comprobaciones están en [project-status.md](project-status.md).
 
 ## Verificación vigente 2026-10-17
 
