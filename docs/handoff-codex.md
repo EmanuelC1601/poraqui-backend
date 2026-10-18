@@ -6,7 +6,7 @@ El backend tiene un único responsable. `main` es la base de integración; cada 
 
 ## Cambios integrados
 
-PR #1 y PR #22–#50 están integrados. El código incluye identidad y permisos por rol/recurso, comercio y catálogo, pedidos con precios del servidor, comprobantes privados y revisión manual, estados de preparación, reparto interno y externo, ofertas, expiración/cancelación, códigos, contacto autorizado, historial, idempotencia, sync offline, SignalR, incidencias, reembolsos manuales, OTP y métricas piloto. La prueba amplia usa SQLite aislado; no acredita concurrencia SQL Server ni servicios externos reales. Ver [ledger](project-status.md) y [recorrido reproducible](order-flow.md).
+PR #1 y PR #22–#58 están integrados. El código incluye identidad y permisos por rol/recurso, comercio y catálogo, pedidos con precios del servidor, comprobantes privados y revisión manual, estados de preparación, reparto interno y externo, ofertas, expiración/cancelación, códigos, contacto autorizado, historial, idempotencia, sync offline, SignalR, incidencias, reembolsos manuales, OTP y métricas piloto. La prueba amplia usa SQLite aislado; las carreras SQL Server ya se verificaron por separado contra una base aislada. Esto no acredita servicios externos reales. Ver [ledger](project-status.md) y [recorrido reproducible](order-flow.md).
 
 Las 13 migraciones integradas están aplicadas en la BD compartida de desarrollo. `dotnet-ef migrations list` se ejecutó el 2026-10-17 con `ConnectionStrings:DefaultConnection` de User Secrets y mostró todas las migraciones sin pendientes. No se aplica migración desde el arranque de la API.
 
@@ -28,12 +28,17 @@ Revalidación tras PR #52 con el SDK local 10.0.402: build con 0 advertencias/er
 
 ## Pendientes y bloqueos
 
-1. Configurar `ConnectionStrings__SqlServerTest` en el entorno local del proceso de test con la conexión Remote de una base **aislada** y habilitar Remote solo en esa base; después ejecutar las pruebas de aceptación/asignación simultáneas. El test carga además `ConnectionStrings:DefaultConnection` de User Secrets para proteger la BD compartida. No usar la BD compartida como destino de pruebas.
-2. Publicar en un sitio MonsterASP.NET con sus variables privadas y almacenamiento persistente; validar health, SignalR y comprobante privado.
-3. Configurar secretos Twilio en privado y probar el envío OTP con un teléfono autorizado.
+1. Publicar en un sitio MonsterASP.NET con sus variables privadas y almacenamiento persistente; validar health, SignalR y comprobante privado.
+2. Configurar secretos Twilio en privado y probar el envío OTP con un teléfono autorizado.
 
 No se publican secretos ni se toman credenciales del chat. El estado verificable vigente está en `docs/project-status.md`.
 
 ## Actualización posterior: PR #56
 
 La corrección de precisión del contrato de carga de comprobante se integró en `main` como merge `8f637d6` (commit `fbe5803`). El snapshot OpenAPI ahora coincide con la salida de ejecución para las 61 rutas y declara la carga multipart y sus respuestas reales. Una prueba de contrato valida ese endpoint. Antes de integrar, SDK .NET 10.0.402 compiló con 0 advertencias/errores y ejecutó 32 pruebas aprobadas; las 2 pruebas de concurrencia SQL permanecieron omitidas al faltar la cadena de una base aislada. La consulta de esquema más reciente usó `ConnectionStrings:DefaultConnection` privada en modo solo lectura y confirmó 13 migraciones aplicadas, sin aplicar migraciones nuevas. No hay otro agente del que dependa el trabajo.
+
+## Actualización posterior: PR #58 y verificación SQL aislada
+
+PR #58 (`d38493f`) quedó integrado en `main` como merge `f9fa0d2`. Corrige la limpieza de la prueba de concurrencia externa: descarta snapshots rastreados anteriores a los cambios con rowversion y relee los registros antes de borrarlos.
+
+Verificado localmente con SDK .NET 10.0.402: `dotnet test Poraqui.sln --no-restore` aprobó 32 pruebas y omitió las dos SQL por configuración ausente en el proceso predeterminado. Con `ConnectionStrings:SqlServerTest` privada y aislada, ambas pruebas SQL Server —asignación interna simultánea y aceptación externa simultánea— aprobaron (2/2). La base aislada estaba vacía antes de las pruebas y recibió solo migraciones revisables mediante `MigrateAsync` dentro de los tests; la base compartida no recibió migraciones en esta actualización. `dotnet-ef migrations list` leyó de nuevo la configuración privada de desarrollo y mostró las 13 migraciones integradas. PR #58 no tuvo checks automáticos configurados en GitHub; las verificaciones descritas son locales.
