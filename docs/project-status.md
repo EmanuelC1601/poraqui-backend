@@ -17,15 +17,15 @@ Actualizado: 2026-10-17. `main` es la base de integración, con un solo responsa
 | Integrado | Snapshots SignalR al reconectar y ofertas actuales al suscribirse | PR #38 y #45–#46; reconexión y destinatarios cubiertos por pruebas |
 | Integrado | Guía de despliegue MonsterASP.NET y recorrido reproducible | PR #39 y #49–#50; aún no hay publicación ni verificación de hosting |
 | Integrado; migraciones aplicadas a desarrollo | 13 migraciones EF integradas, incluida `ExternalOfferAcceptancePickupCode` | `dotnet-ef migrations list` conectado en lectura el 2026-10-17 mostró 13 migraciones, ninguna pendiente. La más reciente solo añadió `ProtectedPickupCode nvarchar(2000) NULL` |
-| En curso en `feature/net10-lts-main` | Actualización del target a .NET 10 LTS y EF Core 10 | Validación local con SDK 10.0.402; aún no integrada. Este cambio no modifica el modelo ni crea migraciones |
+| Integrado | Actualización del target a .NET 10 LTS y EF Core 10 | PR #51, merge `5078005`; no cambia el modelo ni genera migraciones |
 | Pendiente | Ejecutar dos pruebas de concurrencia contra SQL Server aislado | Crear/configurar `ConnectionStrings__SqlServerTest` en User Secrets y habilitar acceso Remote únicamente en la base aislada de pruebas; no apuntar a la BD compartida |
 | Pendiente | Publicar y comprobar API, SignalR y almacenamiento privado en MonsterASP.NET | Se necesita sitio destino, variables privadas de producción y ruta persistente autorizada |
 | Pendiente | Verificar OTP Twilio extremo a extremo | Se necesitan `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid`, `TwilioVerify:ApiKeySecret` en configuración privada y un teléfono de prueba autorizado |
 | Fuera de alcance | GPS, distancias inferidas, transferencias bancarias automáticas y frontend | Se usan zonas/tarifas y revisión/pago manual |
 
-## Verificaciones actuales de .NET 10
+## Verificaciones de .NET 10 integradas por PR #51
 
-Rama `feature/net10-lts-main` basada en `main` (`228388c`):
+Commit `05d5410`, integrado en `main` como `5078005`:
 
 - `dotnet build Poraqui.sln --no-restore` con SDK local 10.0.402: 0 advertencias, 0 errores.
 - `dotnet test Poraqui.sln --no-restore`: 31 pasaron; 2 pruebas SQL Server omitidas por falta de configuración aislada.

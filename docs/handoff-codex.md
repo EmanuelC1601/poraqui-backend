@@ -12,9 +12,9 @@ Las 13 migraciones integradas están aplicadas en la BD compartida de desarrollo
 
 PR #49 documenta el test integral reproducible y sus límites. PR #50 distingue su configuración aislada de la configuración privada requerida para ejecutar la API manualmente.
 
-## Incremento activo
+## Último incremento integrado: PR #51
 
-La rama `feature/net10-lts-main` parte del `main` integrado por PR #50 (`228388c`). Actualiza proyectos y paquetes de .NET/EF Core a .NET 10 LTS, SQL Client 7.1.1 y PKCS 10.0.13. No cambia contratos API ni el modelo EF y no genera migraciones.
+PR #51 se integró en `main` como merge `5078005` (commit de trabajo `05d5410`). Actualiza proyectos y paquetes de .NET/EF Core a .NET 10 LTS, SQL Client 7.1.1 y PKCS 10.0.13. No cambia contratos API ni el modelo EF y no genera migraciones.
 
 Validación local con SDK 10.0.402:
 
