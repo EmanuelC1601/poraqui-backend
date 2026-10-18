@@ -50,3 +50,5 @@ Se agregó `.github/workflows/ci.yml` para restaurar, compilar Release y ejecuta
 PR #60 se integró como merge `cb11b72`. GitHub Actions `39084197135` pasó en `ubuntu-24.04` con checkout/setup-dotnet v5. El panel muestra cuatro sitios activos, pero ninguno identificado como Poraqui; no se publicó sobre sitios no identificados. La prueba de concurrencia SQL corre contra una base aislada con `ConnectionStrings:SqlServerTest` guardada en User Secrets; Remote está habilitado únicamente para esa base. La base compartida permanece fuera de las pruebas mutables.
 
 Revalidación local con SDK .NET 10.0.402 y la conexión aislada desde User Secrets: `dotnet test Poraqui.sln --configuration Release --no-restore` pasó 34/34, incluidas las dos pruebas SQL Server de concurrencia (0 omitidas). La base compartida no recibió cambios.
+
+Incremento en revisión en `feature/sql-order-idempotency-concurrency`: agrega una carrera SQL Server para dos reintentos simultáneos de creación con el mismo `commandId`. La suite Release pasó 35/35 (incluidas tres pruebas SQL Server), el build Release pasa sin advertencias y el esquema no cambió. Ese proceso solo utilizó la BD aislada.
