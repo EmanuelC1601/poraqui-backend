@@ -18,8 +18,10 @@ Actualizado: 2026-10-17. `main` es la base de integración, con un solo responsa
 | Integrado; paquete Release verificado, hosting pendiente | Guía de despliegue MonsterASP.NET y recorrido reproducible | PR #39 y #49–#50; `dotnet publish` genera output IIS con `web.config`, aún no hay publicación ni verificación de hosting |
 | Integrado; migraciones aplicadas a desarrollo | 13 migraciones EF integradas, incluida `ExternalOfferAcceptancePickupCode` | `dotnet-ef migrations list` conectado el 2026-10-17 enumeró las 13 migraciones sin pendientes; esta actualización no aplicó migraciones. |
 | Integrado | Actualización del target a .NET 10 LTS y EF Core 10 | PR #51, merge `5078005`; no cambia el modelo ni genera migraciones |
-| Pendiente | Publicar y comprobar API, SignalR y almacenamiento privado en MonsterASP.NET | Se necesita sitio destino, variables privadas de producción y ruta persistente autorizada |
+| Integrado; guard de startup verificado | Configuración de almacenamiento privado en Production | Rama `feature/require-private-evidence-storage`: cuando SQL está configurado, Production exige `PrivateFiles:Root` fuera de `wwwroot` y resuelve el storage al iniciar para comprobar creación/acceso de carpeta. Cuatro pruebas verifican falta de ruta, ubicación dentro de `wwwroot` y ubicación privada. No cambia esquema. |
+| Pendiente; guard de configuración implementado | Publicar y comprobar API, SignalR y almacenamiento privado en MonsterASP.NET | PR de guard valida `PrivateFiles:Root` fuera de `wwwroot` y crea la carpeta en startup de Production; sigue pendiente elegir sitio y proporcionar la ruta persistente privada del Application Pool |
 | Pendiente | Verificar OTP Twilio extremo a extremo | Se necesitan `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid`, `TwilioVerify:ApiKeySecret` en configuración privada y un teléfono de prueba autorizado |
+| Bloqueado por configuración privada local | Acceso de solo lectura a la BD compartida de desarrollo | Esta copia no tiene `ConnectionStrings:DefaultConnection`. Configurarla en User Secrets con la cadena Local de desarrollo antes de comprobar `migrations list`; no usar la cadena Remote aislada ni los datos bancarios o claves compartidos en mensajes. |
 | Fuera de alcance | GPS, distancias inferidas, transferencias bancarias automáticas y frontend | Se usan zonas/tarifas y revisión/pago manual |
 
 ## Verificaciones de .NET 10 integradas por PR #51
@@ -81,3 +83,9 @@ Verificación del PR #67, integrado en `main` como merge `2c50be9`: con `Connect
 ## Replay idempotente en carreras SQL
 
 PR #67, integrado en `main` como merge `2c50be9`, cubre reporte de incidencia y confirmación de entrega offline. Si dos solicitudes concurrentes con el mismo actor y `commandId` compiten por la restricción única, la solicitud perdedora recupera el resultado persistido; el replay idéntico no vuelve a publicar evento. Un payload distinto devuelve conflicto. Las dos pruebas SQL Server fuerzan la carrera en `SaveChanges` y verifican un solo registro e historial. No hay cambios al modelo EF ni migraciones en este incremento.
+
+## Guard del almacenamiento de comprobantes en Production
+
+Rama `feature/require-private-evidence-storage`: la API rechaza el arranque en `Production` (con SQL configurado) si falta `PrivateFiles:Root` o la ruta cae dentro de `wwwroot`; después de construir el host resuelve el servicio para crear/verificar el directorio. Esto evita arrancar con el fallback a `LocalApplicationData`, cuya persistencia no está garantizada por MonsterASP. No prueba persistencia tras reinicios del hosting.
+
+Verificación local en Release: build con 0 advertencias y 0 errores; 4 pruebas unitarias del guard pasaron y suite completa pasó 43/43, incluidas siete pruebas SQL Server sobre la base aislada `db74230`. No se generó migración ni se modificó la BD compartida. En esta copia siguen ausentes `ConnectionStrings:DefaultConnection`, `PrivateFiles:Root` y los tres valores privados `TwilioVerify:*`; el sitio MonsterASP aún requiere una ruta persistente autorizada y elegir el destino de publicación.

@@ -28,6 +28,16 @@ En **Scripting → Environment variables**, agrega estos nombres y valores obten
 
 ASP.NET Core interpreta `__` como separador de secciones (`ConnectionStrings__DefaultConnection` equivale a `ConnectionStrings:DefaultConnection`). Usa valores secretos guardados desde el panel del sitio. La cadena de la aplicación alojada debe ser la cadena Local del panel; la cadena pública del servidor es para conexiones remotas y requiere habilitar acceso remoto.
 
+En `Production`, cuando hay conexión SQL configurada, la API exige `PrivateFiles__Root`, rechaza una ruta dentro de `wwwroot` y crea/verifica la carpeta privada al arrancar. Si falta o IIS no puede escribir la ruta, el proceso falla al iniciar en vez de guardar comprobantes en el directorio local temporal predeterminado. Esta validación no puede demostrar que el plan de hosting conserva la ruta tras reinicios; verifícalo con MonsterASP antes de recibir comprobantes reales.
+
+Para configuración local de desarrollo, guarda `ConnectionStrings:DefaultConnection` en User Secrets (no `appsettings*.json`):
+
+```powershell
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<cadena Local de la BD de desarrollo>" --project src/Poraqui.Api
+```
+
+Para pruebas mutables SQL, configura `ConnectionStrings:SqlServerTest` con la cadena de la BD aislada y ejecútalas contra esa base. No uses la cadena de test como `DefaultConnection`.
+
 ## Migraciones y activación
 
 La API no aplica migraciones al iniciar. Antes de usar una base de producción, el responsable de migraciones debe revisar el destino, conciliar `__EFMigrationsHistory`, generar scripts SQL revisables, verificar que sean aditivos y preserven datos, y aplicarlos explícitamente. No confundas la base de desarrollo con la base destino de producción.

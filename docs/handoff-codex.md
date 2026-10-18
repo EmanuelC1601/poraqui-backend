@@ -64,3 +64,11 @@ PR #67 (`feature/sql-idempotent-command-replays`, commit `48da602`) se fusionó 
 La cadena `ConnectionStrings:SqlServerTest` está disponible en User Secrets de esta copia y apunta a `db74230`; no se imprimió ni versionó. `dotnet build Poraqui.sln --configuration Release --no-restore` pasó con 0 advertencias/errores. La suite Release completa pasó 39/39 (32 pruebas SQLite y siete pruebas SQL Server); la base aislada recibió las operaciones de los tests, sin cambios en la BD compartida. El check `backend-ci / build-and-test` pasó antes de integrar.
 
 Siguiente trabajo desde `main`: resolver los pendientes desplegables descritos en `docs/project-status.md` (destino del sitio MonsterASP, ruta persistente para archivos y credenciales Twilio privadas para verificar SMS). Los módulos comerciales siguen con cobertura parcial documentada; no declarar completitud basándose solo en entidades o mapeos.
+
+## Guard de storage privado en Production
+
+Rama `feature/require-private-evidence-storage` añade validación de `PrivateFiles:Root` durante el arranque en Production: debe configurarse y quedar fuera de `wwwroot`; el registro del servicio en startup comprueba que IIS pueda crear/abrir el directorio. Evita arrancar con un fallback de almacenamiento no persistente, pero la persistencia después de reciclos debe probarse en el sitio MonsterASP elegido.
+
+Build Release: 0 advertencias, 0 errores. Pruebas del guard: 4/4. Suite Release completa: 43/43, con siete pruebas SQL Server en la BD aislada `db74230`; no hubo cambios de modelo, migraciones o datos en la BD compartida. El `git diff --check` debe ejecutarse antes del commit.
+
+Configuración local confirmada por nombre de clave, sin mostrar valores: existe `ConnectionStrings:SqlServerTest`; faltan `ConnectionStrings:DefaultConnection`, `PrivateFiles:Root` y `TwilioVerify:ServiceSid`, `TwilioVerify:ApiKeySid`, `TwilioVerify:ApiKeySecret`. Para la cadena compartida de desarrollo, agrega `ConnectionStrings:DefaultConnection` a User Secrets del proyecto API con la cadena Local adecuada; `docs/deployment-monsterasp.md` incluye el comando y las variables de sitio. No hay credenciales de base compartida disponibles en esta copia y no se usaron valores de mensajes.
