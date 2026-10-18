@@ -37,4 +37,6 @@ Los tests API usan SQLite en memoria y almacenamiento temporal. No prueban SQL S
 
 ## Configuración privada requerida para la prueba SQL
 
-`ConnectionStrings__SqlServerTest` debe contener la cadena Remote de la base aislada de pruebas. El loader también lee `ConnectionStrings:DefaultConnection` desde User Secrets y omite la prueba si el catálogo de prueba es el de desarrollo compartido. No se habilitó Remote ni se guardaron credenciales en el repositorio.
+`ConnectionStrings__SqlServerTest` debe estar presente como variable de entorno del proceso `dotnet test` y contener la cadena Remote de una base aislada. La prueba lee `ConnectionStrings:DefaultConnection` desde User Secrets y omite las carreras si falta la cadena aislada, falta la conexión privada compartida para comparar catálogos, o ambos destinos usan la misma base. No se habilitó Remote ni se guardaron credenciales en el repositorio. Configura la variable solo en el entorno local privado desde el que ejecutarás los tests; no añadas el valor a archivos versionados.
+
+Verificación repetida tras integrar PR #52 (`edac6bf`): SDK local 10.0.402, compilación con 0 advertencias/errores, 31 tests aprobados y las dos carreras SQL omitidas porque falta `ConnectionStrings__SqlServerTest`. `dotnet-ef migrations list` conectó en lectura a la BD de desarrollo privada y mostró las 13 migraciones integradas sin pendientes. No se ejecutaron pruebas mutables ni migraciones en esta comprobación.

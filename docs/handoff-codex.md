@@ -10,7 +10,7 @@ PR #1 y PR #22–#50 están integrados. El código incluye identidad y permisos 
 
 Las 13 migraciones integradas están aplicadas en la BD compartida de desarrollo. `dotnet-ef migrations list` se ejecutó el 2026-10-17 con `ConnectionStrings:DefaultConnection` de User Secrets y mostró todas las migraciones sin pendientes. No se aplica migración desde el arranque de la API.
 
-PR #49 documenta el test integral reproducible y sus límites. PR #50 distingue su configuración aislada de la configuración privada requerida para ejecutar la API manualmente.
+PR #49 documenta el test integral reproducible y sus límites. PR #50 distingue su configuración aislada de la configuración privada requerida para ejecutar la API manualmente. PR #52 (`edac6bf`) registra la integración de .NET 10 y mantiene explícitos los pendientes.
 
 ## Último incremento integrado: PR #51
 
@@ -24,9 +24,11 @@ Validación local con SDK 10.0.402:
 - `dotnet-ef migrations has-pending-model-changes`: no hay cambios de modelo.
 - `dotnet-ef migrations list`: 13 migraciones aplicadas, ninguna pendiente (consulta de solo lectura).
 
+Revalidación tras PR #52 con el SDK local 10.0.402: build con 0 advertencias/errores; 31 tests pasaron y 2 carreras SQL se omitieron; listado de migraciones de desarrollo sin pendientes. La prueba SQL requiere que `ConnectionStrings__SqlServerTest` exista en el entorno del proceso de test; `ConnectionStrings:DefaultConnection` se lee de User Secrets. Este detalle evita confundir el valor privado persistido con la variable de entorno que consumen las pruebas.
+
 ## Pendientes y bloqueos
 
-1. Configurar `ConnectionStrings__SqlServerTest` en User Secrets con la conexión Remote de una base **aislada** y habilitar Remote solo en esa base; después ejecutar las pruebas de aceptación/asignación simultáneas. No usar la BD compartida.
+1. Configurar `ConnectionStrings__SqlServerTest` en el entorno local del proceso de test con la conexión Remote de una base **aislada** y habilitar Remote solo en esa base; después ejecutar las pruebas de aceptación/asignación simultáneas. El test carga además `ConnectionStrings:DefaultConnection` de User Secrets para proteger la BD compartida. No usar la BD compartida como destino de pruebas.
 2. Publicar en un sitio MonsterASP.NET con sus variables privadas y almacenamiento persistente; validar health, SignalR y comprobante privado.
 3. Configurar secretos Twilio en privado y probar el envío OTP con un teléfono autorizado.
 
