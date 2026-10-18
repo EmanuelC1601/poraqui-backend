@@ -440,6 +440,20 @@ public sealed class BusinessApiTests
             using var evidenceResponse = await client.SendAsync(evidenceRequest);
             Assert.Equal(HttpStatusCode.Accepted, evidenceResponse.StatusCode);
         }
+        await RegisterAsync(client, "unrelated-customer@example.test");
+        var unrelatedCustomerToken = await LoginAsync(client, "unrelated-customer@example.test");
+        using (var unauthorizedCustomerCancellation = await SendAsync(client, HttpMethod.Post,
+                   $"api/orders/{customerCancellableOrderId}/cancel", unrelatedCustomerToken,
+                   JsonContent.Create(new { reason = "Intento de cancelar pedido ajeno" })))
+            Assert.Equal(HttpStatusCode.Forbidden, unauthorizedCustomerCancellation.StatusCode);
+        using (var unchangedOrder = await SendAsync(client, HttpMethod.Get,
+                   $"api/orders/{customerCancellableOrderId}", customerToken))
+        using (var unchangedOrderJson = JsonDocument.Parse(await unchangedOrder.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(HttpStatusCode.OK, unchangedOrder.StatusCode);
+            Assert.Equal("AwaitingPaymentReview", unchangedOrderJson.RootElement.GetProperty("status").GetString());
+            Assert.Null(unchangedOrderJson.RootElement.GetProperty("refundStatus").GetString());
+        }
         var customerCancellation = JsonContent.Create(new { reason = "El cliente cancela antes de la aceptación" });
         using (var customerCancellationResponse = await SendAsync(client, HttpMethod.Post,
                    $"api/orders/{customerCancellableOrderId}/cancel", customerToken, customerCancellation))
