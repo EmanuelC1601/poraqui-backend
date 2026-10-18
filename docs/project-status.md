@@ -117,3 +117,9 @@ Verificación local en Release: build con 0 advertencias y 0 errores; 4 pruebas 
 PR #76 se integró en `main` como `e91298d`: OpenAPI describe la respuesta tipada de cancelación (`OrderWorkflowView`, incluido `refundStatus`), los errores y la regla previa a la aceptación; `docs/openapi.json` refleja el documento generado. PR #77 se integró como `ade461f` y comprueba que otro cliente recibe `403` y no modifica el pedido ni crea reembolso. Ambos pasaron CI. Pruebas locales pertinentes: contrato OpenAPI 2/2; recorrido API SQLite 1/1. Suite local sin `ConnectionStrings__SqlServerTest`: 42 aprobadas, 8 pruebas SQL Server omitidas; no se ejecutaron migraciones ni hubo escrituras SQL.
 
 PR #79, merge `96f31a0`, refuerza el replay de cancelación en el recorrido API: la segunda solicitud mantiene el estado, `refundStatus`, cantidad de historial y una sola transición `Cancelled`. Prueba enfocada SQLite 1/1 y CI aprobado. No hay migraciones ni cambios SQL.
+
+## Verificación local más reciente (2026-10-17)
+
+Después de PR #81, `dotnet test Poraqui.sln --configuration Release --no-restore` compiló la solución y pasó **50/50 pruebas**, cero fallidas y cero omitidas (42 con SQLite y 8 con SQL Server aislado `db74230`). La cadena `ConnectionStrings:SqlServerTest` se leyó de User Secrets y se expuso solo al proceso; no se imprimió ni versionó. El arnés compara el catálogo de test con `DefaultConnection`. Estas pruebas ejecutaron migraciones únicamente en la base aislada; la BD compartida `db74183` no fue modificada.
+
+La suite incluye concurrencia de aceptación y comandos. Esta ejecución local no sustituye CI, una verificación en MonsterASP, SMS real o pruebas con WhatsApp. La publicación sigue pendiente hasta configurar sitio, rutas persistentes y servicios privados.

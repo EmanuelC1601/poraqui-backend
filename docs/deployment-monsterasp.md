@@ -70,3 +70,7 @@ El output contiene `Poraqui.Api.dll`, `web.config`, `.deps.json` y `.runtimeconf
 - [Obtener la cadena de conexión SQL Server](https://help.monsterasp.net/databases/mssql/connection-string)
 - [Compatibilidad, WebSockets y SignalR](https://help.monsterasp.net/getting-started/first-steps/supported-technologies)
 - [Modelo de hospedaje ASP.NET Core en IIS](https://help.monsterasp.net/websites/configuration/hosting-model)
+
+## Última comprobación del paquete local
+
+El paquete `work/publish` se regeneró desde `main` el 2026-10-17 con SDK .NET 10.0.402. Incluye `Poraqui.Api.dll`, `.deps.json`, `.runtimeconfig.json` y `web.config` configurado para IIS InProcess. Los archivos de configuración de salida contienen solo ajustes de logging; la inspección no encontró cadenas de conexión, passwords ni secretos. El paquete está bajo una ruta ignorada por Git. La solución compiló como parte de la suite Release 50/50; esto no prueba el arranque remoto ni confirma que MonsterASP tenga runtime o rutas persistentes configuradas.
