@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Poraqui.Application.Accounts;
 using System.Threading.RateLimiting;
 using Poraqui.Api.HostedServices;
+using Poraqui.Api.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -102,6 +103,12 @@ if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
 }
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 var identityConfigured = !string.IsNullOrWhiteSpace(connectionString);
+if (identityConfigured && builder.Environment.IsProduction())
+{
+    var webRootPath = builder.Environment.WebRootPath ?? Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
+    PrivateEvidenceStorageConfiguration.ValidateProductionRoot(builder.Configuration["PrivateFiles:Root"], webRootPath);
+}
+
 if (!string.IsNullOrWhiteSpace(connectionString))
 {
     if (!builder.Environment.IsEnvironment("Testing"))
@@ -127,6 +134,9 @@ if (!string.IsNullOrWhiteSpace(connectionString))
 builder.Services.AddPoraquiAuthorization();
 
 var app = builder.Build();
+
+if (identityConfigured && app.Environment.IsProduction())
+    app.Services.GetRequiredService<ITransferEvidenceStorage>();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
