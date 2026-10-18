@@ -31,4 +31,6 @@ Hub autenticado `/hubs/orders`; `SubscribeOrder(orderId)` valida cliente, negoci
 
 ## Operación y límites
 
+`GET /health/live` indica que el proceso HTTP está activo. `GET /health/ready` verifica conectividad SQL sin autenticación y devuelve 503 si no hay cadena configurada o SQL no está disponible; no aplica migraciones ni comprueba servicios externos.
+
 No se ejecuta migración al iniciar la API. Migraciones y scripts revisables están bajo `src/Poraqui.Infrastructure/Persistence/Migrations` y `docs/sql`; las 15 migraciones de desarrollo están aplicadas. Las diez restricciones SQL rechazan importes negativos, cantidades no positivas, horarios inconsistentes, disponibilidad sin zona y ofertas aceptadas sin código protegido. `ConnectionStrings__SqlServerTest` se configura en privado para una base aislada cuyo catálogo difiere del `InitialCatalog` de `ConnectionStrings:DefaultConnection`; el test loader omite las carreras si ambos nombres coinciden, aun si se usan alias de servidor distintos. Sin GPS ni distancia inferida; el proveedor Twilio Verify ya está integrado, pero el envío SMS productivo no se ha comprobado porque faltan sus credenciales privadas. No hay llamadas automáticas de WhatsApp ni pagos bancarios automáticos.
