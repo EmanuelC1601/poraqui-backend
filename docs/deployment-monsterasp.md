@@ -21,14 +21,14 @@ En **Scripting → Environment variables**, agrega estos nombres y valores obten
 | `ConnectionStrings__DefaultConnection` | Cadena **Local** de SQL Server para el sitio alojado. MonsterASP.NET distingue las cadenas Local y Remote; la Local es para sitios alojados en su misma infraestructura. |
 | `Bootstrap__AdminKey` | Clave aleatoria privada de al menos 32 caracteres para crear el primer PlatformAdmin. Después de `POST /api/auth/bootstrap-admin`, elimina esta variable y reinicia la aplicación; el endpoint responderá 404 cuando no esté configurada y también rechaza administradores adicionales cuando ya existe uno. |
 | `PrivateFiles__Root` | Ruta persistente y escribible por el proceso IIS, fuera de `wwwroot`, para comprobantes privados. Confirma con el hosting una ruta absoluta admitida por el plan y los permisos del Application Pool. |
-| `DataProtection__KeysPath` | Opcional para una instancia; recomendado en ruta persistente para conservar códigos protegidos tras reciclar el proceso. Con varias instancias debe ser almacenamiento persistente compartido. |
+| `DataProtection__KeysPath` | Obligatoria en Production: ruta persistente privada fuera de `wwwroot` para conservar códigos protegidos entre reinicios. Con varias instancias debe ser almacenamiento persistente compartido. |
 | `TwilioVerify__ServiceSid` | Servicio Twilio Verify para SMS de confirmación telefónica. |
 | `TwilioVerify__ApiKeySid` | Identificador de API key de Twilio Verify. |
 | `TwilioVerify__ApiKeySecret` | Secreto de API key de Twilio Verify. |
 
 ASP.NET Core interpreta `__` como separador de secciones (`ConnectionStrings__DefaultConnection` equivale a `ConnectionStrings:DefaultConnection`). Usa valores secretos guardados desde el panel del sitio. La cadena de la aplicación alojada debe ser la cadena Local del panel; la cadena pública del servidor es para conexiones remotas y requiere habilitar acceso remoto.
 
-En `Production`, cuando hay conexión SQL configurada, la API exige `PrivateFiles__Root`, rechaza una ruta dentro de `wwwroot` y crea/verifica la carpeta privada al arrancar. Si falta o IIS no puede escribir la ruta, el proceso falla al iniciar en vez de guardar comprobantes en el directorio local temporal predeterminado. Esta validación no puede demostrar que el plan de hosting conserva la ruta tras reinicios; verifícalo con MonsterASP antes de recibir comprobantes reales.
+En `Production`, cuando hay conexión SQL configurada, la API exige `PrivateFiles__Root` y `DataProtection__KeysPath`, rechaza rutas dentro de `wwwroot` y crea/verifica ambos directorios al arrancar. Si falta una ruta o IIS no puede escribirla, el proceso falla al iniciar en vez de guardar comprobantes o claves en directorios locales no persistentes. La clave persistente protege el replay de códigos de recogida; con varias instancias comparte la ruta de claves. Esta validación no demuestra que el plan conserve las rutas tras reinicios; verifícalo con MonsterASP antes de recibir pedidos reales.
 
 Para configuración local de desarrollo, guarda `ConnectionStrings:DefaultConnection` en User Secrets (no `appsettings*.json`):
 
