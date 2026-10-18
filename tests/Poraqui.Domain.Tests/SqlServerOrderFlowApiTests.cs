@@ -5,6 +5,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Poraqui.Application.Security;
 using Poraqui.Domain.Commerce;
 using Poraqui.Domain.Orders;
 using Poraqui.Infrastructure.Identity;
@@ -12,6 +13,7 @@ using Poraqui.Infrastructure.Persistence;
 
 namespace Poraqui.Domain.Tests;
 
+[Collection("SQL Server API integration")]
 public sealed class SqlServerOrderFlowApiTests
 {
     private const string TestPassword = "Test-Password-1!";
@@ -39,16 +41,7 @@ public sealed class SqlServerOrderFlowApiTests
 
         try
         {
-            using (var bootstrap = await client.PostAsJsonAsync("api/auth/bootstrap-admin", new
-                   {
-                       email = adminEmail, displayName = "SQL Integration Admin", password = TestPassword,
-                       bootstrapKey = SqlServerApiTestHost.BootstrapKey
-                   }))
-            {
-                Assert.Equal(HttpStatusCode.Created, bootstrap.StatusCode);
-                using var body = JsonDocument.Parse(await bootstrap.Content.ReadAsStringAsync());
-                adminId = body.RootElement.GetProperty("id").GetGuid();
-            }
+            adminId = await CreateAdminAsync(factory.Services, adminEmail);
             var adminToken = await LoginAsync(client, adminEmail);
 
             await RegisterAsync(client, merchantEmail);
@@ -212,6 +205,25 @@ public sealed class SqlServerOrderFlowApiTests
         var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var user = await users.FindByEmailAsync(email) ?? throw new InvalidOperationException("Test user was not created.");
         return user.Id;
+    }
+
+    private static async Task<Guid> CreateAdminAsync(IServiceProvider services, string email)
+    {
+        using var scope = services.CreateScope();
+        var provider = scope.ServiceProvider;
+        var roles = provider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
+        if (!await roles.RoleExistsAsync(ApplicationRoles.PlatformAdmin))
+        {
+            var roleResult = await roles.CreateAsync(new IdentityRole<Guid>(ApplicationRoles.PlatformAdmin));
+            Assert.True(roleResult.Succeeded, string.Join("; ", roleResult.Errors.Select(error => error.Description)));
+        }
+        var users = provider.GetRequiredService<UserManager<ApplicationUser>>();
+        var admin = new ApplicationUser { UserName = email, Email = email, EmailConfirmed = true, DisplayName = "SQL Integration Admin" };
+        var createResult = await users.CreateAsync(admin, TestPassword);
+        Assert.True(createResult.Succeeded, string.Join("; ", createResult.Errors.Select(error => error.Description)));
+        var addRoleResult = await users.AddToRoleAsync(admin, ApplicationRoles.PlatformAdmin);
+        Assert.True(addRoleResult.Succeeded, string.Join("; ", addRoleResult.Errors.Select(error => error.Description)));
+        return admin.Id;
     }
 
     private static async Task CleanupAsync(IServiceProvider services, Guid? adminId, Guid? merchantId, Guid? customerId,
