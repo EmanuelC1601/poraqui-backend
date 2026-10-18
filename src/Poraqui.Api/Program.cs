@@ -74,6 +74,54 @@ builder.Services.AddOpenApi(options => options.AddOperationTransformer((operatio
         operation.Responses["409"] = new OpenApiResponse { Description = "Command conflict or invalid order state." };
         operation.Responses["413"] = new OpenApiResponse { Description = "Evidence exceeds the request size limit." };
     }
+    else if (context.Description.HttpMethod == "POST" &&
+             string.Equals(context.Description.RelativePath?.TrimStart('/'), "api/orders/{orderId}/cancel", StringComparison.Ordinal))
+    {
+        operation.Summary = "Cancel an order before business acceptance";
+        operation.Description = "The customer may cancel while payment is pending review or the business has not accepted. If transfer evidence was submitted or approved, the response includes the manual refund follow-up status. Cancellation is not allowed after business acceptance.";
+        operation.Responses ??= new OpenApiResponses();
+        operation.Responses["400"] = new OpenApiResponse
+        {
+            Description = "Cancellation request is invalid.",
+            Content = new Dictionary<string, OpenApiMediaType>
+            {
+                ["application/json"] = new()
+                {
+                    Schema = new OpenApiSchema
+                    {
+                        Type = JsonSchemaType.Object,
+                        Properties = new Dictionary<string, IOpenApiSchema>
+                        {
+                            ["error"] = new OpenApiSchema { Type = JsonSchemaType.String }
+                        },
+                        Required = new HashSet<string>(StringComparer.Ordinal) { "error" }
+                    }
+                }
+            }
+        };
+        operation.Responses["401"] = new OpenApiResponse { Description = "Authentication is required." };
+        operation.Responses["403"] = new OpenApiResponse { Description = "The order belongs to another customer." };
+        operation.Responses["404"] = new OpenApiResponse { Description = "Order not found." };
+        operation.Responses["409"] = new OpenApiResponse
+        {
+            Description = "The order state changed or cancellation is not allowed.",
+            Content = new Dictionary<string, OpenApiMediaType>
+            {
+                ["application/json"] = new()
+                {
+                    Schema = new OpenApiSchema
+                    {
+                        Type = JsonSchemaType.Object,
+                        Properties = new Dictionary<string, IOpenApiSchema>
+                        {
+                            ["error"] = new OpenApiSchema { Type = JsonSchemaType.String }
+                        },
+                        Required = new HashSet<string>(StringComparer.Ordinal) { "error" }
+                    }
+                }
+            }
+        };
+    }
 
     return Task.CompletedTask;
 }));

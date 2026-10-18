@@ -28,6 +28,12 @@ public sealed class OrderWorkflowController(OrderWorkflowService workflow, UserM
     }
 
     [HttpPost("orders/{orderId:guid}/cancel")]
+    [ProducesResponseType(typeof(OrderWorkflowView), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CancelCustomerOrder(Guid orderId, CancelOrderRequest request, CancellationToken cancellationToken)
     {
         if (!TryGetActor(out var actorId, out _)) return Unauthorized();
