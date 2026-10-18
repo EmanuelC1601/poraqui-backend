@@ -108,3 +108,9 @@ PR #76 (`e91298d`) documenta en OpenAPI la respuesta y los errores de cancelaci�
 PR #79, integrado en `main` como `96f31a0`, asegura en el flujo API que reintentar la cancelación del mismo cliente conserva el número de entradas de historial y una sola transición `Cancelled`. Prueba SQLite enfocada 1/1; CI pasó. No hay migración.
 
 La última ejecución local completa de la suite Release en esta copia fue **42 aprobadas y 8 omitidas, de 50**; los PR #77 y #79 después de esa ejecución solo fortalecieron assertions dentro de pruebas existentes y pasaron CI. Las omitidas son las pruebas SQL Server que requieren `ConnectionStrings:SqlServerTest`; la configuración adicional quedó pendiente por indicación del usuario. Los checks de GitHub pasan con SQLite y omiten esas pruebas SQL por diseño.
+
+## Verificación vigente 2026-10-17
+
+Desde main en 1952640, SDK .NET 10.0.402, dotnet test Poraqui.sln --configuration Release --no-restore terminó **50/50 aprobadas, 0 fallidas, 0 omitidas**. Incluye las ocho pruebas SQL Server en db74230, mediante ConnectionStrings:SqlServerTest leída de User Secrets y cargada solo en el proceso. El arnés compara el catálogo con DefaultConnection; las migraciones de prueba se ejecutaron solo en la base aislada. La base compartida no fue modificada. No se imprimieron ni versionaron secretos.
+
+El paquete IIS fue publicado localmente en work/publish: contiene la API y web.config con hosting InProcess. El directorio está ignorado. No hay publicación en MonsterASP ni se han verificado runtime IIS o almacenamiento persistente del sitio. ConnectionStrings:DefaultConnection está presente en User Secrets pero no se inspeccionó su valor. Continúan pendientes la configuración privada del sitio, SMS real y las verificaciones de hosting descritas en docs/project-status.md.
