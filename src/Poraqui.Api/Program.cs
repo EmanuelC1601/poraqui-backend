@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.OpenApi;
+using System.Text.Json.Schema;
 using Microsoft.EntityFrameworkCore;
 using Poraqui.Infrastructure.Identity;
 using Poraqui.Infrastructure.Persistence;
@@ -16,7 +18,64 @@ using Poraqui.Api.HostedServices;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options => options.AddOperationTransformer((operation, context, _) =>
+{
+    if (context.Description.HttpMethod == "POST" &&
+        context.Description.RelativePath?.TrimStart('/').EndsWith("/transfer-evidence", StringComparison.Ordinal) == true)
+    {
+        operation.Summary = "Upload private transfer evidence";
+        operation.Description = "Uploads a JPEG, PNG, or PDF transfer receipt. Files larger than 8 MB are rejected.";
+        operation.RequestBody = new OpenApiRequestBody
+        {
+            Required = true,
+            Content = new Dictionary<string, OpenApiMediaType>
+            {
+                ["multipart/form-data"] = new()
+                {
+                    Schema = new OpenApiSchema
+                    {
+                        Type = JsonSchemaType.Object,
+                        Properties = new Dictionary<string, IOpenApiSchema>
+                        {
+                            ["commandId"] = new OpenApiSchema { Type = JsonSchemaType.String, Format = "uuid" },
+                            ["file"] = new OpenApiSchema { Type = JsonSchemaType.String, Format = "binary" }
+                        },
+                        Required = new HashSet<string>(StringComparer.Ordinal) { "commandId", "file" }
+                    }
+                }
+            }
+        };
+        operation.Responses ??= new OpenApiResponses();
+        operation.Responses.Remove("200");
+        operation.Responses["202"] = new OpenApiResponse
+        {
+            Description = "Evidence accepted or an identical command replayed.",
+            Content = new Dictionary<string, OpenApiMediaType>
+            {
+                ["application/json"] = new()
+                {
+                    Schema = new OpenApiSchema
+                    {
+                        Type = JsonSchemaType.Object,
+                        Properties = new Dictionary<string, IOpenApiSchema>
+                        {
+                            ["replayed"] = new OpenApiSchema { Type = JsonSchemaType.Boolean }
+                        },
+                        Required = new HashSet<string>(StringComparer.Ordinal) { "replayed" }
+                    }
+                }
+            }
+        };
+        operation.Responses["400"] = new OpenApiResponse { Description = "Invalid command or unsupported evidence file." };
+        operation.Responses["401"] = new OpenApiResponse { Description = "Authentication is required." };
+        operation.Responses["403"] = new OpenApiResponse { Description = "The order belongs to another customer." };
+        operation.Responses["404"] = new OpenApiResponse { Description = "Order not found." };
+        operation.Responses["409"] = new OpenApiResponse { Description = "Command conflict or invalid order state." };
+        operation.Responses["413"] = new OpenApiResponse { Description = "Evidence exceeds the request size limit." };
+    }
+
+    return Task.CompletedTask;
+}));
 builder.Services.AddHttpClient<IPhoneVerificationProvider, TwilioVerifyPhoneVerificationProvider>();
 builder.Services.AddRateLimiter(options =>
 {
@@ -70,7 +129,7 @@ builder.Services.AddPoraquiAuthorization();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
 {
     app.MapOpenApi();
 }
