@@ -8,7 +8,7 @@ Estado: el paquete Release se generó y revisó localmente; la API aún no se ha
 2. Usa Git Deploy con tipo **Build .NET app** y selecciona `src/Poraqui.Api/Poraqui.Api.csproj`, o publica la carpeta de salida de ese proyecto con Web Deploy/FTP. No elijas **Static** para la API.
 3. Habilita `ASPNETCORE_ENVIRONMENT=Production` en **Websites → sitio → Scripting → Environment variables**.
 
-También se puede compilar en GitHub Actions con el workflow `.github/workflows/ci.yml`. El workflow restaura, compila en Release y ejecuta la suite; las pruebas SQL Server se omiten en CI si no se configura un catálogo aislado privado. La alternativa del panel MonsterASP.NET es Git Deploy con tipo **Build .NET app**, el repositorio público, rama `main` y el proyecto `src/Poraqui.Api/Poraqui.Api.csproj`. El proveedor compila y publica el output, sin exponer la carpeta de fuentes al sitio.
+También se puede compilar en GitHub Actions con el workflow `.github/workflows/ci.yml`, que fija `ubuntu-24.04` y usa `actions/checkout@v5` y `actions/setup-dotnet@v5`. El workflow restaura, compila en Release y ejecuta la suite; las pruebas SQL Server se omiten en CI si no se configura un catálogo aislado privado. La alternativa del panel MonsterASP.NET es Git Deploy con tipo **Build .NET app**, el repositorio público, rama `main` y el proyecto `src/Poraqui.Api/Poraqui.Api.csproj`. El proveedor compila y publica el output, sin exponer la carpeta de fuentes al sitio.
 
 MonsterASP.NET corre ASP.NET Core detrás de IIS y permite WebSockets/SignalR. El hosting `InProcess` es el recomendado; no configures arranque como EXE combinado con `OutOfProcess`.
 
