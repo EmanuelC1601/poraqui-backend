@@ -42,7 +42,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
         builder.Entity<BusinessOpeningHours>(entity =>
         {
-            entity.ToTable("BusinessOpeningHours");
+            entity.ToTable("BusinessOpeningHours", table => table.HasCheckConstraint("CK_BusinessOpeningHours_ClosedOrValidHours",
+                "([IsClosed] = 1 AND [OpensAt] IS NULL AND [ClosesAt] IS NULL) OR ([IsClosed] = 0 AND [OpensAt] IS NOT NULL AND [ClosesAt] IS NOT NULL AND [OpensAt] < [ClosesAt])"));
             entity.HasKey(x => new { x.BusinessId, x.Day });
             entity.Property(x => x.Day).HasConversion<int>();
             entity.Property(x => x.OpensAt).HasColumnType("time");
@@ -51,7 +52,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
         builder.Entity<CatalogProduct>(entity =>
         {
-            entity.ToTable("CatalogProducts");
+            entity.ToTable("CatalogProducts", table => table.HasCheckConstraint("CK_CatalogProducts_NonNegativePrice", "[Price] >= 0"));
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Name).HasMaxLength(160).IsRequired();
             entity.Property(x => x.Price).HasPrecision(18, 2);
@@ -63,7 +64,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
         builder.Entity<ProductOptionGroup>(entity =>
         {
-            entity.ToTable("ProductOptionGroups");
+            entity.ToTable("ProductOptionGroups", table => table.HasCheckConstraint("CK_ProductOptionGroups_SelectionBounds",
+                "[MinSelections] >= 0 AND [MaxSelections] >= 1 AND [MinSelections] <= [MaxSelections]"));
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Name).HasMaxLength(120).IsRequired();
             entity.HasMany(x => x.Options).WithOne().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Cascade);
@@ -73,7 +75,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
         builder.Entity<ProductOption>(entity =>
         {
-            entity.ToTable("ProductOptions");
+            entity.ToTable("ProductOptions", table => table.HasCheckConstraint("CK_ProductOptions_NonNegativePriceDelta", "[PriceDelta] >= 0"));
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Name).HasMaxLength(120).IsRequired();
             entity.Property(x => x.PriceDelta).HasPrecision(18, 2);
@@ -90,7 +92,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
         builder.Entity<DeliveryRate>(entity =>
         {
-            entity.ToTable("DeliveryRates");
+            entity.ToTable("DeliveryRates", table => table.HasCheckConstraint("CK_DeliveryRates_NonNegativeFee", "[Fee] >= 0"));
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Fee).HasPrecision(18, 2);
             entity.HasOne<Business>().WithMany().HasForeignKey(x => x.BusinessId).OnDelete(DeleteBehavior.Restrict);
@@ -100,7 +102,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
         builder.Entity<Order>(entity =>
         {
-            entity.ToTable("Orders");
+            entity.ToTable("Orders", table => table.HasCheckConstraint("CK_Orders_NonNegativeAmountsAndValidVersion",
+                "[DeliveryFee] >= 0 AND [Total] >= 0 AND ([CourierPaymentAmount] IS NULL OR [CourierPaymentAmount] >= 0) AND [Version] > 0"));
             entity.HasKey(x => x.Id);
             entity.Property(x => x.OrderNumber).HasMaxLength(40).IsRequired();
             entity.HasIndex(x => x.OrderNumber).IsUnique();
@@ -162,7 +165,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
         builder.Entity<OrderLine>(entity =>
         {
-            entity.ToTable("OrderLines");
+            entity.ToTable("OrderLines", table => table.HasCheckConstraint("CK_OrderLines_NonNegativeAmountsAndPositiveQuantity",
+                "[UnitPrice] >= 0 AND [LineTotal] >= 0 AND [Quantity] > 0"));
             entity.HasKey(x => x.Id);
             entity.Property(x => x.ProductName).HasMaxLength(160).IsRequired();
             entity.Property(x => x.UnitPrice).HasPrecision(18, 2);
@@ -195,7 +199,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
         builder.Entity<ManualRefundCase>(entity =>
         {
-            entity.ToTable("ManualRefundCases");
+            entity.ToTable("ManualRefundCases", table => table.HasCheckConstraint("CK_ManualRefundCases_ValidAmounts",
+                "[RequestedAmount] >= 0 AND ([RefundedAmount] IS NULL OR ([RefundedAmount] >= 0 AND [RefundedAmount] <= [RequestedAmount]))"));
             entity.HasKey(x => x.Id);
             entity.Property(x => x.RequestedAmount).HasPrecision(18, 2);
             entity.Property(x => x.RefundedAmount).HasPrecision(18, 2);
@@ -233,7 +238,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
         builder.Entity<CourierAvailability>(entity =>
         {
-            entity.ToTable("CourierAvailabilities");
+            entity.ToTable("CourierAvailabilities", table => table.HasCheckConstraint("CK_CourierAvailabilities_ZoneWhenAvailable",
+                "[IsAvailable] = 0 OR [ZoneId] IS NOT NULL"));
             entity.HasKey(x => x.CourierUserId);
             entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CourierUserId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<DeliveryZone>().WithMany().HasForeignKey(x => x.ZoneId).OnDelete(DeleteBehavior.Restrict);
@@ -241,7 +247,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
         builder.Entity<ExternalDeliveryOffer>(entity =>
         {
-            entity.ToTable("ExternalDeliveryOffers");
+            entity.ToTable("ExternalDeliveryOffers", table => table.HasCheckConstraint("CK_ExternalDeliveryOffers_ValidRemunerationVersionAndAcceptance",
+                "[Remuneration] >= 0 AND [Version] > 0 AND ([Status] <> 'Accepted' OR [ProtectedPickupCode] IS NOT NULL)"));
             entity.HasKey(x => x.Id);
             entity.Property(x => x.PickupAddress).HasMaxLength(500).IsRequired();
             entity.Property(x => x.DestinationAddress).HasMaxLength(500).IsRequired();

@@ -17,7 +17,7 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.10")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -225,7 +225,10 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
 
                     b.HasKey("BusinessId", "Day");
 
-                    b.ToTable("BusinessOpeningHours", (string)null);
+                    b.ToTable("BusinessOpeningHours", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_BusinessOpeningHours_ClosedOrValidHours", "([IsClosed] = 1 AND [OpensAt] IS NULL AND [ClosesAt] IS NULL) OR ([IsClosed] = 0 AND [OpensAt] IS NOT NULL AND [ClosesAt] IS NOT NULL AND [OpensAt] < [ClosesAt])");
+                        });
                 });
 
             modelBuilder.Entity("Poraqui.Domain.Commerce.CatalogProduct", b =>
@@ -253,7 +256,10 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("BusinessId", "IsAvailable");
 
-                    b.ToTable("CatalogProducts", (string)null);
+                    b.ToTable("CatalogProducts", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CatalogProducts_NonNegativePrice", "[Price] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("Poraqui.Domain.Commerce.DeliveryRate", b =>
@@ -282,7 +288,10 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                     b.HasIndex("BusinessId", "ZoneId")
                         .IsUnique();
 
-                    b.ToTable("DeliveryRates", (string)null);
+                    b.ToTable("DeliveryRates", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_DeliveryRates_NonNegativeFee", "[Fee] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("Poraqui.Domain.Commerce.DeliveryZone", b =>
@@ -333,7 +342,10 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                     b.HasIndex("GroupId", "Name")
                         .IsUnique();
 
-                    b.ToTable("ProductOptions", (string)null);
+                    b.ToTable("ProductOptions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ProductOptions_NonNegativePriceDelta", "[PriceDelta] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("Poraqui.Domain.Commerce.ProductOptionGroup", b =>
@@ -364,7 +376,10 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
                     b.HasIndex("ProductId", "Name")
                         .IsUnique();
 
-                    b.ToTable("ProductOptionGroups", (string)null);
+                    b.ToTable("ProductOptionGroups", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ProductOptionGroups_SelectionBounds", "[MinSelections] >= 0 AND [MaxSelections] >= 1 AND [MinSelections] <= [MaxSelections]");
+                        });
                 });
 
             modelBuilder.Entity("Poraqui.Domain.Orders.CourierAssignmentCommand", b =>
@@ -424,7 +439,10 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ZoneId");
 
-                    b.ToTable("CourierAvailabilities", (string)null);
+                    b.ToTable("CourierAvailabilities", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CourierAvailabilities_ZoneWhenAvailable", "[IsAvailable] = 0 OR [ZoneId] IS NOT NULL");
+                        });
                 });
 
             modelBuilder.Entity("Poraqui.Domain.Orders.ExternalDeliveryOffer", b =>
@@ -492,7 +510,10 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CourierUserId", "Status", "ExpiresAtUtc");
 
-                    b.ToTable("ExternalDeliveryOffers", (string)null);
+                    b.ToTable("ExternalDeliveryOffers", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ExternalDeliveryOffers_ValidRemunerationVersionAndAcceptance", "[Remuneration] >= 0 AND [Version] > 0 AND ([Status] <> 'Accepted' OR [ProtectedPickupCode] IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("Poraqui.Domain.Orders.ManualRefundCase", b =>
@@ -548,7 +569,10 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Status", "CreatedAtUtc");
 
-                    b.ToTable("ManualRefundCases", (string)null);
+                    b.ToTable("ManualRefundCases", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ManualRefundCases_ValidAmounts", "[RequestedAmount] >= 0 AND ([RefundedAmount] IS NULL OR ([RefundedAmount] >= 0 AND [RefundedAmount] <= [RequestedAmount]))");
+                        });
                 });
 
             modelBuilder.Entity("Poraqui.Domain.Orders.OfflineDeliverySyncRecord", b =>
@@ -699,7 +723,10 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("BusinessId", "Status", "CreatedAtUtc");
 
-                    b.ToTable("Orders", (string)null);
+                    b.ToTable("Orders", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Orders_NonNegativeAmountsAndValidVersion", "[DeliveryFee] >= 0 AND [Total] >= 0 AND ([CourierPaymentAmount] IS NULL OR [CourierPaymentAmount] >= 0) AND [Version] > 0");
+                        });
                 });
 
             modelBuilder.Entity("Poraqui.Domain.Orders.OrderCreationCommand", b =>
@@ -822,7 +849,10 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OrderId");
 
-                    b.ToTable("OrderLines", (string)null);
+                    b.ToTable("OrderLines", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_OrderLines_NonNegativeAmountsAndPositiveQuantity", "[UnitPrice] >= 0 AND [LineTotal] >= 0 AND [Quantity] > 0");
+                        });
                 });
 
             modelBuilder.Entity("Poraqui.Domain.Orders.OrderLineOption", b =>
