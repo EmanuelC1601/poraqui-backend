@@ -6,13 +6,13 @@ El backend tiene un único responsable. `main` es la base de integración; cada 
 
 ## Cambios integrados
 
-PR #1 y PR #22–#60 están integrados. El código incluye identidad y permisos por rol/recurso, comercio y catálogo, pedidos con precios del servidor, comprobantes privados y revisión manual, estados de preparación, reparto interno y externo, ofertas, expiración/cancelación, códigos, contacto autorizado, historial, idempotencia, sync offline, SignalR, incidencias, reembolsos manuales, OTP y métricas piloto. La prueba amplia usa SQLite aislado; las carreras SQL Server ya se verificaron por separado contra una base aislada. Esto no acredita servicios externos reales. Ver [ledger](project-status.md) y [recorrido reproducible](order-flow.md).
+PR #1 y PR #22–#65 están integrados. El código incluye identidad y permisos por rol/recurso, comercio y catálogo, pedidos con precios del servidor, comprobantes privados y revisión manual, estados de preparación, reparto interno y externo, ofertas, expiración/cancelación, códigos, contacto autorizado, historial, idempotencia, sincronización offline validada por el servidor, SignalR, incidencias, reembolsos manuales, OTP y métricas piloto. La prueba amplia usa SQLite; las pruebas SQL Server se han ejecutado históricamente con una base aislada, pero no corren en esta copia mientras falte `ConnectionStrings:SqlServerTest`. Esto no acredita servicios externos reales. Ver [ledger](project-status.md) y [recorrido reproducible](order-flow.md).
 
 Las 13 migraciones integradas están aplicadas en la BD compartida de desarrollo. `dotnet-ef migrations list` se ejecutó el 2026-10-17 con `ConnectionStrings:DefaultConnection` de User Secrets y mostró todas las migraciones sin pendientes. No se aplica migración desde el arranque de la API.
 
 PR #49 documenta el test integral reproducible y sus límites. PR #50 distingue su configuración aislada de la configuración privada requerida para ejecutar la API manualmente. PR #52 (`edac6bf`) registra la integración de .NET 10 y mantiene explícitos los pendientes.
 
-## Último incremento de código: PR #51 (los PR #52 y #53 actualizaron documentación y estado)
+## Incrementos posteriores
 
 PR #51 se integró en `main` como merge `5078005` (commit de trabajo `05d5410`). Actualiza proyectos y paquetes de .NET/EF Core a .NET 10 LTS, SQL Client 7.1.1 y PKCS 10.0.13. No cambia contratos API ni el modelo EF y no genera migraciones.
 
@@ -53,4 +53,6 @@ Revalidación local con SDK .NET 10.0.402 y la conexión aislada desde User Secr
 
 PR #62 se integró en `main` como merge `7ac25f8`: agrega una carrera SQL Server para dos reintentos simultáneos de creación con el mismo `commandId`. La suite Release pasó 35/35 (incluidas tres pruebas SQL Server), el build Release pasó sin advertencias y el esquema no cambió. Ese proceso solo utilizó la BD aislada.
 
-PR #64 se integró en `main` como merge `fe37ce7`, con un recorrido API de reparto externo probado contra SQL Server aislado. El incremento en `feature/sql-server-offline-delivery-sync` verifica entrega offline, validación server-side e idempotencia SQL Server. Build Release pasó con 0 advertencias/errores; suite Release completa pasó 37/37 con cinco pruebas SQL Server y 0 omitidas. No cambia esquema ni accede a la BD compartida. `docs/order-flow.md` contiene los recorridos y sus límites.
+PR #64 se integró en `main` como merge `fe37ce7`, con un recorrido API de reparto externo probado contra SQL Server aislado.
+
+PR #65 se integró en `main` como merge `be7da78`; verifica entrega offline, validación del código en servidor, replay idempotente y conflicto por payload diferente. Build Release pasó con 0 advertencias/errores; antes del merge, suite Release completa pasó 37/37 con cinco pruebas SQL Server. No cambia esquema ni accede a la BD compartida. La copia local actual no tiene la clave de SQL de prueba, así que una reejecución local pasó 32 tests y omitió cinco SQL; la compilación Release pasó. Guarda `ConnectionStrings:SqlServerTest` en User Secrets para habilitarlas.
