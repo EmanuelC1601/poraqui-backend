@@ -51,6 +51,6 @@ PR #60 se integró como merge `cb11b72`. GitHub Actions `39084197135` pasó en `
 
 Revalidación local con SDK .NET 10.0.402 y la conexión aislada desde User Secrets: `dotnet test Poraqui.sln --configuration Release --no-restore` pasó 34/34, incluidas las dos pruebas SQL Server de concurrencia (0 omitidas). La base compartida no recibió cambios.
 
-Incremento en revisión en `feature/sql-order-idempotency-concurrency`: agrega una carrera SQL Server para dos reintentos simultáneos de creación con el mismo `commandId`. La suite Release pasó 35/35 (incluidas tres pruebas SQL Server), el build Release pasa sin advertencias y el esquema no cambió. Ese proceso solo utilizó la BD aislada.
+PR #62 se integró en `main` como merge `7ac25f8`: agrega una carrera SQL Server para dos reintentos simultáneos de creación con el mismo `commandId`. La suite Release pasó 35/35 (incluidas tres pruebas SQL Server), el build Release pasó sin advertencias y el esquema no cambió. Ese proceso solo utilizó la BD aislada.
 
 PR #63 se integró en `main` como merge `cb86962`, con un recorrido API de reparto interno probado contra SQL Server aislado. El siguiente incremento en `feature/sql-server-external-delivery-flow` prueba API de reparto externo con SQL Server. La suite Release pasó 37/37 con cinco pruebas SQL Server y 0 omitidas; build Release pasó sin advertencias ni errores. No cambia el esquema ni la BD compartida. `docs/order-flow.md` contiene los dos recorridos y sus límites.
