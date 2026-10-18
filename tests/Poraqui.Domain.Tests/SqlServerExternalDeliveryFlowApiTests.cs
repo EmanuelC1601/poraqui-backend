@@ -14,6 +14,7 @@ using Poraqui.Infrastructure.Persistence;
 
 namespace Poraqui.Domain.Tests;
 
+[Collection("SQL Server API integration")]
 public sealed class SqlServerExternalDeliveryFlowApiTests
 {
     private const string TestPassword = "Test-Password-1!";
@@ -192,13 +193,34 @@ public sealed class SqlServerExternalDeliveryFlowApiTests
                 Assert.Equal(HttpStatusCode.OK, orderForCode.StatusCode);
                 Assert.Equal("InTransit", body.RootElement.GetProperty("status").GetString());
                 Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(client, HttpMethod.Post,
-                    $"api/orders/{orderId}/delivery/confirm", courierToken,
-                    JsonContent.Create(new { code = "111111" }))).StatusCode);
-                using var confirm = await SendAsync(client, HttpMethod.Post,
-                    $"api/orders/{orderId}/delivery/confirm", courierToken,
-                    JsonContent.Create(new { code = deliveryCode ?? throw new InvalidOperationException("Test delivery code was not returned.") }));
-                Assert.Equal(HttpStatusCode.NoContent, confirm.StatusCode);
+                    $"api/orders/{orderId}/sync/delivery-confirmation", courierToken,
+                    JsonContent.Create(new { commandId = Guid.NewGuid(), code = "111111", clientCapturedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-2) }))).StatusCode);
             }
+            var syncCommandId = Guid.NewGuid();
+            var capturedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-2);
+            var acceptedSyncCommand = new
+            {
+                commandId = syncCommandId,
+                code = deliveryCode ?? throw new InvalidOperationException("Test delivery code was not returned."),
+                clientCapturedAtUtc = capturedAtUtc
+            };
+            using (var sync = await SendAsync(client, HttpMethod.Post,
+                       $"api/orders/{orderId}/sync/delivery-confirmation", courierToken, JsonContent.Create(acceptedSyncCommand)))
+            using (var body = JsonDocument.Parse(await sync.Content.ReadAsStringAsync()))
+            {
+                Assert.Equal(HttpStatusCode.OK, sync.StatusCode);
+                Assert.False(body.RootElement.GetProperty("replayed").GetBoolean());
+            }
+            using (var replay = await SendAsync(client, HttpMethod.Post,
+                       $"api/orders/{orderId}/sync/delivery-confirmation", courierToken, JsonContent.Create(acceptedSyncCommand)))
+            using (var body = JsonDocument.Parse(await replay.Content.ReadAsStringAsync()))
+            {
+                Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
+                Assert.True(body.RootElement.GetProperty("replayed").GetBoolean());
+            }
+            Assert.Equal(HttpStatusCode.Conflict, (await SendAsync(client, HttpMethod.Post,
+                $"api/orders/{orderId}/sync/delivery-confirmation", courierToken,
+                JsonContent.Create(new { commandId = syncCommandId, code = "111111", clientCapturedAtUtc = capturedAtUtc }))).StatusCode);
             using (var finalOrder = await SendAsync(client, HttpMethod.Get, $"api/orders/{orderId}", customerToken))
             using (var body = JsonDocument.Parse(await finalOrder.Content.ReadAsStringAsync()))
             {
