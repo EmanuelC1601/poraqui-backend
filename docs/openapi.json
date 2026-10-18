@@ -1636,6 +1636,8 @@
         "tags": [
           "OrderWorkflow"
         ],
+        "summary": "Cancel an order before business acceptance",
+        "description": "The customer may cancel while payment is pending review or the business has not accepted. If transfer evidence was submitted or approved, the response includes the manual refund follow-up status. Cancellation is not allowed after business acceptance.",
         "parameters": [
           {
             "name": "orderId",
@@ -1669,7 +1671,69 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderWorkflowView"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderWorkflowView"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderWorkflowView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Cancellation request is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required."
+          },
+          "403": {
+            "description": "The order belongs to another customer."
+          },
+          "404": {
+            "description": "Order not found."
+          },
+          "409": {
+            "description": "The order state changed or cancellation is not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -3094,6 +3158,225 @@
           }
         }
       },
+      "OrderWorkflowHistory": {
+        "required": [
+          "actorUserId",
+          "status",
+          "changedAtUtc",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "actorUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "changedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "OrderWorkflowLine": {
+        "required": [
+          "productId",
+          "productName",
+          "unitPrice",
+          "quantity",
+          "lineTotal",
+          "options"
+        ],
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "unitPrice": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "quantity": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "lineTotal": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SelectedOrderOptionView"
+            }
+          }
+        }
+      },
+      "OrderWorkflowView": {
+        "required": [
+          "id",
+          "orderNumber",
+          "customerUserId",
+          "businessId",
+          "businessPickupAddress",
+          "zoneId",
+          "courierUserId",
+          "deliveryAddress",
+          "subtotal",
+          "deliveryFee",
+          "total",
+          "courierPaymentAmount",
+          "courierPaymentReceived",
+          "status",
+          "createdAtUtc",
+          "deliveryStartedAtUtc",
+          "deliveredAtUtc",
+          "items",
+          "history",
+          "transferInstructions"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "orderNumber": {
+            "type": "string"
+          },
+          "customerUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "businessId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "businessPickupAddress": {
+            "type": "string"
+          },
+          "zoneId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "courierUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "deliveryAddress": {
+            "type": "string"
+          },
+          "subtotal": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "deliveryFee": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "courierPaymentAmount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "courierPaymentReceived": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deliveryStartedAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "deliveredAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderWorkflowLine"
+            }
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderWorkflowHistory"
+            }
+          },
+          "transferInstructions": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TransferInstructionsView"
+              }
+            ]
+          },
+          "refundStatus": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "PickupCodeRequest": {
         "required": [
           "code"
@@ -3447,6 +3730,31 @@
           }
         }
       },
+      "SelectedOrderOptionView": {
+        "required": [
+          "optionId",
+          "name",
+          "priceDelta"
+        ],
+        "type": "object",
+        "properties": {
+          "optionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "priceDelta": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
       "SetAvailabilityRequest": {
         "required": [
           "isAvailable",
@@ -3528,6 +3836,32 @@
           "clientCapturedAtUtc": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "TransferInstructionsView": {
+        "required": [
+          "recipientName",
+          "institution",
+          "accountReference",
+          "instructions"
+        ],
+        "type": "object",
+        "properties": {
+          "recipientName": {
+            "type": "string"
+          },
+          "institution": {
+            "type": "string"
+          },
+          "accountReference": {
+            "type": "string"
+          },
+          "instructions": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

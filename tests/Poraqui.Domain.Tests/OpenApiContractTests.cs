@@ -42,4 +42,45 @@ public sealed class OpenApiContractTests
         Assert.True(responses.TryGetProperty("413", out _));
         Assert.False(responses.TryGetProperty("200", out _));
     }
+
+    [Fact]
+    public async Task Customer_cancellation_contract_describes_order_refund_status_response()
+    {
+        await using var factory = new ApiTestHost();
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync("/openapi/v1.json");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var operation = document.RootElement.GetProperty("paths")
+            .GetProperty("/api/orders/{orderId}/cancel")
+            .GetProperty("post");
+
+        Assert.Equal("Cancel an order before business acceptance", operation.GetProperty("summary").GetString());
+        Assert.Contains("manual refund", operation.GetProperty("description").GetString(), StringComparison.OrdinalIgnoreCase);
+        var responses = operation.GetProperty("responses");
+        Assert.True(responses.TryGetProperty("200", out var success));
+        Assert.True(responses.TryGetProperty("409", out _));
+        Assert.False(responses.GetProperty("401").TryGetProperty("content", out _));
+        Assert.Equal("string", responses.GetProperty("400").GetProperty("content")
+            .GetProperty("application/json").GetProperty("schema").GetProperty("properties")
+            .GetProperty("error").GetProperty("type").GetString());
+        var schemaRef = success.GetProperty("content").GetProperty("application/json")
+            .GetProperty("schema").GetProperty("$ref").GetString();
+        var schemaName = schemaRef!.Split('/').Last();
+        var schema = document.RootElement.GetProperty("components").GetProperty("schemas").GetProperty(schemaName);
+        var refundStatusType = schema.GetProperty("properties").GetProperty("refundStatus").GetProperty("type");
+        Assert.Contains("string", refundStatusType.EnumerateArray().Select(type => type.GetString()));
+
+        var snapshotPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../docs/openapi.json"));
+        using var snapshot = JsonDocument.Parse(await File.ReadAllTextAsync(snapshotPath));
+        var snapshotOperation = snapshot.RootElement.GetProperty("paths")
+            .GetProperty("/api/orders/{orderId}/cancel").GetProperty("post");
+        Assert.Equal(operation.GetProperty("summary").GetString(), snapshotOperation.GetProperty("summary").GetString());
+        var snapshotResponseSchema = snapshotOperation.GetProperty("responses").GetProperty("200")
+            .GetProperty("content").GetProperty("application/json").GetProperty("schema").GetProperty("$ref").GetString()!;
+        Assert.EndsWith(schemaName, snapshotResponseSchema, StringComparison.Ordinal);
+        Assert.True(snapshot.RootElement.GetProperty("components").GetProperty("schemas")
+            .GetProperty(schemaName).GetProperty("properties").TryGetProperty("refundStatus", out _));
+    }
 }
