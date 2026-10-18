@@ -22,6 +22,21 @@
         }
       }
     },
+    "/health/ready": {
+      "get": {
+        "tags": [
+          "Poraqui.Api"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "503": {
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
     "/api/auth/register": {
       "post": {
         "tags": [

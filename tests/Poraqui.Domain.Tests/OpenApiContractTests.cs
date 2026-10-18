@@ -6,6 +6,28 @@ namespace Poraqui.Domain.Tests;
 public sealed class OpenApiContractTests
 {
     [Fact]
+    public async Task Readiness_contract_reports_success_and_unavailable_responses()
+    {
+        await using var factory = new ApiTestHost();
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync("/openapi/v1.json");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var responses = document.RootElement.GetProperty("paths").GetProperty("/health/ready")
+            .GetProperty("get").GetProperty("responses");
+        Assert.True(responses.TryGetProperty("200", out _));
+        Assert.True(responses.TryGetProperty("503", out _));
+
+        var snapshotPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../docs/openapi.json"));
+        using var snapshot = JsonDocument.Parse(await File.ReadAllTextAsync(snapshotPath));
+        var snapshotResponses = snapshot.RootElement.GetProperty("paths").GetProperty("/health/ready")
+            .GetProperty("get").GetProperty("responses");
+        Assert.True(snapshotResponses.TryGetProperty("200", out _));
+        Assert.True(snapshotResponses.TryGetProperty("503", out _));
+    }
+
+    [Fact]
     public async Task Transfer_evidence_contract_describes_multipart_upload_and_actual_responses()
     {
         await using var factory = new ApiTestHost();

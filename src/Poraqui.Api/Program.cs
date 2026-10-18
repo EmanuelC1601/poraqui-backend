@@ -186,6 +186,27 @@ builder.Services.AddPoraquiAuthorization();
 
 var app = builder.Build();
 
+async Task<IResult> CheckReadinessAsync(CancellationToken cancellationToken)
+{
+    if (!identityConfigured) return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+    try
+    {
+        await using var scope = app.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await db.Database.CanConnectAsync(cancellationToken)
+            ? Results.Ok(new { status = "ready" })
+            : Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+    }
+    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+    {
+        throw;
+    }
+    catch
+    {
+        return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+    }
+}
+
 if (identityConfigured && app.Environment.IsProduction())
     app.Services.GetRequiredService<ITransferEvidenceStorage>();
 
@@ -217,6 +238,10 @@ if (identityConfigured)
 
 app.UseAuthorization();
 app.MapGet("/health/live", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
+app.MapGet("/health/ready", CheckReadinessAsync)
+    .AllowAnonymous()
+    .Produces(StatusCodes.Status200OK)
+    .Produces(StatusCodes.Status503ServiceUnavailable);
 
 app.Run();
 

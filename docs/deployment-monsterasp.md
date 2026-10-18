@@ -46,7 +46,8 @@ No ejecutes pruebas que inserten y limpien datos sobre la base compartida de des
 
 ## Verificación posterior a publicación
 
-- Solicita `/health/live` y confirma HTTP 200.
+- Solicita `/health/live` y confirma HTTP 200 para validar que el proceso está activo.
+- Solicita `/health/ready` y confirma HTTP 200 para validar conectividad con SQL Server; HTTP 503 indica que falta configuración de SQL o la base no está disponible. Este endpoint no aplica migraciones ni verifica servicios externos.
 - Confirma que el entorno sea `Production`.
 - Verifica en el hosting que Identity acceda a la base destino y que el almacenamiento privado pueda guardar y leer un comprobante de prueba.
 - Valida WebSockets y el hub autenticado `/hubs/orders` desde un cliente autorizado.
