@@ -42,3 +42,9 @@ Los tests API usan SQLite en memoria y almacenamiento temporal. No prueban SQL S
 Verificación repetida tras integrar PR #52 (`edac6bf`): SDK local 10.0.402, compilación con 0 advertencias/errores, 31 tests aprobados y las dos carreras SQL omitidas porque falta `ConnectionStrings__SqlServerTest`. `dotnet-ef migrations list` conectó en lectura a la BD de desarrollo privada y mostró las 13 migraciones integradas sin pendientes. No se ejecutaron pruebas mutables ni migraciones en esta comprobación.
 
 Validación de esquema del 2026-10-17: una consulta directa de solo lectura mediante `ConnectionStrings:DefaultConnection` privada confirmó 13 filas de historial de migraciones y el esquema anterior. No leyó datos funcionales ni modificó tablas. La presencia del índice filtrado y columnas de versión no sustituye ejecutar aceptación simultánea en SQL Server aislado; esa verificación continúa pendiente.
+
+## Corrección del contrato OpenAPI por PR #56
+
+PR #56 se integró en `main` como merge `8f637d6` (commit de trabajo `fbe5803`). La especificación generada ahora describe el comprobante como `multipart/form-data`, con `commandId` UUID y archivo binario obligatorios, respuesta `202` con `replayed` y los estados de error observados. `OpenApiContractTests` comprueba esos campos y respuestas; `docs/openapi.json` coincide con el documento emitido en ejecución y contiene 61 rutas.
+
+Validación ejecutada antes de integrar PR #56 con SDK .NET 10.0.402: build correcto con 0 advertencias y 0 errores; 32 pruebas pasaron y las 2 pruebas de concurrencia SQL Server quedaron omitidas porque falta `ConnectionStrings__SqlServerTest`; `git diff --check` pasó. La consulta SQL Server de solo lectura más reciente confirmó conexión privada y las 13 migraciones aplicadas, hasta `20261017234424_ExternalOfferAcceptancePickupCode`. No se ejecutaron migraciones en esta actualización.
