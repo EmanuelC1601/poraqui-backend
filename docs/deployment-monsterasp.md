@@ -1,6 +1,6 @@
 # Despliegue en MonsterASP.NET
 
-Estado: instrucciones preparadas; la API aún no se ha publicado en un sitio MonsterASP.NET. Este repositorio apunta a .NET 9 y el proveedor anuncia soporte para ese runtime. Verifica el runtime habilitado para el sitio antes de publicar.
+Estado: instrucciones preparadas; la API aún no se ha publicado en un sitio MonsterASP.NET. El proyecto apunta a .NET 10 LTS. La documentación actual del proveedor admite versiones modernas de ASP.NET Core; selecciona el runtime moderno compatible con .NET 10 en Scripting antes de publicar. [Soporte de tecnologías](https://help.monsterasp.net/getting-started/first-steps/supported-technologies) · [Selección de runtime](https://help.monsterasp.net/websites/configuration/scripting).
 
 ## Preparación del sitio
 

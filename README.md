@@ -1,6 +1,6 @@
 # Poraqui Backend
 
-API de la plataforma de comida local, construida en .NET 9 con Clean Architecture. `main` es la base de integración y el proyecto tiene un único responsable.
+API de la plataforma de comida local, construida en .NET 10 LTS con Clean Architecture. `main` es la base de integración y el proyecto tiene un único responsable.
 
 ## Compilar y probar
 
@@ -9,6 +9,8 @@ dotnet restore Poraqui.sln
 dotnet build Poraqui.sln
 dotnet test Poraqui.sln
 ```
+
+La solución apunta a `net10.0` y usa EF Core 10. Instala el SDK .NET 10 para compilar, probar y restaurar la herramienta `dotnet-ef`.
 
 Las pruebas de API usan SQLite en memoria y archivos temporales. No validan concurrencia ni sintaxis/índices del servidor SQL.
 
