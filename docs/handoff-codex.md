@@ -98,3 +98,7 @@ Validación local actual con SDK .NET 10.0.402: build Release 0 advertencias/err
 Integrado en `main` como `6e269c6`. Cancelar después de enviar comprobante o de aprobar el pago, antes de que el negocio acepte, crea seguimiento manual de reembolso. La API devuelve `refundStatus` en la respuesta de cancelación; los reintentos idénticos no agregan cambios y la cancelación después de aceptar se rechaza. No requiere migración. Pruebas locales: 49/49 Release con SQLite y SQL Server aislado; CI del PR pasó.
 
 La conexión SQL aislada se consume desde User Secrets solo en el proceso de test. No se imprimió ni versionó. El usuario pidió dejar para más adelante cualquier configuración privada adicional desde el panel del hosting.
+
+## Revisión del PR #1
+
+GitHub confirma PR #1 cerrado y fusionado a `main` (`e346995`, ancestro de `main`); añadió las entidades iniciales de negocio, catálogo, zona, tarifa y pedido, sus mapeos y pruebas de dominio/round-trip SQLite. El merge no tiene check runs registrados ni reviews; las pruebas originales cubrían reglas básicas y persistencia SQLite, no permisos de API ni operación real en SQL Server. Por eso el ledger lo conserva como fundación parcial. Los endpoints y recorridos completos se añadieron en incrementos posteriores. En la copia actual, la suite Release 49/49 valida el estado acumulado en SQLite y SQL Server aislado; no se reescribió el PR ya integrado.
