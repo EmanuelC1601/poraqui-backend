@@ -455,6 +455,7 @@ public sealed class BusinessApiTests
             Assert.Null(unchangedOrderJson.RootElement.GetProperty("refundStatus").GetString());
         }
         var customerCancellation = JsonContent.Create(new { reason = "El cliente cancela antes de la aceptación" });
+        int customerCancellationHistoryCount;
         using (var customerCancellationResponse = await SendAsync(client, HttpMethod.Post,
                    $"api/orders/{customerCancellableOrderId}/cancel", customerToken, customerCancellation))
         using (var customerCancellationJson = JsonDocument.Parse(await customerCancellationResponse.Content.ReadAsStringAsync()))
@@ -462,6 +463,9 @@ public sealed class BusinessApiTests
             Assert.Equal(HttpStatusCode.OK, customerCancellationResponse.StatusCode);
             Assert.Equal("Cancelled", customerCancellationJson.RootElement.GetProperty("status").GetString());
             Assert.Equal("ReviewRequired", customerCancellationJson.RootElement.GetProperty("refundStatus").GetString());
+            var history = customerCancellationJson.RootElement.GetProperty("history").EnumerateArray().ToArray();
+            customerCancellationHistoryCount = history.Length;
+            Assert.Single(history, entry => entry.GetProperty("status").GetString() == "Cancelled");
         }
         using (var replayedCustomerCancellation = await SendAsync(client, HttpMethod.Post,
                    $"api/orders/{customerCancellableOrderId}/cancel", customerToken,
@@ -471,6 +475,9 @@ public sealed class BusinessApiTests
             Assert.Equal(HttpStatusCode.OK, replayedCustomerCancellation.StatusCode);
             Assert.Equal("Cancelled", replayedCancellationJson.RootElement.GetProperty("status").GetString());
             Assert.Equal("ReviewRequired", replayedCancellationJson.RootElement.GetProperty("refundStatus").GetString());
+            var replayedHistory = replayedCancellationJson.RootElement.GetProperty("history").EnumerateArray().ToArray();
+            Assert.Equal(customerCancellationHistoryCount, replayedHistory.Length);
+            Assert.Single(replayedHistory, entry => entry.GetProperty("status").GetString() == "Cancelled");
         }
         using (var customerRefundCase = await SendAsync(client, HttpMethod.Get,
                    $"api/businesses/{businessId}/orders/{customerCancellableOrderId}/refund", merchantToken))
