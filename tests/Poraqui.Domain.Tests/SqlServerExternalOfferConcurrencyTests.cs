@@ -113,6 +113,10 @@ public sealed class SqlServerExternalOfferConcurrencyTests
     private static async Task CleanupAsync(AppDbContext db, Guid orderId, Guid businessId, Guid zoneId,
         IReadOnlyCollection<Guid> userIds)
     {
+        // The concurrent accept attempts update row-versioned offers and the order.
+        // The setup context still tracks the pre-race snapshots, so cleanup must
+        // re-read fresh versions before deleting its uniquely identified test data.
+        db.ChangeTracker.Clear();
         db.ExternalDeliveryOffers.RemoveRange(await db.ExternalDeliveryOffers.Where(offer => offer.OrderId == orderId).ToArrayAsync());
         var order = await db.Orders.SingleOrDefaultAsync(candidate => candidate.Id == orderId);
         if (order is not null) db.Orders.Remove(order);
