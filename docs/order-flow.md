@@ -14,6 +14,8 @@ La ruta principal con persistencia SQL Server real se verifica aparte con `SqlSe
 
 El recorrido de reparto externo con proveedor SQL Server se verifica con `SqlServerExternalDeliveryFlowApiTests.Sql_server_api_flow_dispatches_accepts_and_delivers_one_external_order`. Comprueba zona de disponibilidad, publicación de oferta, origen, destino, remuneración y condiciones visibles antes de aceptar, aceptación repetible, código de recogida, pago al recoger registrado por el negocio, llamada autorizada y confirmación de entrega sincronizada sin conexión. Comprueba que el servidor rechace un código inválido, que el mismo comando se pueda reintentar sin duplicar la entrega y que reutilizarlo con otros datos produzca conflicto. Limpia sus registros identificados en la misma base aislada. Expiración, cancelación, rechazo, ausencia de repartidores y SignalR tienen además cobertura de ruta sobre SQLite; la aceptación simultánea SQL Server se prueba separadamente.
 
+El mismo recorrido de API cubre también cancelación por el cliente después de subir comprobante y antes de la aceptación del negocio. La respuesta queda en `Cancelled` con reembolso manual `ReviewRequired`; repetir la cancelación mantiene un único caso. La regla de dominio también cubre cancelación pendiente de pago, pago aprobado aún no aceptado, y rechazo al intentar cancelar después de que el negocio aceptó.
+
 La prueba recorre estos pasos y valida sus respuestas:
 
 1. Crear al administrador inicial, registrar negocio y cliente, y configurar el negocio como activo.
