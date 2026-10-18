@@ -12,7 +12,7 @@ Las 13 migraciones integradas están aplicadas en la BD compartida de desarrollo
 
 PR #49 documenta el test integral reproducible y sus límites. PR #50 distingue su configuración aislada de la configuración privada requerida para ejecutar la API manualmente. PR #52 (`edac6bf`) registra la integración de .NET 10 y mantiene explícitos los pendientes.
 
-## Último incremento integrado: PR #51
+## Último incremento de código: PR #51 (los PR #52 y #53 actualizaron documentación y estado)
 
 PR #51 se integró en `main` como merge `5078005` (commit de trabajo `05d5410`). Actualiza proyectos y paquetes de .NET/EF Core a .NET 10 LTS, SQL Client 7.1.1 y PKCS 10.0.13. No cambia contratos API ni el modelo EF y no genera migraciones.
 
