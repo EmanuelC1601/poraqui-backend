@@ -121,4 +121,4 @@ PR #84 quedó integrado en `main` como `a38ee0a`. `GET /health/ready` comprueba 
 
 PR #86 integró el paquete IIS en CI (`90b177d`). La ejecución de `main` #39092852859 pasó y generó `poraqui-api-iis-90b177d54c2eb632a9c0a41fe8942063fcfd3fdf` (5,679,063 bytes, retención de 14 días). La publicación local también generó `web.config` InProcess; suite completa: 53/53. El sitio MonsterASP aún no se ha configurado ni verificado.
 
-La rama `feature/authorize-before-courier-lookup` corrige el orden de autorización en `POST /api/businesses/{businessId}/orders/{orderId}/assign-courier`: primero autoriza el recurso, después consulta la existencia/rol del courier. Prueba API enfocada aprobada; suite Release completa 54/54 con ocho pruebas SQL Server en la BD aislada. Sin migraciones. PR/CI pendientes.
+PR #88 integró en `main` (`914d291`) la autorización del negocio/pedido antes de consultar la existencia o rol del courier en `POST /api/businesses/{businessId}/orders/{orderId}/assign-courier`. La prueba API enfocada aprobó; suite Release completa 54/54 con ocho pruebas SQL Server en la BD aislada. Sin migraciones.
