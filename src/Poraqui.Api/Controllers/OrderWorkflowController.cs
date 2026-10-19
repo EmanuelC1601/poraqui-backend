@@ -303,13 +303,13 @@ public sealed class OrderWorkflowController(OrderWorkflowService workflow, UserM
     public async Task<IActionResult> AssignCourier(Guid businessId, Guid orderId, AssignCourierRequest request, CancellationToken cancellationToken)
     {
         if (!TryGetActor(out var actorId, out _)) return Unauthorized();
-        var courier = await users.FindByIdAsync(request.CourierUserId.ToString());
-        if (courier is null || !await users.IsInRoleAsync(courier, ApplicationRoles.DeliveryPerson))
-            return BadRequest(new { error = "The selected user is not an internal delivery person." });
         try
         {
             var order = await workflow.GetForBusinessAsync(orderId, actorId, false, cancellationToken);
             if (order is null || order.BusinessId != businessId) return NotFound();
+            var courier = await users.FindByIdAsync(request.CourierUserId.ToString());
+            if (courier is null || !await users.IsInRoleAsync(courier, ApplicationRoles.DeliveryPerson))
+                return BadRequest(new { error = "The selected user is not an internal delivery person." });
             return Ok(await workflow.AssignCourierAsync(orderId, actorId, request.CourierUserId, request.CourierPaymentAmount, request.CommandId, cancellationToken));
         }
         catch (OrderResourceForbiddenException) { return Forbid(); }
