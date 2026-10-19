@@ -72,6 +72,66 @@ public sealed class BusinessApiTests
     }
 
     [Fact]
+    public async Task Courier_assignment_checks_order_access_before_looking_up_target_courier()
+    {
+        await using var factory = new ApiTestHost();
+        using var client = factory.CreateClient();
+        await factory.InitializeDatabaseAsync();
+
+        var bootstrap = await client.PostAsJsonAsync("api/auth/bootstrap-admin", new
+        {
+            email = "assignment-admin@example.test", displayName = "Test Admin", password = "Test-Password-1!",
+            bootstrapKey = "integration-test-bootstrap-key-with-sufficient-length"
+        });
+        Assert.Equal(HttpStatusCode.Created, bootstrap.StatusCode);
+        var adminToken = await LoginAsync(client, "assignment-admin@example.test");
+
+        await RegisterAsync(client, "resource-owner@example.test");
+        var resourceOwnerToken = await LoginAsync(client, "resource-owner@example.test");
+        var resourceBusinessId = await RegisterBusinessAsync(client, resourceOwnerToken, "Negocio protegido");
+        resourceOwnerToken = await LoginAsync(client, "resource-owner@example.test");
+        Assert.Equal(HttpStatusCode.OK, (await SendAsync(client, HttpMethod.Put,
+            $"api/businesses/{resourceBusinessId}/active", adminToken, JsonContent.Create(new { active = true }))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await SendAsync(client, HttpMethod.Put,
+            $"api/businesses/{resourceBusinessId}/transfer-details", resourceOwnerToken,
+            JsonContent.Create(new { recipientName = "Negocio", institution = "Banco de prueba", accountReference = "TEST-1234", instructions = "" }))).StatusCode);
+
+        using var zoneResponse = await SendAsync(client, HttpMethod.Post, "api/delivery-zones", adminToken,
+            JsonContent.Create(new { name = "Zona protegida" }));
+        Assert.Equal(HttpStatusCode.OK, zoneResponse.StatusCode);
+        using var zoneJson = JsonDocument.Parse(await zoneResponse.Content.ReadAsStringAsync());
+        var zoneId = zoneJson.RootElement.GetProperty("id").GetGuid();
+        using var productResponse = await SendAsync(client, HttpMethod.Post,
+            $"api/businesses/{resourceBusinessId}/products", resourceOwnerToken,
+            JsonContent.Create(new { name = "Producto", price = 20m }));
+        Assert.Equal(HttpStatusCode.Created, productResponse.StatusCode);
+        using var productJson = JsonDocument.Parse(await productResponse.Content.ReadAsStringAsync());
+        var productId = productJson.RootElement.GetProperty("id").GetGuid();
+        Assert.Equal(HttpStatusCode.OK, (await SendAsync(client, HttpMethod.Post,
+            $"api/businesses/{resourceBusinessId}/delivery-rates", resourceOwnerToken,
+            JsonContent.Create(new { zoneId, fee = 5m }))).StatusCode);
+
+        await RegisterAsync(client, "order-customer@example.test");
+        var customerToken = await LoginAsync(client, "order-customer@example.test");
+        using var orderResponse = await SendAsync(client, HttpMethod.Post, "api/orders", customerToken,
+            JsonContent.Create(new { commandId = Guid.NewGuid(), businessId = resourceBusinessId, zoneId,
+                deliveryAddress = "Destino de prueba", items = new[] { new { productId, quantity = 1 } } }));
+        Assert.Equal(HttpStatusCode.Created, orderResponse.StatusCode);
+        using var orderJson = JsonDocument.Parse(await orderResponse.Content.ReadAsStringAsync());
+        var orderId = orderJson.RootElement.GetProperty("id").GetGuid();
+
+        await RegisterAsync(client, "unrelated-owner@example.test");
+        var unrelatedOwnerToken = await LoginAsync(client, "unrelated-owner@example.test");
+        _ = await RegisterBusinessAsync(client, unrelatedOwnerToken, "Otro negocio");
+        unrelatedOwnerToken = await LoginAsync(client, "unrelated-owner@example.test");
+        using var response = await SendAsync(client, HttpMethod.Post,
+            $"api/businesses/{resourceBusinessId}/orders/{orderId}/assign-courier", unrelatedOwnerToken,
+            JsonContent.Create(new { courierUserId = Guid.NewGuid(), courierPaymentAmount = 10m, commandId = Guid.NewGuid() }));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Manual_payment_and_internal_delivery_flow_preserves_server_pricing_and_history()
     {
         await using var factory = new ApiTestHost();
