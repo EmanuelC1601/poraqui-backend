@@ -129,8 +129,8 @@ PR #90 quedó integrado en `main` como `978638c`. `PUT /api/admin/users/{userId}
 
 Para el head de PR, build Release: 0 advertencias/errores; suite Release: 47 aprobadas, 0 fallidas, 8 SQL Server omitidas por la configuración diferida de `SqlServerTest`. También pasaron el test de revocación (1/1) y el recorrido interno (1/1) sobre SQLite. CI `build-and-test` pasó antes de integrar. No hubo migraciones ni accesos a bases compartidas o SQL de pruebas.
 
-## Incremento en curso: cancelar ofertas al revocar courier
+## PR #91 integrado: cancelar ofertas al revocar courier
 
-Rama `feature/revoke-courier-offers` se creó desde `main` después del merge `978638c`. `PUT /api/admin/users/{userId}/external-courier` cancela las ofertas `Offered` de ese courier antes de guardar rol/perfil y commitea todo junto; después del commit publica el evento SignalR `Cancelled`. Así las ofertas no reaparecen si el rol se reactiva y la conexión activa recibe el cierre. Prueba API focalizada pasó 1/1 con SQLite. Build Release: 0 advertencias/errores; suite completa: 47 aprobadas, 0 fallidas, 8 SQL Server omitidas. No cambia esquema ni toca SQL Server. PR aún no creado.
+PR #91 quedó integrado como `5701981` en `main`. `PUT /api/admin/users/{userId}/external-courier` cancela las ofertas `Offered` de ese courier en la transacción que revoca rol/perfil; después del commit publica el evento SignalR `Cancelled`. Las ofertas no reaparecen al reactivar el rol y la conexión activa recibe el cierre. Test API enfocado pasó 1/1 en SQLite. Build Release: 0 advertencias/errores; suite: 47 aprobadas, 0 fallidas y 8 SQL Server omitidas. CI `build-and-test` pasó antes de integrar. Sin migraciones ni acceso a SQL Server.
 
 La verificación SQL Server aislada queda pendiente hasta que el usuario configure `ConnectionStrings:SqlServerTest` en User Secrets. Instrucción: `dotnet user-secrets set "ConnectionStrings:SqlServerTest" "<cadena privada de la BD aislada>" --project src/Poraqui.Api`; no enviar el valor por chat ni usar `DefaultConnection` compartida para pruebas que escriban.
