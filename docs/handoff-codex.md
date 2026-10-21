@@ -166,3 +166,9 @@ La documentación de seguimiento se integró mediante PR #96 (`5955ff1`). El CI 
 PR #99 (`3a510cf`, `b894df3`) se integró como `982a973`: el test OpenAPI compara `openapi`, `info`, `paths` y `components` completos contra `docs/openapi.json`; solo ignora el arreglo dinámico `servers`. Prueba focalizada 1/1; suite Release 48 aprobadas, 0 fallidas y 8 SQL omitidas. CI posterior al merge `39553449615` pasó y produjo `poraqui-api-iis-982a9731156cabeb11d27ddd02f050af75b35564` (5,683,240 bytes, vence 2026-11-04). Sin cambios de esquema o acceso a bases. El despliegue MonsterASP y pruebas SQL siguen pendientes.
 
 PR #100 quedó integrado como `886c7c1`; el run de `main` `39553789750` pasó y generó `poraqui-api-iis-886c7c150998ea428409107825af34108e144118` (5,683,261 bytes, vence 2026-11-04). El paquete continúa sin publicarse porque falta seleccionar y configurar el sitio y sus rutas privadas.
+
+## PR #108 integrado: límite de comprobante
+
+PR #108 quedó integrado en `main` como merge `801d6a8`. Un archivo de comprobante que excede 8 MiB responde HTTP 413, conforme al contrato existente. La prueba API verifica el caso de 8 MiB + 1 byte y confirma que el pedido permanece en `PendingPayment`. Prueba enfocada SQLite 1/1; suite Release completa 49 aprobadas, 0 fallidas y 8 pruebas SQL Server omitidas por la conexión aislada aplazada. CI `build-and-test` pasó antes del merge y el CI post-merge run `39645985977` también pasó. No hay cambios de esquema ni migraciones.
+
+PR #102 sigue abierto en borrador: la CI pasó para `5758bbf` (run `39559470102`) y la suite local pasó 50 con 9 integraciones SQL Server omitidas. La carrera de despacho concurrente debe aprobarse en SQL Server aislado antes de integrar; `ConnectionStrings:SqlServerTest` sigue pendiente a petición del usuario. La migración de ese PR ya se aplicó explícitamente a la base compartida tras revisar cero duplicados; no se volvió a ejecutar en PR #108.
