@@ -10,14 +10,63 @@ using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 using Poraqui.Application.Security;
 using Poraqui.Application.Orders;
 using Poraqui.Infrastructure.Identity;
+using Poraqui.Infrastructure.Persistence;
 
 namespace Poraqui.Domain.Tests;
 
 public sealed class BusinessApiTests
 {
+    [Fact]
+    public async Task External_courier_role_and_availability_profile_are_provisioned_and_revoked_together()
+    {
+        await using var factory = new ApiTestHost();
+        using var client = factory.CreateClient();
+        await factory.InitializeDatabaseAsync();
+
+        var bootstrap = await client.PostAsJsonAsync("api/auth/bootstrap-admin", new
+        {
+            email = "courier-admin@example.test", displayName = "Test Admin", password = "Test-Password-1!",
+            bootstrapKey = "integration-test-bootstrap-key-with-sufficient-length"
+        });
+        Assert.Equal(HttpStatusCode.Created, bootstrap.StatusCode);
+        var adminToken = await LoginAsync(client, "courier-admin@example.test");
+        await RegisterAsync(client, "provisioned-courier@example.test");
+
+        await using var identityScope = factory.Services.CreateAsyncScope();
+        var users = identityScope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var courier = await users.FindByEmailAsync("provisioned-courier@example.test");
+        Assert.NotNull(courier);
+
+        using var grant = await SendAsync(client, HttpMethod.Put,
+            $"api/admin/users/{courier!.Id}/external-courier", adminToken,
+            JsonContent.Create(new { isExternalCourier = true }));
+        Assert.Equal(HttpStatusCode.NoContent, grant.StatusCode);
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.True(await db.UserRoles.AnyAsync(x => x.UserId == courier.Id && x.RoleId == db.Roles
+                .Where(role => role.Name == ApplicationRoles.ExternalCourier).Select(role => role.Id).Single()));
+            var profile = await db.CourierAvailabilities.SingleAsync(x => x.CourierUserId == courier.Id);
+            Assert.False(profile.IsAvailable);
+        }
+
+        using var revoke = await SendAsync(client, HttpMethod.Put,
+            $"api/admin/users/{courier.Id}/external-courier", adminToken,
+            JsonContent.Create(new { isExternalCourier = false }));
+        Assert.Equal(HttpStatusCode.NoContent, revoke.StatusCode);
+        await using var finalScope = factory.Services.CreateAsyncScope();
+        var finalDb = finalScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var externalRoleId = await finalDb.Roles.Where(role => role.Name == ApplicationRoles.ExternalCourier)
+            .Select(role => role.Id).SingleAsync();
+        Assert.False(await finalDb.UserRoles.AnyAsync(x => x.UserId == courier.Id && x.RoleId == externalRoleId));
+        var revokedProfile = await finalDb.CourierAvailabilities.SingleAsync(x => x.CourierUserId == courier.Id);
+        Assert.False(revokedProfile.IsAvailable);
+    }
+
     [Fact]
     public async Task Authenticated_business_owners_can_manage_only_their_own_business()
     {

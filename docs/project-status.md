@@ -6,6 +6,7 @@ Actualizado: 2026-10-17. `main` es la base de integración, con un solo responsa
 
 | Estado | Capacidad | Evidencia / límite |
 |---|---|---|
+| En PR | Alta y revocación del rol de repartidor externo junto con su perfil de disponibilidad dentro de una transacción EF/Identity | `feature/atomic-external-courier-role`; prueba API con SQLite confirma que el rol y el perfil quedan provisionados/revocados en conjunto. Sin cambios de esquema. La conexión de verificación SQL Server aislada está pendiente de configuración privada del usuario. |
 | Integrado; cobertura funcional parcial | Clean Architecture, Identity, roles y autorización por relación con negocio/pedido; comercios, catálogo y opciones, zonas, tarifas, horarios y precios calculados por servidor | PR #1, #22–#33; prueba API integral sobre SQLite; ver requisitos SQL y hosting pendientes |
 | Integrado | Asignación de repartidor interno comprueba primero acceso al pedido/negocio antes de consultar el rol del usuario objetivo | PR #88, merge `914d291`; prueba API confirma `403` para propietario ajeno incluso con courier ID inexistente, evitando sondeo del rol de otros usuarios |
 | Integrado; cobertura funcional parcial | Pedido, comprobante privado, revisión manual de transferencia, decisión del negocio, preparación, repartidor propio/externo, ofertas, códigos, contacto autorizado e historial | Prueba amplia SQLite y recorridos API SQL Server de reparto interno, externo y confirmación offline (PR #63–#65); suite SQL Server aislada 39/39 tras PR #67; límites en `docs/order-flow.md` |
