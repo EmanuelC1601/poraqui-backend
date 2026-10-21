@@ -39,9 +39,9 @@ PR #103 quedó integrado en `main` como merge `c3270da`. `OrderWorkflowRepositor
 
 Prueba SQLite enfocada: **1/1**; suite Release completa: **49 aprobadas, 0 fallidas, 8 omitidas** (integraciones SQL Server, configuración aislada aplazada); CI `build-and-test` del PR pasó antes de integrar. No hubo escrituras en SQL Server ni migraciones.
 
-## Cobertura de API en rama: teléfono no confirmado
+## Integrado: PR #106, teléfono no confirmado sin transición parcial
 
-Rama `feature/test-verified-contact-workflow` añade a `BusinessApiTests` el caso de inicio de entrega con el teléfono desconfirmado. El endpoint responde `409`, el mensaje no filtra el teléfono y `GET /api/orders/{id}` conserva `PickedUp`; al restablecer `PhoneNumberConfirmed=true`, iniciar contacto devuelve el número esperado. Prueba API focalizada **1/1**; suite Release **49 aprobadas, 0 fallidas, 8 SQL Server omitidas**. `git diff --check` pasó; no hay cambios de producción, esquema ni bases de datos.
+PR #106 se integró en `main` como merge `3c32c68`. `BusinessApiTests` verifica inicio de entrega con teléfono desconfirmado: el endpoint responde `409`, el mensaje no filtra el teléfono y `GET /api/orders/{id}` conserva `PickedUp`; al restablecer `PhoneNumberConfirmed=true`, iniciar contacto devuelve el número esperado. Prueba API focalizada **1/1**; suite Release **49 aprobadas, 0 fallidas, 8 SQL Server omitidas**. CI pasó. No hay cambios de producción, esquema ni bases de datos.
 
 ## Artefacto de despliegue vigente en `main`
 
