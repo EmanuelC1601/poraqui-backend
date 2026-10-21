@@ -31,6 +31,12 @@ Revalidación tras PR #52 con el SDK local 10.0.402: build con 0 advertencias/er
 1. Publicar en un sitio MonsterASP.NET con sus variables privadas y almacenamiento persistente; validar health, SignalR y comprobante privado.
 2. Configurar secretos Twilio en privado y probar el envío OTP con un teléfono autorizado.
 
+## Incremento en revisión: unicidad de ofertas activas
+
+La rama `feature/unique-active-external-offer` añade un índice único filtrado para impedir dos ofertas `Offered` para el mismo pedido/courier y convierte colisiones al despachar concurrentemente en HTTP 409. El despacho persiste primero las expiraciones del pedido para que ofertas vencidas fuera de la ventana del barrido no bloqueen el redispatch. Incluye cobertura API SQLite para expiración/redispatch y prueba SQL Server de despacho simultáneo. La migración revisable `20261021061647_UniqueActiveExternalOfferPerCourier` y su script están incluidos en el cambio. En `db74183`, una consulta previa encontró cero pares duplicados activos; la migración fue aplicada explícitamente y una consulta posterior confirmó índice, registro de migración y cero duplicados. No eliminó ni actualizó datos funcionales.
+
+Tras incorporar `origin/main` hasta `b47ff54`, la suite Release pasó **50 pruebas, 0 fallidas y 9 omitidas**. Se mantienen los cambios de contacto con teléfono confirmado y no hay conflictos pendientes. Las omitidas son integraciones SQL Server, incluida la carrera nueva, porque el usuario aplazó `ConnectionStrings:SqlServerTest`. CI `build-and-test` pasó para el head `5758bbf` (run `39559470102`); PR #102 sigue borrador y no integrado hasta ejecutar su carrera de dispatch simultáneo contra SQL Server aislado. La conexión requerida es `ConnectionStrings:SqlServerTest` en User Secrets para `src/Poraqui.Api`; no usar `DefaultConnection` compartida para esas pruebas.
+
 No se publican secretos ni se toman credenciales del chat. El estado verificable vigente está en `docs/project-status.md`.
 
 ## Integrado: PR #103, teléfono confirmado para contacto de entrega

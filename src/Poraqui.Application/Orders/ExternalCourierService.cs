@@ -19,6 +19,7 @@ public interface IExternalCourierRepository
     Task<ExternalDeliveryOffer?> GetOfferAsync(Guid offerId, CancellationToken cancellationToken);
     Task<bool> HasAcceptedOfferAsync(Guid orderId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ExternalDeliveryOffer>> ExpireDueOffersAsync(DateTimeOffset now, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ExternalDeliveryOffer>> ExpireDueOffersForOrderAsync(Guid orderId, DateTimeOffset now, CancellationToken cancellationToken);
     void AddOffer(ExternalDeliveryOffer offer);
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }
@@ -65,8 +66,11 @@ public sealed class ExternalCourierService(IExternalCourierRepository repository
         if (await repository.HasAcceptedOfferAsync(orderId, ct)) throw new InvalidOperationException("Order already has an accepted external offer.");
         var pickup = await repository.GetBusinessAddressAsync(order.BusinessId, ct) ?? throw new InvalidOperationException("Business pickup address is unavailable.");
         var couriers = await repository.GetAvailableCouriersAsync(order.ZoneId, ct);
-        var existing = await repository.GetCouriersWithActiveOffersAsync(order.Id, DateTimeOffset.UtcNow, ct);
-        var expiresAt = DateTimeOffset.UtcNow.Add(offerDuration);
+        var now = DateTimeOffset.UtcNow;
+        var expired = await repository.ExpireDueOffersForOrderAsync(order.Id, now, ct);
+        await PublishChangesAsync(expired, ct);
+        var existing = await repository.GetCouriersWithActiveOffersAsync(order.Id, now, ct);
+        var expiresAt = now.Add(offerDuration);
         var createdOffers = new List<ExternalDeliveryOffer>();
         foreach (var courierId in couriers)
             if (!existing.Contains(courierId))

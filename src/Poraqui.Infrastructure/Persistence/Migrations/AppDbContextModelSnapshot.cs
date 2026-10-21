@@ -508,6 +508,10 @@ namespace Poraqui.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ZoneId");
 
+                    b.HasIndex("OrderId", "CourierUserId")
+                        .IsUnique()
+                        .HasFilter("[Status] = 'Offered'");
+
                     b.HasIndex("CourierUserId", "Status", "ExpiresAtUtc");
 
                     b.ToTable("ExternalDeliveryOffers", null, t =>

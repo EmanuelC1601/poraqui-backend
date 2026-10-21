@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Poraqui.Application.Orders;
 using Poraqui.Application.Security;
@@ -87,6 +88,10 @@ public sealed class ExternalCourierController(ExternalCourierService couriers, I
         catch (InvalidOperationException exception) { return Conflict(new { error = exception.Message }); }
         catch (ArgumentException exception) { return BadRequest(new { error = exception.Message }); }
         catch (DbUpdateConcurrencyException) { return Conflict(new { error = "Order changed while offers were being created." }); }
+        catch (DbUpdateException exception) when (IsUniqueConstraintViolation(exception))
+        {
+            return Conflict(new { error = "Offers changed while dispatch was being processed; reload active offers." });
+        }
     }
 
     [Authorize(Policy = ApplicationPolicies.ManageBusiness)]
@@ -108,6 +113,9 @@ public sealed class ExternalCourierController(ExternalCourierService couriers, I
     }
 
     private bool Actor(out Guid actorId) => Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out actorId);
+
+    private static bool IsUniqueConstraintViolation(DbUpdateException exception) =>
+        exception.GetBaseException() is SqlException { Number: 2601 or 2627 };
 
     private async Task<bool> HasCurrentExternalCourierRoleAsync(Guid courierId)
     {

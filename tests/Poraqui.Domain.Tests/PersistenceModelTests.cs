@@ -206,4 +206,35 @@ public sealed class PersistenceModelTests
             (await verify.ExternalDeliveryOffers.SingleAsync(x => x.Id == secondOffer.Id)).Status);
         Assert.Equal(firstCourier.Id, (await verify.Orders.SingleAsync(x => x.Id == order.Id)).CourierUserId);
     }
+
+    [Fact]
+    public async Task Only_one_active_offer_per_courier_and_order_can_be_persisted()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
+        var owner = new ApplicationUser { Id = Guid.NewGuid(), UserName = "unique-offer-owner" };
+        var customer = new ApplicationUser { Id = Guid.NewGuid(), UserName = "unique-offer-customer" };
+        var courier = new ApplicationUser { Id = Guid.NewGuid(), UserName = "unique-offer-courier" };
+        var zone = new DeliveryZone("Zona oferta única");
+        var business = new Business(owner.Id, "Negocio oferta única", "Origen");
+        var order = new Order(customer.Id, business.Id, zone.Id, "Destino", 3m,
+            [(Guid.NewGuid(), "Producto", 10m, 1)]);
+        var expires = DateTimeOffset.UtcNow.AddMinutes(10);
+        var first = new ExternalDeliveryOffer(order.Id, courier.Id, zone.Id, "Origen", "Destino", 20m, null, expires);
+        var duplicate = new ExternalDeliveryOffer(order.Id, courier.Id, zone.Id, "Origen", "Destino", 20m, null, expires);
+
+        await using (var db = new AppDbContext(options))
+        {
+            await db.Database.EnsureCreatedAsync();
+            db.Users.AddRange(owner, customer, courier);
+            db.AddRange(zone, business, order, first);
+            await db.SaveChangesAsync();
+            db.ExternalDeliveryOffers.Add(duplicate);
+            await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        }
+
+        await using var verify = new AppDbContext(options);
+        Assert.Single(await verify.ExternalDeliveryOffers.AsNoTracking().ToArrayAsync());
+    }
 }
