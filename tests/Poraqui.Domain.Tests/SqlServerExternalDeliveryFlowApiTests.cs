@@ -155,6 +155,44 @@ public sealed class SqlServerExternalDeliveryFlowApiTests
                 Assert.Equal("Negocio paga en efectivo al recoger", offer.GetProperty("conditions").GetString());
             }
 
+            var revokedOfferId = offerId;
+            Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put,
+                $"api/admin/users/{courierId}/external-courier", adminToken,
+                JsonContent.Create(new { isExternalCourier = false }))).StatusCode);
+            using (var revokedOffersResponse = await SendAsync(client, HttpMethod.Get,
+                       "api/courier/external/offers", courierToken))
+                Assert.Equal(HttpStatusCode.Forbidden, revokedOffersResponse.StatusCode);
+            await using (var scope = factory.Services.CreateAsyncScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var revokedOffer = await db.ExternalDeliveryOffers.SingleAsync(offer => offer.Id == revokedOfferId);
+                Assert.Equal(ExternalDeliveryOfferStatus.Cancelled, revokedOffer.Status);
+            }
+
+            Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put,
+                $"api/admin/users/{courierId}/external-courier", adminToken,
+                JsonContent.Create(new { isExternalCourier = true }))).StatusCode);
+            courierToken = await LoginAsync(client, courierEmail);
+            Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put,
+                "api/courier/external/availability", courierToken,
+                JsonContent.Create(new { isAvailable = true, zoneId }))).StatusCode);
+            using (var redispatch = await SendAsync(client, HttpMethod.Post,
+                       $"api/businesses/{businessId}/orders/{orderId}/external-offers", merchantToken,
+                       JsonContent.Create(new { remuneration = 32.75m, conditions = "Negocio paga en efectivo al recoger", expiresInMinutes = 15 })))
+            {
+                Assert.Equal(HttpStatusCode.Accepted, redispatch.StatusCode);
+                using var body = JsonDocument.Parse(await redispatch.Content.ReadAsStringAsync());
+                Assert.Equal("OffersCreated", body.RootElement.GetProperty("outcome").GetString());
+                Assert.Equal(1, body.RootElement.GetProperty("offerCount").GetInt32());
+            }
+            using (var offersResponse = await SendAsync(client, HttpMethod.Get, "api/courier/external/offers", courierToken))
+            using (var offersBody = JsonDocument.Parse(await offersResponse.Content.ReadAsStringAsync()))
+            {
+                var offer = Assert.Single(offersBody.RootElement.EnumerateArray());
+                offerId = offer.GetProperty("id").GetGuid();
+                Assert.NotEqual(revokedOfferId, offerId);
+            }
+
             using var accept = await SendAsync(client, HttpMethod.Post,
                 $"api/courier/external/offers/{offerId}/accept", courierToken);
             Assert.Equal(HttpStatusCode.OK, accept.StatusCode);
