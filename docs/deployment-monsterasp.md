@@ -1,6 +1,6 @@
 # Despliegue en MonsterASP.NET
 
-Estado: el paquete Release se generó y revisó localmente; la API aún no se ha publicado en un sitio MonsterASP.NET. El proyecto apunta a .NET 10 LTS. La documentación actual del proveedor admite versiones modernas de ASP.NET Core; selecciona el runtime moderno compatible con .NET 10 en Scripting antes de publicar. [Soporte de tecnologías](https://help.monsterasp.net/getting-started/first-steps/supported-technologies) · [Selección de runtime](https://help.monsterasp.net/websites/configuration/scripting).
+Estado: el artefacto IIS vigente se generó para `main` en el run [39557674487](https://github.com/EmanuelC1601/poraqui-backend/actions/runs/39557674487): `poraqui-api-iis-91a5def695be4ccf542941b757ac66bf9a4df0ac` (5,683,276 bytes; vence 2026-11-04). El paquete no prueba un despliegue; la API aún no se ha publicado en un sitio MonsterASP.NET. El proyecto apunta a .NET 10 LTS. La documentación actual del proveedor admite versiones modernas de ASP.NET Core; selecciona el runtime moderno compatible con .NET 10 en Scripting antes de publicar. [Soporte de tecnologías](https://help.monsterasp.net/getting-started/first-steps/supported-technologies) · [Selección de runtime](https://help.monsterasp.net/websites/configuration/scripting).
 
 ## Preparación del sitio
 

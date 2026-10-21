@@ -922,6 +922,36 @@ public sealed class BusinessApiTests
             Assert.True(businessOrderJson.RootElement.GetProperty("courierPaymentReceived").GetBoolean());
             Assert.Equal(37.50m, businessOrderJson.RootElement.GetProperty("courierPaymentAmount").GetDecimal());
         }
+        await using (var unconfirmedPhoneScope = factory.Services.CreateAsyncScope())
+        {
+            var users = unconfirmedPhoneScope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var customer = await users.FindByEmailAsync("customer@example.test");
+            Assert.NotNull(customer);
+            customer.PhoneNumberConfirmed = false;
+            var update = await users.UpdateAsync(customer);
+            Assert.True(update.Succeeded, string.Join("; ", update.Errors.Select(error => error.Description)));
+        }
+        using (var unconfirmedContact = await SendAsync(client, HttpMethod.Post,
+                   $"api/orders/{orderId}/delivery/start", courierToken, JsonContent.Create(new { contactChannel = "whatsapp" })))
+        {
+            Assert.Equal(HttpStatusCode.Conflict, unconfirmedContact.StatusCode);
+            Assert.DoesNotContain(customerPhone, await unconfirmedContact.Content.ReadAsStringAsync());
+        }
+        using (var unchangedOrderResponse = await SendAsync(client, HttpMethod.Get, $"api/orders/{orderId}", customerToken))
+        using (var unchangedOrder = JsonDocument.Parse(await unchangedOrderResponse.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(HttpStatusCode.OK, unchangedOrderResponse.StatusCode);
+            Assert.Equal("PickedUp", unchangedOrder.RootElement.GetProperty("status").GetString());
+        }
+        await using (var confirmedPhoneScope = factory.Services.CreateAsyncScope())
+        {
+            var users = confirmedPhoneScope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var customer = await users.FindByEmailAsync("customer@example.test");
+            Assert.NotNull(customer);
+            customer.PhoneNumberConfirmed = true;
+            var update = await users.UpdateAsync(customer);
+            Assert.True(update.Succeeded, string.Join("; ", update.Errors.Select(error => error.Description)));
+        }
         using (var contactResponse = await SendAsync(client, HttpMethod.Post,
                    $"api/orders/{orderId}/delivery/start", courierToken, JsonContent.Create(new { contactChannel = "whatsapp" })))
         {

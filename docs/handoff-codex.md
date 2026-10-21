@@ -6,7 +6,7 @@ El backend tiene un único responsable. `main` es la base de integración; cada 
 
 ## Cambios integrados
 
-PR #1 y los incrementos posteriores están integrados en `main`. El código contiene identidad y permisos por rol/recurso, comercio y catálogo, pedidos con precios del servidor, comprobantes privados y revisión manual, estados de preparación, reparto interno y externo, ofertas, expiración/cancelación, códigos, contacto autorizado, historial, idempotencia, sincronización offline validada por el servidor, SignalR, incidencias, reembolsos manuales, OTP y métricas piloto. La última suite Release en `main` aprobó **53/53**, con SQLite y ocho pruebas SQL Server en la base aislada `db74230`. Esto no acredita servicios externos ni hosting reales. Ver [ledger](project-status.md) y [recorrido reproducible](order-flow.md).
+PR #1 y los incrementos posteriores están integrados en `main`. El código contiene identidad y permisos por rol/recurso, comercio y catálogo, pedidos con precios del servidor, comprobantes privados y revisión manual, estados de preparación, reparto interno y externo, ofertas, expiración/cancelación, códigos, contacto autorizado, historial, idempotencia, sincronización offline validada por el servidor, SignalR, incidencias, reembolsos manuales, OTP y métricas piloto. La suite Release local más reciente aprobó **49 pruebas, 0 fallidas y 8 SQL Server omitidas** por configuración aislada aplazada. CI del PR #103 pasó; el runner no recibe cadena de BD. Esto no acredita servicios externos ni hosting reales. Ver [ledger](project-status.md) y [recorrido reproducible](order-flow.md).
 
 El proyecto contiene 15 migraciones EF. La verificación de modelo más reciente indicó que no hay cambios pendientes de migración; las pruebas SQL Release migran solo su base aislada. Los registros históricos de integración y despliegue de este documento conservan los conteos que eran vigentes cuando se ejecutaron. No se aplica migración desde el arranque de la API.
 
@@ -35,9 +35,23 @@ Revalidación tras PR #52 con el SDK local 10.0.402: build con 0 advertencias/er
 
 La rama `feature/unique-active-external-offer` añade un índice único filtrado para impedir dos ofertas `Offered` para el mismo pedido/courier y convierte colisiones al despachar concurrentemente en HTTP 409. El despacho persiste primero las expiraciones del pedido para que ofertas vencidas fuera de la ventana del barrido no bloqueen el redispatch. Incluye cobertura API SQLite para expiración/redispatch y prueba SQL Server de despacho simultáneo. La migración revisable `20261021061647_UniqueActiveExternalOfferPerCourier` y su script están incluidos en el cambio. En `db74183`, una consulta previa encontró cero pares duplicados activos; la migración fue aplicada explícitamente y una consulta posterior confirmó índice, registro de migración y cero duplicados. No eliminó ni actualizó datos funcionales.
 
-Suite completa Release tras este ajuste: **49 aprobadas, 0 fallidas, 9 omitidas**. El recorrido API focalizado con SQLite también pasó **1/1**. Las omitidas son integraciones SQL Server, incluida la carrera nueva, porque el usuario aplazó `ConnectionStrings:SqlServerTest`. La rama está publicada en Git y PR #102 está abierto como borrador. CI `build-and-test` pasó para el commit `78de8e3` (run `39556336526`); esa suite no prueba SQL Server porque el runner no recibe una cadena aislada. El PR no está integrado. Al retomar, configure `ConnectionStrings:SqlServerTest` en User Secrets para `src/Poraqui.Api` y ejecute `dotnet test Poraqui.sln --configuration Release`; no use la cadena compartida en esas pruebas.
+Tras incorporar `origin/main` hasta `b47ff54`, la suite Release pasó **50 pruebas, 0 fallidas y 9 omitidas**. Se mantienen los cambios de contacto con teléfono confirmado y no hay conflictos pendientes. Las omitidas son integraciones SQL Server, incluida la carrera nueva, porque el usuario aplazó `ConnectionStrings:SqlServerTest`. PR #102 permanece como borrador y no está integrado; la CI del head actualizado todavía debe ejecutarse. La conexión requerida es `ConnectionStrings:SqlServerTest` en User Secrets para `src/Poraqui.Api`; no usar `DefaultConnection` compartida para esas pruebas.
 
 No se publican secretos ni se toman credenciales del chat. El estado verificable vigente está en `docs/project-status.md`.
+
+## Integrado: PR #103, teléfono confirmado para contacto de entrega
+
+PR #103 quedó integrado en `main` como merge `c3270da`. `OrderWorkflowRepository.GetCustomerPhoneAsync` ahora devuelve solo teléfonos con `PhoneNumberConfirmed=true`. `BeginDeliveryAsync` ya restringe el acceso al courier asignado; este filtro evita revelar un teléfono no confirmado. Se actualizó el contrato; no requiere migración ni cambia el esquema.
+
+Prueba SQLite enfocada: **1/1**; suite Release completa: **49 aprobadas, 0 fallidas, 8 omitidas** (integraciones SQL Server, configuración aislada aplazada); CI `build-and-test` del PR pasó antes de integrar. No hubo escrituras en SQL Server ni migraciones.
+
+## Integrado: PR #106, teléfono no confirmado sin transición parcial
+
+PR #106 se integró en `main` como merge `3c32c68`. `BusinessApiTests` verifica inicio de entrega con teléfono desconfirmado: el endpoint responde `409`, el mensaje no filtra el teléfono y `GET /api/orders/{id}` conserva `PickedUp`; al restablecer `PhoneNumberConfirmed=true`, iniciar contacto devuelve el número esperado. Prueba API focalizada **1/1**; suite Release **49 aprobadas, 0 fallidas, 8 SQL Server omitidas**. CI pasó. No hay cambios de producción, esquema ni bases de datos.
+
+## Artefacto de despliegue vigente en `main`
+
+El run `39557674487` pasó para `main` en `91a5def695be4ccf542941b757ac66bf9a4df0ac` y publicó `poraqui-api-iis-91a5def695be4ccf542941b757ac66bf9a4df0ac` (5,683,276 bytes; vence 2026-11-04). [Abrir ejecución de CI](https://github.com/EmanuelC1601/poraqui-backend/actions/runs/39557674487). Esto verifica la compilación y el paquete IIS, no el despliegue, la conectividad del sitio ni almacenamiento persistente en MonsterASP.
 
 ## Actualización posterior: PR #56
 
