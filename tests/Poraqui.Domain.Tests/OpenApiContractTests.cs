@@ -1,10 +1,27 @@
 using System.Net;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Poraqui.Domain.Tests;
 
 public sealed class OpenApiContractTests
 {
+    [Fact]
+    public async Task Versioned_openapi_snapshot_matches_runtime_paths_and_schemas()
+    {
+        await using var factory = new ApiTestHost();
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync("/openapi/v1.json");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var runtime = JsonNode.Parse(await response.Content.ReadAsStringAsync())!;
+        var snapshotPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../docs/openapi.json"));
+        var snapshot = JsonNode.Parse(await File.ReadAllTextAsync(snapshotPath))!;
+
+        Assert.True(JsonNode.DeepEquals(snapshot["paths"], runtime["paths"]), "The versioned OpenAPI paths differ from the runtime document.");
+        Assert.True(JsonNode.DeepEquals(snapshot["components"], runtime["components"]), "The versioned OpenAPI schemas differ from the runtime document.");
+    }
+
     [Fact]
     public async Task Readiness_contract_reports_success_and_unavailable_responses()
     {
