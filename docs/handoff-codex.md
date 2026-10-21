@@ -125,7 +125,7 @@ PR #88 integró en `main` (`914d291`) la autorización del negocio/pedido antes 
 
 ## Incremento en curso: atomicidad de rol externo
 
-Rama `feature/atomic-external-courier-role` inicia desde `main` (`9450f45`). `PUT /api/admin/users/{userId}/external-courier` ahora agrupa cambios de Identity y `CourierAvailabilities` en una transacción; antes, un error al guardar el perfil podía dejar rol y disponibilidad fuera de sincronía. La prueba API confirma concesión/revocación del rol y perfil inactivo usando SQLite en memoria. No modifica contratos ni esquema.
+Rama `feature/atomic-external-courier-role` inicia desde `main` (`9450f45`). `PUT /api/admin/users/{userId}/external-courier` agrupa cambios de Identity y `CourierAvailabilities` en una transacción. La prueba halló que un token emitido antes de revocar el rol seguía accediendo a ofertas. Ahora los endpoints externos verifican el rol vigente en la BD; SignalR consulta el rol actual al suscribirse y antes de publicar notificaciones. La prueba API SQLite confirma concesión/revocación, denegación del token anterior y de una suscripción posterior a revocación. No modifica contratos ni esquema.
 
 Verificación local: build Release correcto (0 advertencias/errores); suite Release **47 aprobadas, 0 fallidas, 8 pruebas SQL Server omitidas** porque el usuario pidió dejar pendiente la configuración privada para la cadena de `SqlServerTest`. La prueba focalizada SQLite pasó 1/1. No se ejecutaron migraciones ni se accedió a las bases compartidas o SQL de pruebas. `git diff --check` aprobado.
 

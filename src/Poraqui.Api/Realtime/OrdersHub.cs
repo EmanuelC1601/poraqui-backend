@@ -7,7 +7,8 @@ using Poraqui.Application.Security;
 namespace Poraqui.Api.Realtime;
 
 [Authorize]
-public sealed class OrdersHub(OrderWorkflowService workflow, ExternalCourierService externalCouriers) : Hub
+public sealed class OrdersHub(OrderWorkflowService workflow, ExternalCourierService externalCouriers,
+    IExternalCourierRepository externalCourierRepository) : Hub
 {
     public async Task<OrderRealtimeSnapshot> SubscribeOrder(Guid orderId)
     {
@@ -49,10 +50,11 @@ public sealed class OrdersHub(OrderWorkflowService workflow, ExternalCourierServ
 
     public async Task<IReadOnlyList<ExternalOfferView>> SubscribeCourierOffers()
     {
-        if (Context.User?.IsInRole(ApplicationRoles.ExternalCourier) != true)
-            throw new HubException("Only external couriers can subscribe to delivery offers.");
-        if (!Guid.TryParse(Context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? Context.User.FindFirstValue("sub"), out var courierId))
+        var principal = Context.User;
+        if (principal is null || !Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? principal.FindFirstValue("sub"), out var courierId))
             throw new HubException("Authenticated user id is unavailable.");
+        if (!await externalCourierRepository.IsExternalCourierAsync(courierId, Context.ConnectionAborted))
+            throw new HubException("Only current external couriers can subscribe to delivery offers.");
 
         var group = ExternalOfferChangeGroups.For(courierId);
         await Groups.AddToGroupAsync(Context.ConnectionId, group, Context.ConnectionAborted);
@@ -69,9 +71,8 @@ public sealed class OrdersHub(OrderWorkflowService workflow, ExternalCourierServ
 
     public async Task UnsubscribeCourierOffers()
     {
-        if (Context.User?.IsInRole(ApplicationRoles.ExternalCourier) != true)
-            throw new HubException("Only external couriers can unsubscribe from delivery offers.");
-        if (!Guid.TryParse(Context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? Context.User.FindFirstValue("sub"), out var courierId))
+        var principal = Context.User;
+        if (principal is null || !Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? principal.FindFirstValue("sub"), out var courierId))
             throw new HubException("Authenticated user id is unavailable.");
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, ExternalOfferChangeGroups.For(courierId), Context.ConnectionAborted);
     }
@@ -112,11 +113,13 @@ public sealed class SignalROrderChangePublisher(IHubContext<OrdersHub> hub, ILog
 
 public sealed record OrderStatusUpdate(Guid OrderId, string Status, long Version, DateTimeOffset ChangedAtUtc);
 
-public sealed class SignalRExternalOfferPublisher(IHubContext<OrdersHub> hub, ILogger<SignalRExternalOfferPublisher> logger)
+public sealed class SignalRExternalOfferPublisher(IHubContext<OrdersHub> hub, ILogger<SignalRExternalOfferPublisher> logger,
+    IExternalCourierRepository couriers)
     : IExternalOfferPublisher
 {
     public async Task PublishAvailableAsync(Guid courierUserId, ExternalOfferNotice notice, CancellationToken cancellationToken)
     {
+        if (!await couriers.IsExternalCourierAsync(courierUserId, cancellationToken)) return;
         try
         {
             await hub.Clients.Group(ExternalOfferChangeGroups.For(courierUserId))
@@ -131,6 +134,7 @@ public sealed class SignalRExternalOfferPublisher(IHubContext<OrdersHub> hub, IL
 
     public async Task PublishChangedAsync(Guid courierUserId, ExternalOfferChangedNotice notice, CancellationToken cancellationToken)
     {
+        if (!await couriers.IsExternalCourierAsync(courierUserId, cancellationToken)) return;
         try
         {
             await hub.Clients.Group(ExternalOfferChangeGroups.For(courierUserId))

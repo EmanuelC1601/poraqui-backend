@@ -53,6 +53,7 @@ public sealed class BusinessApiTests
             var profile = await db.CourierAvailabilities.SingleAsync(x => x.CourierUserId == courier.Id);
             Assert.False(profile.IsAvailable);
         }
+        var courierToken = await LoginAsync(client, "provisioned-courier@example.test");
 
         using var revoke = await SendAsync(client, HttpMethod.Put,
             $"api/admin/users/{courier.Id}/external-courier", adminToken,
@@ -65,6 +66,13 @@ public sealed class BusinessApiTests
         Assert.False(await finalDb.UserRoles.AnyAsync(x => x.UserId == courier.Id && x.RoleId == externalRoleId));
         var revokedProfile = await finalDb.CourierAvailabilities.SingleAsync(x => x.CourierUserId == courier.Id);
         Assert.False(revokedProfile.IsAvailable);
+        using var revokedCourierOffers = await SendAsync(client, HttpMethod.Get,
+            "api/courier/external/offers", courierToken);
+        Assert.Equal(HttpStatusCode.Forbidden, revokedCourierOffers.StatusCode);
+        await using var revokedCourierHub = CreateSignalRClient(factory, client, courierToken);
+        await revokedCourierHub.StartAsync();
+        await Assert.ThrowsAsync<HubException>(() =>
+            revokedCourierHub.InvokeAsync<IReadOnlyList<ExternalOfferView>>("SubscribeCourierOffers"));
     }
 
     [Fact]
