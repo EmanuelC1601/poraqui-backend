@@ -767,6 +767,21 @@ public sealed class BusinessApiTests
         });
         await courierTwoOfferHub.StartAsync();
         Assert.Empty(await courierTwoOfferHub.InvokeAsync<IReadOnlyList<ExternalOfferView>>("SubscribeCourierOffers"));
+        Guid[] staleOfferIds;
+        await using (var staleOffersScope = factory.Services.CreateAsyncScope())
+        {
+            var db = staleOffersScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var staleOffers = new[]
+            {
+                new ExternalDeliveryOffer(orderId, courierId, zoneId, "Domicilio prueba", "Calle de prueba", 30m, null, DateTimeOffset.UtcNow.AddMinutes(10)),
+                new ExternalDeliveryOffer(orderId, courierTwoId, zoneId, "Domicilio prueba", "Calle de prueba", 30m, null, DateTimeOffset.UtcNow.AddMinutes(10))
+            };
+            staleOfferIds = staleOffers.Select(offer => offer.Id).ToArray();
+            db.ExternalDeliveryOffers.AddRange(staleOffers);
+            foreach (var offer in staleOffers)
+                db.Entry(offer).Property(candidate => candidate.ExpiresAtUtc).CurrentValue = DateTimeOffset.UtcNow.AddMinutes(-1);
+            await db.SaveChangesAsync();
+        }
         Assert.Equal(HttpStatusCode.BadRequest, (await SendAsync(client, HttpMethod.Put, "api/courier/external/availability", courierToken,
             JsonContent.Create(new { isAvailable = true, zoneId = Guid.NewGuid() }))).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put, "api/courier/external/availability", courierToken,
@@ -781,6 +796,12 @@ public sealed class BusinessApiTests
                 $"External offer dispatch returned {(int)dispatch.StatusCode}: {await dispatch.Content.ReadAsStringAsync()}");
             using var dispatchJson = JsonDocument.Parse(await dispatch.Content.ReadAsStringAsync());
             Assert.Equal(2, dispatchJson.RootElement.GetProperty("offerCount").GetInt32());
+        }
+        await using (var expiredOffersScope = factory.Services.CreateAsyncScope())
+        {
+            var db = expiredOffersScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var persistedStaleOffers = await db.ExternalDeliveryOffers.Where(offer => staleOfferIds.Contains(offer.Id)).ToArrayAsync();
+            Assert.All(persistedStaleOffers, offer => Assert.Equal(ExternalDeliveryOfferStatus.Expired, offer.Status));
         }
         var receivedOfferNotice = await offerNotice.Task.WaitAsync(TimeSpan.FromSeconds(5));
         var receivedOfferNoticeTwo = await offerNoticeTwo.Task.WaitAsync(TimeSpan.FromSeconds(5));
