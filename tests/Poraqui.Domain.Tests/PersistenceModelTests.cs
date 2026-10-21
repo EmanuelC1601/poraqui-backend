@@ -12,6 +12,35 @@ namespace Poraqui.Domain.Tests;
 public sealed class PersistenceModelTests
 {
     [Fact]
+    public async Task Delivery_contact_exposes_only_a_confirmed_customer_phone()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
+        var customer = new ApplicationUser
+        {
+            Id = Guid.NewGuid(),
+            UserName = "delivery-contact-customer",
+            PhoneNumber = "+5215550102030",
+            PhoneNumberConfirmed = false
+        };
+
+        await using var db = new AppDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+        db.Users.Add(customer);
+        await db.SaveChangesAsync();
+        var repository = new OrderWorkflowRepository(db);
+
+        Assert.Null(await repository.GetCustomerPhoneAsync(customer.Id, CancellationToken.None));
+
+        customer.PhoneNumberConfirmed = true;
+        await db.SaveChangesAsync();
+
+        Assert.Equal(customer.PhoneNumber,
+            await repository.GetCustomerPhoneAsync(customer.Id, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task Commerce_order_and_manual_review_round_trip_in_isolated_sqlite_database()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");

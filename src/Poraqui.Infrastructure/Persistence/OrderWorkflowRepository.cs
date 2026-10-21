@@ -32,7 +32,8 @@ public sealed class OrderWorkflowRepository(AppDbContext db) : IOrderWorkflowRep
         db.Businesses.AnyAsync(business => business.Id == businessId && business.OwnerUserId == ownerUserId, cancellationToken);
 
     public Task<string?> GetCustomerPhoneAsync(Guid customerUserId, CancellationToken cancellationToken) =>
-        db.Users.Where(user => user.Id == customerUserId).Select(user => user.PhoneNumber).SingleOrDefaultAsync(cancellationToken);
+        db.Users.Where(user => user.Id == customerUserId && user.PhoneNumberConfirmed)
+            .Select(user => user.PhoneNumber).SingleOrDefaultAsync(cancellationToken);
 
     public Task<OfflineDeliverySyncRecord?> GetOfflineDeliveryCommandAsync(Guid actorUserId, Guid commandId, CancellationToken cancellationToken) =>
         db.OfflineDeliverySyncRecords.SingleOrDefaultAsync(command => command.ActorUserId == actorUserId && command.Id == commandId, cancellationToken);
