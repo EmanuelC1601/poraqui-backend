@@ -87,6 +87,7 @@ public sealed class ExternalCourierController(ExternalCourierService couriers, I
         catch (InvalidOperationException exception) { return Conflict(new { error = exception.Message }); }
         catch (ArgumentException exception) { return BadRequest(new { error = exception.Message }); }
         catch (DbUpdateConcurrencyException) { return Conflict(new { error = "Order changed while offers were being created." }); }
+        catch (DbUpdateException) { return Conflict(new { error = "Offers changed while dispatch was being processed; reload active offers." }); }
     }
 
     [Authorize(Policy = ApplicationPolicies.ManageBusiness)]

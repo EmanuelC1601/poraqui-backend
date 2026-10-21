@@ -1,9 +1,11 @@
 using Microsoft.Data.SqlClient;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Poraqui.Application.Commerce;
 using Poraqui.Application.Orders;
+using Poraqui.Application.Security;
 using Poraqui.Domain.Commerce;
 using Poraqui.Domain.Orders;
 using Poraqui.Infrastructure.Identity;
@@ -14,6 +16,85 @@ namespace Poraqui.Domain.Tests;
 
 public sealed class SqlServerExternalOfferConcurrencyTests
 {
+    [SqlServerIntegrationFact]
+    public async Task Concurrent_dispatches_persist_only_one_active_offer_per_courier_and_order()
+    {
+        var connectionString = Environment.GetEnvironmentVariable(SqlServerIntegrationFactAttribute.ConnectionStringEnvironmentVariable)!;
+        var setupOptions = new DbContextOptionsBuilder<AppDbContext>().UseSqlServer(connectionString).Options;
+        await using var setup = new AppDbContext(setupOptions);
+        await setup.Database.MigrateAsync();
+
+        var owner = NewUser("dispatch-owner");
+        var customer = NewUser("dispatch-customer");
+        var reviewer = NewUser("dispatch-reviewer");
+        var couriers = new[] { NewUser("dispatch-courier-a"), NewUser("dispatch-courier-b") };
+        var zone = new DeliveryZone($"Dispatch concurrency zone {Guid.NewGuid():N}");
+        var business = new Business(owner.Id, $"Dispatch concurrency business {Guid.NewGuid():N}", "Test pickup address");
+        var order = new Order(customer.Id, business.Id, zone.Id, "Test delivery address", 25m,
+            [(Guid.NewGuid(), "Dispatch concurrency item", 100m, 1)]);
+        order.SubmitTransferEvidence($"private/sql-test/{Guid.NewGuid():N}");
+        order.ReviewTransfer(reviewer.Id, approved: true);
+        order.AcceptByBusiness(owner.Id);
+        order.BeginPreparation(owner.Id);
+        order.MarkReadyForPickup(owner.Id);
+        var role = await setup.Roles.SingleOrDefaultAsync(candidate => candidate.Name == ApplicationRoles.ExternalCourier);
+        var createdRole = role is null;
+        role ??= new IdentityRole<Guid>(ApplicationRoles.ExternalCourier);
+        if (createdRole) setup.Roles.Add(role);
+        setup.Users.AddRange([owner, customer, reviewer, .. couriers]);
+        setup.UserRoles.AddRange(couriers.Select(courier => new IdentityUserRole<Guid> { UserId = courier.Id, RoleId = role.Id }));
+        setup.CourierAvailabilities.AddRange(couriers.Select(courier =>
+        {
+            var availability = new CourierAvailability(courier.Id);
+            availability.SetAvailable(true, zone.Id);
+            return availability;
+        }));
+        setup.DeliveryZones.Add(zone);
+        setup.Businesses.Add(business);
+        setup.Orders.Add(order);
+        await setup.SaveChangesAsync();
+
+        var saveBarrier = new TwoPartySaveBarrier();
+        try
+        {
+            async Task<(ExternalOfferDispatchResult? Result, Exception? Error)> DispatchAsync()
+            {
+                var options = new DbContextOptionsBuilder<AppDbContext>()
+                    .UseSqlServer(connectionString)
+                    .AddInterceptors(saveBarrier)
+                    .Options;
+                await using var db = new AppDbContext(options);
+                var service = new ExternalCourierService(new ExternalCourierRepository(db), new NullOrderChangePublisher(),
+                    new NullExternalOfferPublisher(), new TestExternalOfferSecretProtector());
+                try
+                {
+                    return (await service.CreateOffersAsync(order.Id, owner.Id, isAdmin: false, 35m,
+                        "Concurrent dispatch integration test", TimeSpan.FromMinutes(10), CancellationToken.None), null);
+                }
+                catch (Exception exception)
+                {
+                    return (null, exception);
+                }
+            }
+
+            var attempts = await Task.WhenAll(DispatchAsync(), DispatchAsync());
+            Assert.Single(attempts, attempt => attempt.Result is not null);
+            Assert.Single(attempts, attempt => attempt.Error is not null);
+            Assert.IsAssignableFrom<DbUpdateException>(attempts.Single(attempt => attempt.Error is not null).Error);
+
+            var activeOffers = await setup.ExternalDeliveryOffers.AsNoTracking()
+                .Where(offer => offer.OrderId == order.Id && offer.Status == ExternalDeliveryOfferStatus.Offered)
+                .ToArrayAsync();
+            Assert.Equal(couriers.Length, activeOffers.Length);
+            Assert.Equal(couriers.Length, activeOffers.Select(offer => offer.CourierUserId).Distinct().Count());
+        }
+        finally
+        {
+            await CleanupAsync(setup, order.Id, business.Id, zone.Id,
+                [owner.Id, customer.Id, reviewer.Id, .. couriers.Select(courier => courier.Id)], removeExternalCourierRole: createdRole);
+        }
+    }
+
     [SqlServerIntegrationFact]
     public async Task Concurrent_acceptance_assigns_the_order_to_exactly_one_external_courier()
     {
@@ -111,7 +192,7 @@ public sealed class SqlServerExternalOfferConcurrencyTests
     }
 
     private static async Task CleanupAsync(AppDbContext db, Guid orderId, Guid businessId, Guid zoneId,
-        IReadOnlyCollection<Guid> userIds)
+        IReadOnlyCollection<Guid> userIds, bool removeExternalCourierRole = false)
     {
         // The concurrent accept attempts update row-versioned offers and the order.
         // The setup context still tracks the pre-race snapshots, so cleanup must
@@ -126,7 +207,14 @@ public sealed class SqlServerExternalOfferConcurrencyTests
         if (business is not null) db.Businesses.Remove(business);
         var zone = await db.DeliveryZones.SingleOrDefaultAsync(candidate => candidate.Id == zoneId);
         if (zone is not null) db.DeliveryZones.Remove(zone);
+        db.CourierAvailabilities.RemoveRange(await db.CourierAvailabilities.Where(profile => userIds.Contains(profile.CourierUserId)).ToArrayAsync());
+        db.UserRoles.RemoveRange(await db.UserRoles.Where(userRole => userIds.Contains(userRole.UserId)).ToArrayAsync());
         db.Users.RemoveRange(await db.Users.Where(user => userIds.Contains(user.Id)).ToArrayAsync());
+        if (removeExternalCourierRole)
+        {
+            var role = await db.Roles.SingleOrDefaultAsync(candidate => candidate.Name == ApplicationRoles.ExternalCourier);
+            if (role is not null) db.Roles.Remove(role);
+        }
         await db.SaveChangesAsync();
     }
 }

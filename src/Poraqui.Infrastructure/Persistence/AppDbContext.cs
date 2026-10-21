@@ -261,6 +261,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CourierUserId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<DeliveryZone>().WithMany().HasForeignKey(x => x.ZoneId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(x => new { x.CourierUserId, x.Status, x.ExpiresAtUtc });
+            entity.HasIndex(x => new { x.OrderId, x.CourierUserId }).IsUnique().HasFilter("[Status] = 'Offered'");
             entity.HasIndex(x => x.OrderId).IsUnique().HasFilter("[Status] = 'Accepted'");
         });
 

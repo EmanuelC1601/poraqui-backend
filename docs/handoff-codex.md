@@ -31,6 +31,12 @@ Revalidación tras PR #52 con el SDK local 10.0.402: build con 0 advertencias/er
 1. Publicar en un sitio MonsterASP.NET con sus variables privadas y almacenamiento persistente; validar health, SignalR y comprobante privado.
 2. Configurar secretos Twilio en privado y probar el envío OTP con un teléfono autorizado.
 
+## Incremento en revisión: unicidad de ofertas activas
+
+La rama `feature/unique-active-external-offer` añade un índice único filtrado para impedir dos ofertas `Offered` para el mismo pedido/courier y convierte colisiones al despachar concurrentemente en HTTP 409. Incluye prueba SQLite y prueba SQL Server de despacho simultáneo. La migración revisable `20261021061647_UniqueActiveExternalOfferPerCourier` y su script están incluidos en el cambio. En `db74183`, una consulta previa encontró cero pares duplicados activos; la migración fue aplicada explícitamente y una consulta posterior confirmó índice, registro de migración y cero duplicados. No eliminó ni actualizó datos funcionales.
+
+Verificación local Release: **49 aprobadas, 0 fallidas, 9 omitidas**. La prueba SQLite de unicidad pasó; las pruebas de integración SQL Server, incluida la nueva carrera, se omitieron porque el usuario aplazó `ConnectionStrings:SqlServerTest`. `git diff --check` pasó antes de esta actualización documental. La rama aún no está publicada ni tiene PR, por lo que no está integrada. Al retomar, configure `ConnectionStrings:SqlServerTest` en User Secrets para `src/Poraqui.Api` y ejecute `dotnet test Poraqui.sln --configuration Release`; no use la cadena compartida en esas pruebas.
+
 No se publican secretos ni se toman credenciales del chat. El estado verificable vigente está en `docs/project-status.md`.
 
 ## Actualización posterior: PR #56
