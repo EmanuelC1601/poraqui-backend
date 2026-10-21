@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 using Poraqui.Application.Security;
 using Poraqui.Domain.Orders;
 using Poraqui.Infrastructure.Identity;
@@ -35,6 +36,7 @@ public sealed class AdminUsersController(UserManager<ApplicationUser> users, Rol
     [HttpPut("{userId:guid}/external-courier")]
     public async Task<IActionResult> SetExternalCourier(Guid userId, SetExternalCourierRequest request, CancellationToken cancellationToken)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var user = await users.FindByIdAsync(userId.ToString());
         if (user is null) return NotFound();
         if (!await roles.RoleExistsAsync(ApplicationRoles.ExternalCourier))
@@ -54,6 +56,7 @@ public sealed class AdminUsersController(UserManager<ApplicationUser> users, Rol
         if (request.IsExternalCourier && profile is null) db.CourierAvailabilities.Add(new CourierAvailability(userId));
         if (!request.IsExternalCourier) profile?.SetAvailable(false);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return NoContent();
     }
 }

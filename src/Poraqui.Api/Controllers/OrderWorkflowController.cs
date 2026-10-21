@@ -75,6 +75,7 @@ public sealed class OrderWorkflowController(OrderWorkflowService workflow, UserM
     public async Task<IActionResult> GetCourierOrders(CancellationToken cancellationToken)
     {
         if (!TryGetActor(out var courierId, out _)) return Unauthorized();
+        if (!await HasCurrentDeliveryOperationsRoleAsync(courierId)) return Forbid();
         return Ok(await workflow.GetOrdersForCourierAsync(courierId, cancellationToken));
     }
 
@@ -83,6 +84,7 @@ public sealed class OrderWorkflowController(OrderWorkflowService workflow, UserM
     public async Task<IActionResult> GetCourierOrder(Guid orderId, CancellationToken cancellationToken)
     {
         if (!TryGetActor(out var courierId, out _)) return Unauthorized();
+        if (!await HasCurrentDeliveryOperationsRoleAsync(courierId)) return Forbid();
         try
         {
             var order = await workflow.GetForCourierAsync(orderId, courierId, cancellationToken);
@@ -325,6 +327,7 @@ public sealed class OrderWorkflowController(OrderWorkflowService workflow, UserM
     public async Task<IActionResult> MarkPickedUp(Guid orderId, PickupCodeRequest request, CancellationToken cancellationToken)
     {
         if (!TryGetActor(out var courierId, out _)) return Unauthorized();
+        if (!await HasCurrentDeliveryOperationsRoleAsync(courierId)) return Forbid();
         try { await workflow.MarkPickedUpAsync(orderId, courierId, request.Code, cancellationToken); return NoContent(); }
         catch (OrderResourceForbiddenException) { return Forbid(); }
         catch (KeyNotFoundException) { return NotFound(); }
@@ -337,6 +340,7 @@ public sealed class OrderWorkflowController(OrderWorkflowService workflow, UserM
     public async Task<IActionResult> BeginDelivery(Guid orderId, BeginDeliveryRequest request, CancellationToken cancellationToken)
     {
         if (!TryGetActor(out var courierId, out _)) return Unauthorized();
+        if (!await HasCurrentDeliveryOperationsRoleAsync(courierId)) return Forbid();
         try { return Ok(await workflow.BeginDeliveryAsync(orderId, courierId, request.ContactChannel, cancellationToken)); }
         catch (OrderResourceForbiddenException) { return Forbid(); }
         catch (KeyNotFoundException) { return NotFound(); }
@@ -350,6 +354,7 @@ public sealed class OrderWorkflowController(OrderWorkflowService workflow, UserM
     public async Task<IActionResult> ConfirmDelivery(Guid orderId, PickupCodeRequest request, CancellationToken cancellationToken)
     {
         if (!TryGetActor(out var courierId, out _)) return Unauthorized();
+        if (!await HasCurrentDeliveryOperationsRoleAsync(courierId)) return Forbid();
         try { await workflow.MarkDeliveredAsync(orderId, courierId, request.Code, cancellationToken); return NoContent(); }
         catch (OrderResourceForbiddenException) { return Forbid(); }
         catch (KeyNotFoundException) { return NotFound(); }
@@ -362,6 +367,7 @@ public sealed class OrderWorkflowController(OrderWorkflowService workflow, UserM
     public async Task<IActionResult> SyncDeliveryConfirmation(Guid orderId, SyncDeliveryConfirmationRequest request, CancellationToken cancellationToken)
     {
         if (!TryGetActor(out var courierId, out _)) return Unauthorized();
+        if (!await HasCurrentDeliveryOperationsRoleAsync(courierId)) return Forbid();
         try
         {
             return Ok(await workflow.SyncDeliveryConfirmationAsync(orderId, courierId, request.CommandId, request.Code,
@@ -395,6 +401,15 @@ public sealed class OrderWorkflowController(OrderWorkflowService workflow, UserM
     {
         isAdmin = User.IsInRole(ApplicationRoles.PlatformAdmin);
         return Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? users.GetUserId(User), out actorId);
+    }
+
+    private async Task<bool> HasCurrentDeliveryOperationsRoleAsync(Guid courierId)
+    {
+        var courier = await users.FindByIdAsync(courierId.ToString());
+        if (courier is null) return false;
+        return await users.IsInRoleAsync(courier, ApplicationRoles.PlatformAdmin)
+            || await users.IsInRoleAsync(courier, ApplicationRoles.DeliveryPerson)
+            || await users.IsInRoleAsync(courier, ApplicationRoles.ExternalCourier);
     }
 }
 

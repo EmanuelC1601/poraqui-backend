@@ -12,6 +12,8 @@ public interface IExternalCourierRepository
     Task<IReadOnlySet<Guid>> GetCouriersWithActiveOffersAsync(Guid orderId, DateTimeOffset now, CancellationToken cancellationToken);
     Task<CourierAvailability?> GetAvailabilityAsync(Guid courierId, CancellationToken cancellationToken);
     Task<bool> IsActiveZoneAsync(Guid zoneId, CancellationToken cancellationToken);
+    Task<bool> IsExternalCourierAsync(Guid courierId, CancellationToken cancellationToken);
+    Task<bool> HasDeliveryCourierRoleAsync(Guid courierId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ExternalDeliveryOffer>> GetOffersAsync(Guid courierId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ExternalDeliveryOffer>> GetOffersForOrderAsync(Guid orderId, CancellationToken cancellationToken);
     Task<ExternalDeliveryOffer?> GetOfferAsync(Guid offerId, CancellationToken cancellationToken);

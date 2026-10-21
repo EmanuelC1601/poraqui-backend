@@ -1,22 +1,26 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Poraqui.Application.Orders;
 using Poraqui.Application.Security;
+using Poraqui.Infrastructure.Identity;
 
 namespace Poraqui.Api.Controllers;
 
 [ApiController]
 [Route("api")]
 [Authorize]
-public sealed class ExternalCourierController(ExternalCourierService couriers, Infrastructure.Persistence.AppDbContext db) : ControllerBase
+public sealed class ExternalCourierController(ExternalCourierService couriers, Infrastructure.Persistence.AppDbContext db,
+    UserManager<ApplicationUser> users) : ControllerBase
 {
     [Authorize(Roles = ApplicationRoles.ExternalCourier)]
     [HttpPut("courier/external/availability")]
     public async Task<IActionResult> SetAvailability(SetAvailabilityRequest request, CancellationToken ct)
     {
         if (!Actor(out var courierId)) return Unauthorized();
+        if (!await HasCurrentExternalCourierRoleAsync(courierId)) return Forbid();
         try
         {
             await couriers.SetAvailabilityAsync(courierId, request.IsAvailable, request.ZoneId, ct);
@@ -31,6 +35,7 @@ public sealed class ExternalCourierController(ExternalCourierService couriers, I
     public async Task<IActionResult> GetOffers(CancellationToken ct)
     {
         if (!Actor(out var courierId)) return Unauthorized();
+        if (!await HasCurrentExternalCourierRoleAsync(courierId)) return Forbid();
         return Ok(await couriers.GetOffersAsync(courierId, ct));
     }
 
@@ -39,6 +44,7 @@ public sealed class ExternalCourierController(ExternalCourierService couriers, I
     public async Task<IActionResult> Reject(Guid offerId, CancellationToken ct)
     {
         if (!Actor(out var courierId)) return Unauthorized();
+        if (!await HasCurrentExternalCourierRoleAsync(courierId)) return Forbid();
         try { await couriers.RejectAsync(offerId, courierId, ct); return NoContent(); }
         catch (OrderResourceForbiddenException) { return Forbid(); }
         catch (KeyNotFoundException) { return NotFound(); }
@@ -51,6 +57,7 @@ public sealed class ExternalCourierController(ExternalCourierService couriers, I
     public async Task<IActionResult> Accept(Guid offerId, CancellationToken ct)
     {
         if (!Actor(out var courierId)) return Unauthorized();
+        if (!await HasCurrentExternalCourierRoleAsync(courierId)) return Forbid();
         try { return Ok(await couriers.AcceptAsync(offerId, courierId, ct)); }
         catch (OrderResourceForbiddenException) { return Forbid(); }
         catch (KeyNotFoundException) { return NotFound(); }
@@ -101,6 +108,12 @@ public sealed class ExternalCourierController(ExternalCourierService couriers, I
     }
 
     private bool Actor(out Guid actorId) => Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out actorId);
+
+    private async Task<bool> HasCurrentExternalCourierRoleAsync(Guid courierId)
+    {
+        var user = await users.FindByIdAsync(courierId.ToString());
+        return user is not null && await users.IsInRoleAsync(user, ApplicationRoles.ExternalCourier);
+    }
 }
 
 public sealed record SetAvailabilityRequest(bool IsAvailable, Guid? ZoneId);

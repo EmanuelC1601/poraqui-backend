@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Poraqui.Application.Orders;
+using Poraqui.Application.Security;
 using Poraqui.Domain.Orders;
 using Poraqui.Infrastructure.Identity;
 
@@ -28,6 +29,17 @@ public sealed class ExternalCourierRepository(AppDbContext db) : IExternalCourie
         db.CourierAvailabilities.SingleOrDefaultAsync(x => x.CourierUserId == courierId, cancellationToken);
     public Task<bool> IsActiveZoneAsync(Guid zoneId, CancellationToken cancellationToken) =>
         db.DeliveryZones.AnyAsync(x => x.Id == zoneId && x.IsActive, cancellationToken);
+    public Task<bool> IsExternalCourierAsync(Guid courierId, CancellationToken cancellationToken) =>
+        (from userRole in db.UserRoles
+         join role in db.Roles on userRole.RoleId equals role.Id
+         where userRole.UserId == courierId && role.Name == ApplicationRoles.ExternalCourier
+         select userRole.UserId).AnyAsync(cancellationToken);
+    public Task<bool> HasDeliveryCourierRoleAsync(Guid courierId, CancellationToken cancellationToken) =>
+        (from userRole in db.UserRoles
+         join role in db.Roles on userRole.RoleId equals role.Id
+         where userRole.UserId == courierId &&
+             (role.Name == ApplicationRoles.DeliveryPerson || role.Name == ApplicationRoles.ExternalCourier)
+         select userRole.UserId).AnyAsync(cancellationToken);
     public async Task<IReadOnlyList<ExternalDeliveryOffer>> GetOffersAsync(Guid courierId, CancellationToken cancellationToken) =>
         await db.ExternalDeliveryOffers.Where(x => x.CourierUserId == courierId && x.Status == ExternalDeliveryOfferStatus.Offered)
             .ToListAsync(cancellationToken);
