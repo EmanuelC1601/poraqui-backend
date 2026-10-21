@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Actualizado: 2026-10-17. `main` es la base de integración, con un solo responsable. Los incrementos salen de `main` en ramas `feature/*` y se integran mediante PR. Contratos persistidos, `AppDbContext` y migraciones tienen un propietario único. La antigua asignación de OpenCode queda solo como antecedente; no hay dependencia operativa.
+Actualizado: 2026-10-20. `main` es la base de integración, con un solo responsable. Los incrementos salen de `main` en ramas `feature/*` y se integran mediante PR. Contratos persistidos, `AppDbContext` y migraciones tienen un propietario único. La antigua asignación de OpenCode queda solo como antecedente; no hay dependencia operativa.
 
 ## Ledger verificable
 
@@ -20,7 +20,7 @@ Actualizado: 2026-10-17. `main` es la base de integración, con un solo responsa
 | Integrado | Endpoints anónimos de liveness y readiness SQL | PR #84, merge `a38ee0a`; `/health/live` informa proceso activo y `/health/ready` responde 200 solo cuando puede conectar a la base configurada, o 503 sin exponer detalles; prueba 503 cuando no hay cadena SQL y contrato OpenAPI probado |
 | Integrado; SMS real pendiente | OTP Twilio Verify, E.164, confirmación Identity y límite de 5 intentos/10 min/IP | PR #36; pruebas HTTP simuladas. Requiere secretos Twilio privados para comprobar entrega real |
 | Integrado | Snapshots SignalR al reconectar y ofertas actuales al suscribirse | PR #38 y #45–#46; reconexión y destinatarios cubiertos por pruebas |
-| Artefacto IIS verificado; hosting pendiente | Guía de despliegue MonsterASP.NET y recorrido reproducible | PR #86, merge `90b177d`; run `39092852859` publicó un paquete de 5,679,063 bytes con expiración a 14 días; aún no se ha publicado ni verificado el sitio |
+| Artefacto IIS verificado; hosting pendiente | Guía de despliegue MonsterASP.NET y recorrido reproducible | PR #86, merge `90b177d`; run vigente de main `39550690307` para `18f6694` generó `poraqui-api-iis-18f66946d905c55fef313e8c884560169bf351d2` (5,683,250 bytes, vence 2026-11-04). El sitio aún no se ha publicado ni verificado |
 | Integrado; migraciones aplicadas a desarrollo | 15 migraciones EF integradas, incluida `ExternalOfferAcceptancePickupCode` e invariantes SQL | `dotnet-ef migrations list` confirmó las 15 aplicadas en `db74183`; la revisión read-only previa verificó cero filas que incumplieran las nuevas restricciones. |
 | Integrado | Actualización del target a .NET 10 LTS y EF Core 10 | PR #51, merge `5078005`; no cambia el modelo ni genera migraciones |
 | Integrado; guard de startup verificado | Configuración privada en Production | PR #69 exige `PrivateFiles:Root` fuera de `wwwroot` y comprueba creación/acceso en startup. PR actual exige además `DataProtection:KeysPath` privada y fuera de `wwwroot`, necesaria para descifrar códigos protegidos tras reinicios; el roundtrip entre proveedores prueba recuperación tras reinicio. Suite Release 48/48 (siete SQL Server aisladas). No cambia esquema. |

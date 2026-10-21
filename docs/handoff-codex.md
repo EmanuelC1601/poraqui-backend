@@ -121,6 +121,8 @@ PR #84 quedó integrado en `main` como `a38ee0a`. `GET /health/ready` comprueba 
 
 PR #86 integró el paquete IIS en CI (`90b177d`). La ejecución de `main` #39092852859 pasó y generó `poraqui-api-iis-90b177d54c2eb632a9c0a41fe8942063fcfd3fdf` (5,679,063 bytes, retención de 14 días). La publicación local también generó `web.config` InProcess; suite completa: 53/53. El sitio MonsterASP aún no se ha configurado ni verificado.
 
+Después de PR #92, el run vigente de `main` #39550690307 pasó CI para `18f66946d905c55fef313e8c884560169bf351d2` y generó `poraqui-api-iis-18f66946d905c55fef313e8c884560169bf351d2` (5,683,250 bytes; vence 2026-11-04). Confirma el artefacto del commit actual, pero no el despliegue/arranque en IIS; siguen pendientes elegir sitio y configurar sus variables/rutas privadas.
+
 PR #88 integró en `main` (`914d291`) la autorización del negocio/pedido antes de consultar la existencia o rol del courier en `POST /api/businesses/{businessId}/orders/{orderId}/assign-courier`. La prueba API enfocada aprobó; suite Release completa 54/54 con ocho pruebas SQL Server en la BD aislada. Sin migraciones.
 
 ## PR #90 integrado: atomicidad y revocación efectiva de rol courier
