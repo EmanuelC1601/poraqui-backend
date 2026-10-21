@@ -33,6 +33,12 @@ Revalidación tras PR #52 con el SDK local 10.0.402: build con 0 advertencias/er
 
 No se publican secretos ni se toman credenciales del chat. El estado verificable vigente está en `docs/project-status.md`.
 
+## Incremento en rama: teléfono confirmado para contacto de entrega
+
+Rama `feature/verified-customer-contact`, creada desde `origin/main`: `OrderWorkflowRepository.GetCustomerPhoneAsync` ahora devuelve solo teléfonos con `PhoneNumberConfirmed=true`. `BeginDeliveryAsync` ya restringe el acceso al courier asignado; este filtro evita revelar un teléfono no confirmado. Se actualizó el contrato; no requiere migración ni cambia el esquema.
+
+Prueba SQLite enfocada: **1/1**; suite Release completa: **49 aprobadas, 0 fallidas, 8 omitidas** (integraciones SQL Server, configuración aislada aplazada). No hubo escrituras en SQL Server. `git diff --check` pasó. Este incremento aún no tiene commit ni PR; debe verificarse, publicarse y abrirse mediante PR.
+
 ## Actualización posterior: PR #56
 
 La corrección de precisión del contrato de carga de comprobante se integró en `main` como merge `8f637d6` (commit `fbe5803`). El snapshot OpenAPI ahora coincide con la salida de ejecución para las 61 rutas y declara la carga multipart y sus respuestas reales. Una prueba de contrato valida ese endpoint. Antes de integrar, SDK .NET 10.0.402 compiló con 0 advertencias/errores y ejecutó 32 pruebas aprobadas; las 2 pruebas de concurrencia SQL permanecieron omitidas al faltar la cadena de una base aislada. La consulta de esquema más reciente usó `ConnectionStrings:DefaultConnection` privada en modo solo lectura y confirmó 13 migraciones aplicadas, sin aplicar migraciones nuevas. No hay otro agente del que dependa el trabajo.
