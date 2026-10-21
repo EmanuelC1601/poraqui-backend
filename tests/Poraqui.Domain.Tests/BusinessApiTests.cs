@@ -69,6 +69,9 @@ public sealed class BusinessApiTests
         using var revokedCourierOffers = await SendAsync(client, HttpMethod.Get,
             "api/courier/external/offers", courierToken);
         Assert.Equal(HttpStatusCode.Forbidden, revokedCourierOffers.StatusCode);
+        using var revokedCourierOrders = await SendAsync(client, HttpMethod.Get,
+            "api/courier/orders", courierToken);
+        Assert.Equal(HttpStatusCode.Forbidden, revokedCourierOrders.StatusCode);
         await using var revokedCourierHub = CreateSignalRClient(factory, client, courierToken);
         await revokedCourierHub.StartAsync();
         await Assert.ThrowsAsync<HubException>(() =>
@@ -710,6 +713,10 @@ public sealed class BusinessApiTests
             JsonContent.Create(new { isExternalCourier = true }))).StatusCode);
         var courierToken = await LoginAsync(client, "courier@example.test");
         var courierTwoToken = await LoginAsync(client, "courier-two@example.test");
+        await using var courierTwoOrderHub = CreateSignalRClient(factory, client, courierTwoToken);
+        await courierTwoOrderHub.StartAsync();
+        Assert.Equal("AssignedToDelivery", (await courierTwoOrderHub.InvokeAsync<OrderRealtimeSnapshot>(
+            "SubscribeOrder", internalOrderId)).Status);
         await using var courierOfferHub = CreateSignalRClient(factory, client, courierToken);
         var offerNotice = new TaskCompletionSource<ExternalOfferNotice>(TaskCreationOptions.RunContinuationsAsynchronously);
         var cancelledNoticeOne = new TaskCompletionSource<ExternalOfferChangedNotice>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -928,6 +935,17 @@ public sealed class BusinessApiTests
         using var invalidMetricsRange = await SendAsync(client, HttpMethod.Get,
             $"api/admin/metrics/pilot?fromUtc={metricsFrom}&toUtc={Uri.EscapeDataString(DateTimeOffset.UtcNow.AddDays(400).ToString("O"))}", adminToken);
         Assert.Equal(HttpStatusCode.BadRequest, invalidMetricsRange.StatusCode);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put,
+            $"api/admin/users/{courierTwoId}/delivery-person", adminToken,
+            JsonContent.Create(new { isDeliveryPerson = false }))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await SendAsync(client, HttpMethod.Put,
+            $"api/admin/users/{courierTwoId}/external-courier", adminToken,
+            JsonContent.Create(new { isExternalCourier = false }))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await SendAsync(client, HttpMethod.Get,
+            "api/courier/orders", courierTwoToken)).StatusCode);
+        await Assert.ThrowsAsync<HubException>(() =>
+            courierTwoOrderHub.InvokeAsync<OrderRealtimeSnapshot>("SubscribeOrder", internalOrderId));
     }
 
     private static async Task RegisterAsync(HttpClient client, string email)

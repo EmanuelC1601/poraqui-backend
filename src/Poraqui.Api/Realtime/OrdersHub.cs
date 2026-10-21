@@ -18,6 +18,9 @@ public sealed class OrdersHub(OrderWorkflowService workflow, ExternalCourierServ
 
         var isAdmin = Context.User?.IsInRole(ApplicationRoles.PlatformAdmin) == true;
         var subscription = await workflow.GetRealtimeSnapshotAsync(orderId, actorId, isAdmin, Context.ConnectionAborted);
+        if (subscription.Audience == "courier" &&
+            !await externalCourierRepository.HasDeliveryCourierRoleAsync(actorId, Context.ConnectionAborted))
+            throw new HubException("Current courier role is required to subscribe to an order.");
         var group = OrderChangeGroups.For(orderId, subscription.Audience);
         await Groups.AddToGroupAsync(Context.ConnectionId, group, Context.ConnectionAborted);
 
@@ -26,6 +29,9 @@ public sealed class OrdersHub(OrderWorkflowService workflow, ExternalCourierServ
             // Read after joining so a transition between authorization and group membership is
             // reflected either by this snapshot or by a subsequent group event.
             var current = await workflow.GetRealtimeSnapshotAsync(orderId, actorId, isAdmin, Context.ConnectionAborted);
+            if (current.Audience == "courier" &&
+                !await externalCourierRepository.HasDeliveryCourierRoleAsync(actorId, Context.ConnectionAborted))
+                throw new HubException("Current courier role is required to subscribe to an order.");
             if (current.Audience != subscription.Audience)
             {
                 await Groups.RemoveFromGroupAsync(Context.ConnectionId, group, Context.ConnectionAborted);
@@ -88,7 +94,8 @@ public static class ExternalOfferChangeGroups
     public static string For(Guid courierUserId) => $"external-offers:{courierUserId:N}";
 }
 
-public sealed class SignalROrderChangePublisher(IHubContext<OrdersHub> hub, ILogger<SignalROrderChangePublisher> logger)
+public sealed class SignalROrderChangePublisher(IHubContext<OrdersHub> hub, ILogger<SignalROrderChangePublisher> logger,
+    IExternalCourierRepository couriers)
     : IOrderChangePublisher
 {
     public async Task PublishAsync(OrderChangeNotice notice, CancellationToken cancellationToken)
@@ -96,12 +103,16 @@ public sealed class SignalROrderChangePublisher(IHubContext<OrdersHub> hub, ILog
         var payload = new OrderStatusUpdate(notice.OrderId, notice.Status, notice.Version, notice.ChangedAtUtc);
         try
         {
-            await hub.Clients.Groups(
-                    OrderChangeGroups.For(notice.OrderId, "customer"),
-                    OrderChangeGroups.For(notice.OrderId, "business"),
-                    OrderChangeGroups.For(notice.OrderId, "courier"),
-                    OrderChangeGroups.For(notice.OrderId, "admin"))
-                .SendAsync("OrderChanged", payload, cancellationToken);
+            var groups = new List<string>
+            {
+                OrderChangeGroups.For(notice.OrderId, "customer"),
+                OrderChangeGroups.For(notice.OrderId, "business"),
+                OrderChangeGroups.For(notice.OrderId, "admin")
+            };
+            if (notice.CourierUserId is { } courierId &&
+                await couriers.HasDeliveryCourierRoleAsync(courierId, cancellationToken))
+                groups.Add(OrderChangeGroups.For(notice.OrderId, "courier"));
+            await hub.Clients.Groups(groups).SendAsync("OrderChanged", payload, cancellationToken);
         }
         catch (Exception exception)
         {
