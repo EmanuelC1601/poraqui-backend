@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Actualizado: 2026-10-20. `main` es la base de integración, con un solo responsable. Los incrementos salen de `main` en ramas `feature/*` y se integran mediante PR. Contratos persistidos, `AppDbContext` y migraciones tienen un propietario único. La antigua asignación de OpenCode queda solo como antecedente; no hay dependencia operativa.
+Actualizado: 2026-10-21. `main` es la base de integración, con un solo responsable. Los incrementos salen de `main` en ramas `feature/*` y se integran mediante PR. Contratos persistidos, `AppDbContext` y migraciones tienen un propietario único. La antigua asignación de OpenCode queda solo como antecedente; no hay dependencia operativa.
 
 ## Ledger verificable
 
@@ -21,8 +21,8 @@ Actualizado: 2026-10-20. `main` es la base de integración, con un solo responsa
 | Integrado | Endpoints anónimos de liveness y readiness SQL | PR #84, merge `a38ee0a`; `/health/live` informa proceso activo y `/health/ready` responde 200 solo cuando puede conectar a la base configurada, o 503 sin exponer detalles; prueba 503 cuando no hay cadena SQL y contrato OpenAPI probado |
 | Integrado; SMS real pendiente | OTP Twilio Verify, E.164, confirmación Identity y límite de 5 intentos/10 min/IP | PR #36; pruebas HTTP simuladas. Requiere secretos Twilio privados para comprobar entrega real |
 | Integrado | Snapshots SignalR al reconectar y ofertas actuales al suscribirse | PR #38 y #45–#46; reconexión y destinatarios cubiertos por pruebas |
-| Integrado | El snapshot OpenAPI versionado coincide en todas sus rutas y schemas con el documento runtime | PR en curso desde `feature/verify-openapi-snapshot`; prueba ignora solo la URL dinámica de `servers` y detecta cambios o rutas faltantes |
-| Artefacto IIS verificado; hosting pendiente | Guía de despliegue MonsterASP.NET y recorrido reproducible | Run de `main` `39552373161` para `5955ff12499c8d3cab870fb12b043088a357d78f` pasó y generó `poraqui-api-iis-5955ff12499c8d3cab870fb12b043088a357d78f` (5,683,271 bytes, vence 2026-11-04). El sitio aún no se ha publicado ni verificado |
+| Integrado | El snapshot OpenAPI versionado coincide en versión, metadatos, todas sus rutas y schemas con el documento runtime | PR #99, merge `982a973`; prueba ignora solo `servers`, cuya URL cambia con el host efímero de pruebas |
+| Artefacto IIS verificado; hosting pendiente | Guía de despliegue MonsterASP.NET y recorrido reproducible | Run de `main` `39553449615` para `982a9731156cabeb11d27ddd02f050af75b35564` pasó y generó `poraqui-api-iis-982a9731156cabeb11d27ddd02f050af75b35564` (5,683,240 bytes, vence 2026-11-04). El sitio aún no se ha publicado ni verificado |
 | Integrado; migraciones aplicadas a desarrollo | 15 migraciones EF integradas, incluida `ExternalOfferAcceptancePickupCode` e invariantes SQL | `dotnet-ef migrations list` confirmó las 15 aplicadas en `db74183`; la revisión read-only previa verificó cero filas que incumplieran las nuevas restricciones. |
 | Integrado | Actualización del target a .NET 10 LTS y EF Core 10 | PR #51, merge `5078005`; no cambia el modelo ni genera migraciones |
 | Integrado; guard de startup verificado | Configuración privada en Production | PR #69 exige `PrivateFiles:Root` fuera de `wwwroot` y comprueba creación/acceso en startup. PR actual exige además `DataProtection:KeysPath` privada y fuera de `wwwroot`, necesaria para descifrar códigos protegidos tras reinicios; el roundtrip entre proveedores prueba recuperación tras reinicio. Suite Release 48/48 (siete SQL Server aisladas). No cambia esquema. |
@@ -131,3 +131,9 @@ Después de PR #81, `dotnet test Poraqui.sln --configuration Release --no-restor
 La suite incluye concurrencia de aceptación y comandos. Esta ejecución local no sustituye CI, una verificación en MonsterASP, SMS real o pruebas con WhatsApp. La publicación sigue pendiente hasta configurar sitio, rutas persistentes y servicios privados.
 
 PR #84 se integró en `main` como `a38ee0a`. La suite Release completa pasó **53/53**, incluidas las ocho pruebas SQL Server de `db74230`; tres pruebas nuevas usan SQLite para readiness con conexión, readiness sin cadena y contrato OpenAPI. La BD compartida no fue modificada.
+
+## OpenAPI y CI vigente 2026-10-21
+
+PR #99 (`3a510cf`, `b894df3`) se integró en `main` como `982a973`. Una prueba compara `openapi`, `info`, `paths` y `components` completos entre `/openapi/v1.json` y `docs/openapi.json`; solo excluye `servers`, cuya URL es dinámica en `WebApplicationFactory`. La prueba focalizada pasó 1/1; la suite Release pasó 48 pruebas, 0 fallidas y 8 SQL Server omitidas.
+
+El CI posterior al merge, run `39553449615`, pasó para `982a973` y generó `poraqui-api-iis-982a9731156cabeb11d27ddd02f050af75b35564` (5,683,240 bytes; vence 2026-11-04). No hay cambios de esquema, conexiones ni migraciones en este incremento. MonsterASP aún no está desplegado.
