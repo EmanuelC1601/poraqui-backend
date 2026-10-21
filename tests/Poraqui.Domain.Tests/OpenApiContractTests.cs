@@ -18,6 +18,8 @@ public sealed class OpenApiContractTests
         var snapshotPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../docs/openapi.json"));
         var snapshot = JsonNode.Parse(await File.ReadAllTextAsync(snapshotPath))!;
 
+        Assert.True(JsonNode.DeepEquals(snapshot["openapi"], runtime["openapi"]), "The OpenAPI versions differ.");
+        Assert.True(JsonNode.DeepEquals(snapshot["info"], runtime["info"]), "The OpenAPI metadata differs.");
         Assert.True(JsonNode.DeepEquals(snapshot["paths"], runtime["paths"]), "The versioned OpenAPI paths differ from the runtime document.");
         Assert.True(JsonNode.DeepEquals(snapshot["components"], runtime["components"]), "The versioned OpenAPI schemas differ from the runtime document.");
     }
