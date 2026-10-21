@@ -6,7 +6,7 @@ El backend tiene un único responsable. `main` es la base de integración; cada 
 
 ## Cambios integrados
 
-PR #1 y los incrementos posteriores están integrados en `main`. El código contiene identidad y permisos por rol/recurso, comercio y catálogo, pedidos con precios del servidor, comprobantes privados y revisión manual, estados de preparación, reparto interno y externo, ofertas, expiración/cancelación, códigos, contacto autorizado, historial, idempotencia, sincronización offline validada por el servidor, SignalR, incidencias, reembolsos manuales, OTP y métricas piloto. La última suite Release en `main` aprobó **53/53**, con SQLite y ocho pruebas SQL Server en la base aislada `db74230`. Esto no acredita servicios externos ni hosting reales. Ver [ledger](project-status.md) y [recorrido reproducible](order-flow.md).
+PR #1 y los incrementos posteriores están integrados en `main`. El código contiene identidad y permisos por rol/recurso, comercio y catálogo, pedidos con precios del servidor, comprobantes privados y revisión manual, estados de preparación, reparto interno y externo, ofertas, expiración/cancelación, códigos, contacto autorizado, historial, idempotencia, sincronización offline validada por el servidor, SignalR, incidencias, reembolsos manuales, OTP y métricas piloto. La suite Release local más reciente aprobó **49 pruebas, 0 fallidas y 8 SQL Server omitidas** por configuración aislada aplazada. CI del PR #103 pasó; el runner no recibe cadena de BD. Esto no acredita servicios externos ni hosting reales. Ver [ledger](project-status.md) y [recorrido reproducible](order-flow.md).
 
 El proyecto contiene 15 migraciones EF. La verificación de modelo más reciente indicó que no hay cambios pendientes de migración; las pruebas SQL Release migran solo su base aislada. Los registros históricos de integración y despliegue de este documento conservan los conteos que eran vigentes cuando se ejecutaron. No se aplica migración desde el arranque de la API.
 
@@ -33,11 +33,11 @@ Revalidación tras PR #52 con el SDK local 10.0.402: build con 0 advertencias/er
 
 No se publican secretos ni se toman credenciales del chat. El estado verificable vigente está en `docs/project-status.md`.
 
-## Incremento en rama: teléfono confirmado para contacto de entrega
+## Integrado: PR #103, teléfono confirmado para contacto de entrega
 
-Rama `feature/verified-customer-contact`, creada desde `origin/main`: `OrderWorkflowRepository.GetCustomerPhoneAsync` ahora devuelve solo teléfonos con `PhoneNumberConfirmed=true`. `BeginDeliveryAsync` ya restringe el acceso al courier asignado; este filtro evita revelar un teléfono no confirmado. Se actualizó el contrato; no requiere migración ni cambia el esquema.
+PR #103 quedó integrado en `main` como merge `c3270da`. `OrderWorkflowRepository.GetCustomerPhoneAsync` ahora devuelve solo teléfonos con `PhoneNumberConfirmed=true`. `BeginDeliveryAsync` ya restringe el acceso al courier asignado; este filtro evita revelar un teléfono no confirmado. Se actualizó el contrato; no requiere migración ni cambia el esquema.
 
-Prueba SQLite enfocada: **1/1**; suite Release completa: **49 aprobadas, 0 fallidas, 8 omitidas** (integraciones SQL Server, configuración aislada aplazada). No hubo escrituras en SQL Server. `git diff --check` pasó. Este incremento aún no tiene commit ni PR; debe verificarse, publicarse y abrirse mediante PR.
+Prueba SQLite enfocada: **1/1**; suite Release completa: **49 aprobadas, 0 fallidas, 8 omitidas** (integraciones SQL Server, configuración aislada aplazada); CI `build-and-test` del PR pasó antes de integrar. No hubo escrituras en SQL Server ni migraciones.
 
 ## Actualización posterior: PR #56
 
