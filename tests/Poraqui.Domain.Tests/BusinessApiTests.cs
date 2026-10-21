@@ -417,6 +417,21 @@ public sealed class BusinessApiTests
                    JsonContent.Create(new { recipientName = "Mercado Poraqui", institution = "Banco de prueba", accountReference = "CLABE-TEST-CHANGED", instructions = "Nueva cuenta." })))
             Assert.Equal(HttpStatusCode.OK, changedDetails.StatusCode);
 
+        using (var oversizedContent = new MultipartFormDataContent())
+        {
+            var oversizedProof = new ByteArrayContent(new byte[8 * 1024 * 1024 + 1]);
+            oversizedProof.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+            oversizedContent.Add(new StringContent(Guid.NewGuid().ToString()), "commandId");
+            oversizedContent.Add(oversizedProof, "file", "oversized.pdf");
+            using var oversizedRequest = new HttpRequestMessage(HttpMethod.Post, $"api/orders/{orderId}/transfer-evidence") { Content = oversizedContent };
+            oversizedRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", customerToken);
+            using var oversizedResponse = await client.SendAsync(oversizedRequest);
+            Assert.Equal(HttpStatusCode.RequestEntityTooLarge, oversizedResponse.StatusCode);
+        }
+        using (var orderAfterOversizedUpload = await SendAsync(client, HttpMethod.Get, $"api/orders/{orderId}", customerToken))
+        using (var orderAfterOversizedUploadJson = JsonDocument.Parse(await orderAfterOversizedUpload.Content.ReadAsStringAsync()))
+            Assert.Equal("PendingPayment", orderAfterOversizedUploadJson.RootElement.GetProperty("status").GetString());
+
         var proofCommandId = Guid.NewGuid();
         using (var proofContent = new MultipartFormDataContent())
         {
