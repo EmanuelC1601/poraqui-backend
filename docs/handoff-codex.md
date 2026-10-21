@@ -140,3 +140,9 @@ La verificación SQL Server aislada queda pendiente hasta que el usuario configu
 ## Cobertura SQL pendiente: revocación de courier
 
 Rama `feature/sql-revocation-offer-test` extiende `SqlServerExternalDeliveryFlowApiTests`: oferta inicial, revocación y cancelación persistida, acceso denegado mientras se revocó, reactivación sin reaparición de la oferta vieja y nueva publicación antes de aceptar. Build Release pasó sin advertencias/errores; la prueba enfocada fue omitida porque falta la cadena privada aislada. Suite local Release: 47 aprobadas, 0 fallidas, 8 SQL Server omitidas. Sin migraciones.
+
+## PR #94 integrado y corrección de la ejecución paralela de pruebas
+
+PR #94 quedó integrado en `main` como `93fc30a`; añade al flujo SQL Server la comprobación de revocación y reactivación de un repartidor externo. No cambia el esquema. La prueba SQL específica no se ejecutó localmente: falta `ConnectionStrings:SqlServerTest` en User Secrets por decisión del usuario.
+
+El push de `main` tras ese merge falló en CI porque `Readiness_checks_database_connectivity_without_requiring_authentication` respondió 503. La suite local reprodujo el fallo mientras los API test hosts cambiaban variables de entorno globales durante ejecución paralela; además, algunas pruebas de API fallaban al arrancar sin los valores globales esperados. La rama `feature/isolate-test-host-configuration` serializa el assembly xUnit para evitar que un host lea la configuración temporal de otro. Suite local Release: 47 aprobadas, 0 fallidas y 8 pruebas SQL omitidas. `git diff --check` pasó. Sin migraciones ni acceso a bases de datos.
