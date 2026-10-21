@@ -145,7 +145,7 @@ public sealed class SignalRExternalOfferPublisher(IHubContext<OrdersHub> hub, IL
 
     public async Task PublishChangedAsync(Guid courierUserId, ExternalOfferChangedNotice notice, CancellationToken cancellationToken)
     {
-        if (!await couriers.IsExternalCourierAsync(courierUserId, cancellationToken)) return;
+        if (notice.Status != "Cancelled" && !await couriers.IsExternalCourierAsync(courierUserId, cancellationToken)) return;
         try
         {
             await hub.Clients.Group(ExternalOfferChangeGroups.For(courierUserId))

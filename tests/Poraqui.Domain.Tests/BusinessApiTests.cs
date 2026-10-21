@@ -13,6 +13,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Poraqui.Application.Security;
 using Poraqui.Application.Orders;
+using Poraqui.Domain.Commerce;
+using Poraqui.Domain.Orders;
 using Poraqui.Infrastructure.Identity;
 using Poraqui.Infrastructure.Persistence;
 
@@ -54,6 +56,32 @@ public sealed class BusinessApiTests
             Assert.False(profile.IsAvailable);
         }
         var courierToken = await LoginAsync(client, "provisioned-courier@example.test");
+        Guid activeOfferId;
+        await using (var seedScope = factory.Services.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var business = new Business(courier.Id, "Courier role revocation test", "Pickup address");
+            var zone = new DeliveryZone("Courier role revocation zone");
+            var order = new Order(courier.Id, business.Id, zone.Id, "Customer destination", 0m,
+                [(Guid.NewGuid(), "Test product", 10m, 1)]);
+            var offer = new ExternalDeliveryOffer(order.Id, courier.Id, zone.Id, business.Address,
+                order.DeliveryAddress, 5m, "Handle with care", DateTimeOffset.UtcNow.AddMinutes(10));
+            activeOfferId = offer.Id;
+            db.Businesses.Add(business);
+            db.DeliveryZones.Add(zone);
+            db.Orders.Add(order);
+            db.ExternalDeliveryOffers.Add(offer);
+            await db.SaveChangesAsync();
+        }
+        var cancellationNotice = new TaskCompletionSource<ExternalOfferChangedNotice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var activeCourierHub = CreateSignalRClient(factory, client, courierToken);
+        activeCourierHub.On<ExternalOfferChangedNotice>("ExternalOfferChanged", notice =>
+        {
+            if (notice.OfferId == activeOfferId) cancellationNotice.TrySetResult(notice);
+        });
+        await activeCourierHub.StartAsync();
+        var currentOffers = await activeCourierHub.InvokeAsync<IReadOnlyList<ExternalOfferView>>("SubscribeCourierOffers");
+        Assert.Contains(currentOffers, offer => offer.Id == activeOfferId);
 
         using var revoke = await SendAsync(client, HttpMethod.Put,
             $"api/admin/users/{courier.Id}/external-courier", adminToken,
@@ -66,16 +94,18 @@ public sealed class BusinessApiTests
         Assert.False(await finalDb.UserRoles.AnyAsync(x => x.UserId == courier.Id && x.RoleId == externalRoleId));
         var revokedProfile = await finalDb.CourierAvailabilities.SingleAsync(x => x.CourierUserId == courier.Id);
         Assert.False(revokedProfile.IsAvailable);
+        var revokedOffer = await finalDb.ExternalDeliveryOffers.SingleAsync(x => x.Id == activeOfferId);
+        Assert.Equal(ExternalDeliveryOfferStatus.Cancelled, revokedOffer.Status);
+        var receivedCancellation = await cancellationNotice.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal("Cancelled", receivedCancellation.Status);
         using var revokedCourierOffers = await SendAsync(client, HttpMethod.Get,
             "api/courier/external/offers", courierToken);
         Assert.Equal(HttpStatusCode.Forbidden, revokedCourierOffers.StatusCode);
         using var revokedCourierOrders = await SendAsync(client, HttpMethod.Get,
             "api/courier/orders", courierToken);
         Assert.Equal(HttpStatusCode.Forbidden, revokedCourierOrders.StatusCode);
-        await using var revokedCourierHub = CreateSignalRClient(factory, client, courierToken);
-        await revokedCourierHub.StartAsync();
         await Assert.ThrowsAsync<HubException>(() =>
-            revokedCourierHub.InvokeAsync<IReadOnlyList<ExternalOfferView>>("SubscribeCourierOffers"));
+            activeCourierHub.InvokeAsync<IReadOnlyList<ExternalOfferView>>("SubscribeCourierOffers"));
     }
 
     [Fact]
