@@ -39,6 +39,10 @@ PR #103 quedó integrado en `main` como merge `c3270da`. `OrderWorkflowRepositor
 
 Prueba SQLite enfocada: **1/1**; suite Release completa: **49 aprobadas, 0 fallidas, 8 omitidas** (integraciones SQL Server, configuración aislada aplazada); CI `build-and-test` del PR pasó antes de integrar. No hubo escrituras en SQL Server ni migraciones.
 
+## Artefacto de despliegue vigente en `main`
+
+El run `39557674487` pasó para `main` en `91a5def695be4ccf542941b757ac66bf9a4df0ac` y publicó `poraqui-api-iis-91a5def695be4ccf542941b757ac66bf9a4df0ac` (5,683,276 bytes; vence 2026-11-04). [Abrir ejecución de CI](https://github.com/EmanuelC1601/poraqui-backend/actions/runs/39557674487). Esto verifica la compilación y el paquete IIS, no el despliegue, la conectividad del sitio ni almacenamiento persistente en MonsterASP.
+
 ## Actualización posterior: PR #56
 
 La corrección de precisión del contrato de carga de comprobante se integró en `main` como merge `8f637d6` (commit `fbe5803`). El snapshot OpenAPI ahora coincide con la salida de ejecución para las 61 rutas y declara la carga multipart y sus respuestas reales. Una prueba de contrato valida ese endpoint. Antes de integrar, SDK .NET 10.0.402 compiló con 0 advertencias/errores y ejecutó 32 pruebas aprobadas; las 2 pruebas de concurrencia SQL permanecieron omitidas al faltar la cadena de una base aislada. La consulta de esquema más reciente usó `ConnectionStrings:DefaultConnection` privada en modo solo lectura y confirmó 13 migraciones aplicadas, sin aplicar migraciones nuevas. No hay otro agente del que dependa el trabajo.
