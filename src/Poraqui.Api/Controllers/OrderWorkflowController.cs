@@ -193,7 +193,7 @@ public sealed class OrderWorkflowController(OrderWorkflowService workflow, UserM
         if (!TryGetActor(out var actorId, out _)) return Unauthorized();
         if (commandId == Guid.Empty) return BadRequest(new { error = "A command ID is required." });
         if (file is null) return BadRequest(new { error = "Evidence file is required." });
-        if (file.Length > 8 * 1024 * 1024) return BadRequest(new { error = "Evidence file exceeds the 8 MB limit." });
+        if (file.Length > 8 * 1024 * 1024) return StatusCode(StatusCodes.Status413PayloadTooLarge);
         string? reference = null;
         try
         {
