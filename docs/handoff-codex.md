@@ -136,3 +136,7 @@ Para el head de PR, build Release: 0 advertencias/errores; suite Release: 47 apr
 PR #91 quedó integrado como `5701981` en `main`. `PUT /api/admin/users/{userId}/external-courier` cancela las ofertas `Offered` de ese courier en la transacción que revoca rol/perfil; después del commit publica el evento SignalR `Cancelled`. Las ofertas no reaparecen al reactivar el rol y la conexión activa recibe el cierre. Test API enfocado pasó 1/1 en SQLite. Build Release: 0 advertencias/errores; suite: 47 aprobadas, 0 fallidas y 8 SQL Server omitidas. CI `build-and-test` pasó antes de integrar. Sin migraciones ni acceso a SQL Server.
 
 La verificación SQL Server aislada queda pendiente hasta que el usuario configure `ConnectionStrings:SqlServerTest` en User Secrets. Instrucción: `dotnet user-secrets set "ConnectionStrings:SqlServerTest" "<cadena privada de la BD aislada>" --project src/Poraqui.Api`; no enviar el valor por chat ni usar `DefaultConnection` compartida para pruebas que escriban.
+
+## Cobertura SQL pendiente: revocación de courier
+
+Rama `feature/sql-revocation-offer-test` extiende `SqlServerExternalDeliveryFlowApiTests`: oferta inicial, revocación y cancelación persistida, acceso denegado mientras se revocó, reactivación sin reaparición de la oferta vieja y nueva publicación antes de aceptar. Build Release pasó sin advertencias/errores; la prueba enfocada fue omitida porque falta la cadena privada aislada. Suite local Release: 47 aprobadas, 0 fallidas, 8 SQL Server omitidas. Sin migraciones.
