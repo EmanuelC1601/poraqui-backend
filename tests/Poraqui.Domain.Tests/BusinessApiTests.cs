@@ -24,6 +24,33 @@ namespace Poraqui.Domain.Tests;
 public sealed class BusinessApiTests
 {
     [Fact]
+    public async Task Admin_bootstrap_limits_invalid_key_attempts_by_remote_ip()
+    {
+        await using var factory = new ApiTestHost();
+        using var client = factory.CreateClient();
+        await factory.InitializeDatabaseAsync();
+        var request = new
+        {
+            email = "bootstrap-rate-limit@example.test",
+            displayName = "Bootstrap Rate Limit",
+            password = "Test-Password-1!",
+            bootstrapKey = "incorrect-bootstrap-key-with-sufficient-length"
+        };
+
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            using var response = await client.PostAsJsonAsync("api/auth/bootstrap-admin", request);
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        using var limitedResponse = await client.PostAsJsonAsync("api/auth/bootstrap-admin", request);
+        Assert.Equal(HttpStatusCode.TooManyRequests, limitedResponse.StatusCode);
+        using var scope = factory.Services.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        Assert.Null(await users.FindByEmailAsync(request.email));
+    }
+
+    [Fact]
     public async Task Revoked_admin_role_in_existing_token_cannot_use_admin_or_resource_wide_access()
     {
         await using var factory = new ApiTestHost();
