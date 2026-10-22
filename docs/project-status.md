@@ -4,7 +4,7 @@ Actualizado: 2026-10-22, tras PR #129. `main` es la base de integración, con un
 
 ## Revalidación actual de `main`
 
-PR #129 (754a8ab) y PR #128 documental (de5169e) están integrados. El CI post-merge de PR #129 está ejecutándose en [run 39723167300](https://github.com/EmanuelC1601/poraqui-backend/actions/runs/39723167300). La suite Release local tras PR #129 aprobó 62; fallos 0; omitidas 9 por configuración aplazada de SQL Server. La prueba focalizada del evento de expiración pasó 1/1.
+PR #129 (754a8ab) y PR #128 documental (de5169e) están integrados. El CI post-merge del PR #129 pasó en [run 39723167300](https://github.com/EmanuelC1601/poraqui-backend/actions/runs/39723167300) y publicó `poraqui-api-iis-754a8ab0005b24b4889fa0f326059dbc6eb0ec5a` (5,690,338 bytes; vence 2026-11-05). La suite Release local tras PR #129 aprobó 62; fallos 0; omitidas 9 por configuración aplazada de SQL Server. La prueba focalizada del evento de expiración pasó 1/1.
 
 El CI post-merge del PR #127 pasó en el run [39722353246](https://github.com/EmanuelC1601/poraqui-backend/actions/runs/39722353246) para `main` en `2ccd9b5f07703d63f2c2fd80167eae7576369232`. Publicó `poraqui-api-iis-2ccd9b5f07703d63f2c2fd80167eae7576369232` (5,690,358 bytes; vence 2026-11-05). Este paquete acredita build/test y empaquetado, no un despliegue real.
 
