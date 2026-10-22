@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
+using Poraqui.Api.Realtime;
 using Poraqui.Application.Security;
 using Poraqui.Application.Orders;
 using Poraqui.Domain.Commerce;
@@ -43,6 +44,33 @@ public sealed class BusinessApiTests
         var otherOwnerToken = await LoginAsync(client, "role-revocation-other-owner@example.test");
         var otherBusinessId = await RegisterBusinessAsync(client, otherOwnerToken, "Negocio de otro dueño");
 
+        await RegisterAsync(client, "role-revocation-order-customer@example.test");
+        var customerToken = await LoginAsync(client, "role-revocation-order-customer@example.test");
+        Guid orderId;
+        await using (var seedScope = factory.Services.CreateAsyncScope())
+        {
+            var users = seedScope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var customer = await users.FindByEmailAsync("role-revocation-order-customer@example.test");
+            var db = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var zone = new DeliveryZone("Role revocation realtime zone");
+            var order = new Order(customer!.Id, otherBusinessId, zone.Id, "Private customer destination", 0m,
+                [(Guid.NewGuid(), "Test item", 10m, 1)]);
+            orderId = order.Id;
+            db.DeliveryZones.Add(zone);
+            db.Orders.Add(order);
+            await db.SaveChangesAsync();
+        }
+
+        var adminRealtimeUpdate = new TaskCompletionSource<OrderStatusUpdate>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var activeAdminHub = CreateSignalRClient(factory, client, adminToken);
+        activeAdminHub.On<OrderStatusUpdate>("OrderChanged", update =>
+        {
+            if (update.OrderId == orderId) adminRealtimeUpdate.TrySetResult(update);
+        });
+        await activeAdminHub.StartAsync();
+        var initialSnapshot = await activeAdminHub.InvokeAsync<OrderRealtimeSnapshot>("SubscribeOrder", orderId);
+        Assert.Equal("PendingPayment", initialSnapshot.Status);
+
         await using (var scope = factory.Services.CreateAsyncScope())
         {
             var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
@@ -61,32 +89,25 @@ public sealed class BusinessApiTests
             $"api/businesses/{otherBusinessId}", adminToken);
         Assert.Equal(HttpStatusCode.Forbidden, foreignBusiness.StatusCode);
 
-        await RegisterAsync(client, "role-revocation-order-customer@example.test");
-        await using (var scope = factory.Services.CreateAsyncScope())
-        {
-            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-            var customer = await users.FindByEmailAsync("role-revocation-order-customer@example.test");
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var zone = new DeliveryZone("Role revocation realtime zone");
-            var order = new Order(customer!.Id, otherBusinessId, zone.Id, "Private customer destination", 0m,
-                [(Guid.NewGuid(), "Test item", 10m, 1)]);
-            db.DeliveryZones.Add(zone);
-            db.Orders.Add(order);
-            await db.SaveChangesAsync();
+        using (var customerIncident = await SendAsync(client, HttpMethod.Post,
+                   $"api/orders/{orderId}/incidents", customerToken,
+                   JsonContent.Create(new { commandId = Guid.NewGuid(), category = "Delivery", description = "Customer reported an issue" })))
+            Assert.Equal(HttpStatusCode.OK, customerIncident.StatusCode);
+        Assert.False(adminRealtimeUpdate.Task.IsCompleted,
+            "An already-connected administrator must stop receiving order updates after role revocation.");
 
-            using var staleAdminIncidents = await SendAsync(client, HttpMethod.Get,
-                $"api/orders/{order.Id}/incidents", adminToken);
-            Assert.Equal(HttpStatusCode.Forbidden, staleAdminIncidents.StatusCode);
-            using var staleAdminReport = await SendAsync(client, HttpMethod.Post,
-                $"api/orders/{order.Id}/incidents", adminToken,
-                JsonContent.Create(new { commandId = Guid.NewGuid(), category = "Access", description = "Should be denied" }));
-            Assert.Equal(HttpStatusCode.Forbidden, staleAdminReport.StatusCode);
+        using var staleAdminIncidents = await SendAsync(client, HttpMethod.Get,
+            $"api/orders/{orderId}/incidents", adminToken);
+        Assert.Equal(HttpStatusCode.Forbidden, staleAdminIncidents.StatusCode);
+        using var staleAdminReport = await SendAsync(client, HttpMethod.Post,
+            $"api/orders/{orderId}/incidents", adminToken,
+            JsonContent.Create(new { commandId = Guid.NewGuid(), category = "Access", description = "Should be denied" }));
+        Assert.Equal(HttpStatusCode.Forbidden, staleAdminReport.StatusCode);
 
-            await using var staleAdminHub = CreateSignalRClient(factory, client, adminToken);
-            await staleAdminHub.StartAsync();
-            await Assert.ThrowsAsync<HubException>(() => staleAdminHub.InvokeAsync<OrderRealtimeSnapshot>(
-                "SubscribeOrder", order.Id));
-        }
+        await using var staleAdminHub = CreateSignalRClient(factory, client, adminToken);
+        await staleAdminHub.StartAsync();
+        await Assert.ThrowsAsync<HubException>(() => staleAdminHub.InvokeAsync<OrderRealtimeSnapshot>(
+            "SubscribeOrder", orderId));
     }
 
     [Fact]
