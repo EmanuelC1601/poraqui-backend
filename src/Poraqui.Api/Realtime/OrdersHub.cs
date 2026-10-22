@@ -1,14 +1,16 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNetCore.Identity;
 using Poraqui.Application.Orders;
 using Poraqui.Application.Security;
+using Poraqui.Infrastructure.Identity;
 
 namespace Poraqui.Api.Realtime;
 
 [Authorize]
 public sealed class OrdersHub(OrderWorkflowService workflow, ExternalCourierService externalCouriers,
-    IExternalCourierRepository externalCourierRepository) : Hub
+    IExternalCourierRepository externalCourierRepository, UserManager<ApplicationUser> users) : Hub
 {
     public async Task<OrderRealtimeSnapshot> SubscribeOrder(Guid orderId)
     {
@@ -16,7 +18,8 @@ public sealed class OrdersHub(OrderWorkflowService workflow, ExternalCourierServ
                            Context.User?.FindFirstValue("sub"), out var actorId))
             throw new HubException("Authenticated user id is unavailable.");
 
-        var isAdmin = Context.User?.IsInRole(ApplicationRoles.PlatformAdmin) == true;
+        var hasAdminClaim = Context.User?.IsInRole(ApplicationRoles.PlatformAdmin) == true;
+        var isAdmin = hasAdminClaim && await HasCurrentAdminRoleAsync(actorId);
         var subscription = await workflow.GetRealtimeSnapshotAsync(orderId, actorId, isAdmin, Context.ConnectionAborted);
         if (subscription.Audience == "courier" &&
             !await externalCourierRepository.HasDeliveryCourierRoleAsync(actorId, Context.ConnectionAborted))
@@ -28,6 +31,7 @@ public sealed class OrdersHub(OrderWorkflowService workflow, ExternalCourierServ
         {
             // Read after joining so a transition between authorization and group membership is
             // reflected either by this snapshot or by a subsequent group event.
+            isAdmin = hasAdminClaim && await HasCurrentAdminRoleAsync(actorId);
             var current = await workflow.GetRealtimeSnapshotAsync(orderId, actorId, isAdmin, Context.ConnectionAborted);
             if (current.Audience == "courier" &&
                 !await externalCourierRepository.HasDeliveryCourierRoleAsync(actorId, Context.ConnectionAborted))
@@ -81,6 +85,12 @@ public sealed class OrdersHub(OrderWorkflowService workflow, ExternalCourierServ
         if (principal is null || !Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? principal.FindFirstValue("sub"), out var courierId))
             throw new HubException("Authenticated user id is unavailable.");
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, ExternalOfferChangeGroups.For(courierId), Context.ConnectionAborted);
+    }
+
+    private async Task<bool> HasCurrentAdminRoleAsync(Guid userId)
+    {
+        var user = await users.FindByIdAsync(userId.ToString());
+        return user is not null && await users.IsInRoleAsync(user, ApplicationRoles.PlatformAdmin);
     }
 }
 

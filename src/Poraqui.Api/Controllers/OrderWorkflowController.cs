@@ -52,7 +52,8 @@ public sealed class OrderWorkflowController(OrderWorkflowService workflow, UserM
     [HttpGet("orders/{orderId:guid}/incidents")]
     public async Task<IActionResult> GetIncidents(Guid orderId, CancellationToken cancellationToken)
     {
-        if (!TryGetActor(out var actorId, out var isAdmin)) return Unauthorized();
+        if (!TryGetActor(out var actorId, out _)) return Unauthorized();
+        var isAdmin = await HasCurrentAdminRoleAsync(actorId);
         try { return Ok(await workflow.GetIncidentsAsync(orderId, actorId, isAdmin, cancellationToken)); }
         catch (OrderResourceForbiddenException) { return Forbid(); }
         catch (KeyNotFoundException) { return NotFound(); }
@@ -61,7 +62,8 @@ public sealed class OrderWorkflowController(OrderWorkflowService workflow, UserM
     [HttpPost("orders/{orderId:guid}/incidents")]
     public async Task<IActionResult> ReportIncident(Guid orderId, ReportIncidentRequest request, CancellationToken cancellationToken)
     {
-        if (!TryGetActor(out var actorId, out var isAdmin)) return Unauthorized();
+        if (!TryGetActor(out var actorId, out _)) return Unauthorized();
+        var isAdmin = await HasCurrentAdminRoleAsync(actorId);
         try { return Ok(await workflow.ReportIncidentAsync(orderId, actorId, isAdmin, request.CommandId, request.Category, request.Description, cancellationToken)); }
         catch (OrderResourceForbiddenException) { return Forbid(); }
         catch (KeyNotFoundException) { return NotFound(); }
@@ -410,6 +412,12 @@ public sealed class OrderWorkflowController(OrderWorkflowService workflow, UserM
         return await users.IsInRoleAsync(courier, ApplicationRoles.PlatformAdmin)
             || await users.IsInRoleAsync(courier, ApplicationRoles.DeliveryPerson)
             || await users.IsInRoleAsync(courier, ApplicationRoles.ExternalCourier);
+    }
+
+    private async Task<bool> HasCurrentAdminRoleAsync(Guid userId)
+    {
+        var user = await users.FindByIdAsync(userId.ToString());
+        return user is not null && await users.IsInRoleAsync(user, ApplicationRoles.PlatformAdmin);
     }
 }
 
