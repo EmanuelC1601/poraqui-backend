@@ -65,7 +65,6 @@ public sealed class ExternalCourierRepository(AppDbContext db) : IExternalCourie
             dueOffers = openOffers.Where(x => x.ExpiresAtUtc <= now).ToArray();
         }
         foreach (var offer in dueOffers) offer.Expire(now);
-        if (dueOffers.Length > 0) await db.SaveChangesAsync(cancellationToken);
         return dueOffers;
     }
     public async Task<IReadOnlyList<ExternalDeliveryOffer>> ExpireDueOffersForOrderAsync(Guid orderId, DateTimeOffset now, CancellationToken cancellationToken)
@@ -83,7 +82,6 @@ public sealed class ExternalCourierRepository(AppDbContext db) : IExternalCourie
             dueOffers = openOffers.Where(x => x.ExpiresAtUtc <= now).ToArray();
         }
         foreach (var offer in dueOffers) offer.Expire(now);
-        if (dueOffers.Length > 0) await db.SaveChangesAsync(cancellationToken);
         return dueOffers;
     }
     public void AddOffer(ExternalDeliveryOffer offer) => db.ExternalDeliveryOffers.Add(offer);
