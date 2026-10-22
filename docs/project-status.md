@@ -8,7 +8,7 @@ Actualizado: 2026-10-21. `main` es la base de integración, con un solo responsa
 |---|---|---|
 | Integrado | Alta/revocación de rol de courier y perfil en transacción; las operaciones API de reparto y SignalR consultan roles vigentes, de modo que tokens anteriores no bastan tras revocar | PR #90, merge `978638c`; pruebas API SQLite cubren ofertas externas, lista de pedidos y suscripciones a pedido/ofertas después de revocar. Sin cambios de esquema. |
 | Integrado | Al revocar un repartidor externo, sus ofertas `Offered` se cancelan en la misma transacción y la conexión vigente recibe el aviso después del commit | PR #91, merge `5701981`; prueba API SQLite confirma estado Cancelled persistido, aviso SignalR y denegación posterior. Build Release limpio; suite 47 aprobadas/8 SQL omitidas por configuración pendiente. Sin cambios de esquema. |
-| Integrado; ejecución SQL Server pendiente | El recorrido SQL externo también comprueba cancelación persistida al revocar, ausencia de ofertas antiguas tras reactivar y publicación de una oferta nueva | PR #94, merge `93fc30a`; la prueba está compilada, pero su ejecución SQL se omitió porque `ConnectionStrings__SqlServerTest` no se expuso al proceso de test. El usuario aplazó esa configuración. |
+| Integrado; verificado en SQL Server aislado | El recorrido externo también comprueba cancelación persistida al revocar, ausencia de ofertas antiguas tras reactivar y publicación de una oferta nueva | PR #94, merge `93fc30a`; `SqlServerExternalDeliveryFlowApiTests` pasó en la suite Release 59/59 contra la base aislada, después de que `ConnectionStrings:SqlServerTest` quedara configurada privadamente. La BD compartida no fue destino de esa suite. |
 | Integrado; cobertura funcional parcial | Clean Architecture, Identity, roles y autorización por relación con negocio/pedido; comercios, catálogo y opciones, zonas, tarifas, horarios y precios calculados por servidor | PR #1, #22–#33; prueba API integral sobre SQLite; ver requisitos SQL y hosting pendientes |
 | Integrado | Asignación de repartidor interno comprueba primero acceso al pedido/negocio antes de consultar el rol del usuario objetivo | PR #88, merge `914d291`; prueba API confirma `403` para propietario ajeno incluso con courier ID inexistente, evitando sondeo del rol de otros usuarios |
 | Integrado; cobertura funcional parcial | Pedido, comprobante privado, revisión manual de transferencia, decisión del negocio, preparación, repartidor propio/externo, ofertas, códigos, contacto autorizado e historial | Prueba amplia SQLite y recorridos API SQL Server de reparto interno, externo y confirmación offline (PR #63–#65); suite SQL Server aislada 39/39 tras PR #67; límites en `docs/order-flow.md` |
@@ -35,7 +35,7 @@ Actualizado: 2026-10-21. `main` es la base de integración, con un solo responsa
 | Pendiente por configuración de hosting | Despliegue y replays de códigos tras reinicios | Esta copia no tiene `PrivateFiles:Root` ni `DataProtection:KeysPath`; el sitio MonsterASP aún requiere rutas persistentes apropiadas para archivos y claves. |
 | Fuera de alcance | GPS, distancias inferidas, transferencias bancarias automáticas y frontend | Se usan zonas/tarifas y revisión/pago manual |
 
-## Verificación vigente tras PR #70
+## Verificación histórica tras PR #70
 
 PR #70 (`11f1717`) quedó integrado en `main` como merge `461965c`. La base de integración exige un directorio privado persistente para archivos y claves de Data Protection en Production; no cambia el esquema. La comprobación de modelo no requiere nueva migración.
 
