@@ -1,4 +1,7 @@
 # Estado y entrega de Codex
+## Configuración de pruebas SQL pendiente en la sesión actual
+
+El usuario indicó que por el momento no puede configurar la conexión de la base aislada `db74230`; queda pendiente y no se debe volver a solicitar en cada incremento. La última ejecución documentada con esa conexión pasó las pruebas SQL en fechas anteriores; esa evidencia histórica se conserva, pero no acredita conexión disponible ahora. En esta actualización, la suite Release aprobó 51 pruebas y omitió nueve SQL Server. Al reanudar: guardar `ConnectionStrings:SqlServerTest` en User Secrets del proyecto API sin compartir ni versionar la cadena y ejecutar las pruebas SQL dirigidas. Nunca usar la cadena compartida para pruebas mutables. No se ejecutaron migraciones en esta actualización. La revisión del sync offline confirmó que la hora del dispositivo es solo auditoría: el servidor vuelve a validar asignación, estado y código, y la idempotencia compara el payload. Ver [project-status.md](project-status.md).
 
 ## Flujo de trabajo
 
