@@ -879,8 +879,20 @@ public sealed class BusinessApiTests
             "SubscribeOrder", internalOrderId)).Status);
         await using var courierOfferHub = CreateSignalRClient(factory, client, courierToken);
         var offerNotice = new TaskCompletionSource<ExternalOfferNotice>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var expiredNoticeStatus = new TaskCompletionSource<(Guid OfferId, ExternalDeliveryOfferStatus Status)>(TaskCreationOptions.RunContinuationsAsynchronously);
         var cancelledNoticeOne = new TaskCompletionSource<ExternalOfferChangedNotice>(TaskCreationOptions.RunContinuationsAsynchronously);
         courierOfferHub.On<ExternalOfferNotice>("ExternalOfferAvailable", notice => offerNotice.TrySetResult(notice));
+        courierOfferHub.On<ExternalOfferChangedNotice>("ExternalOfferChanged", async notice =>
+        {
+            if (notice.Status != "Expired") return;
+            await using var scope = factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var status = await db.ExternalDeliveryOffers.AsNoTracking()
+                .Where(offer => offer.Id == notice.OfferId)
+                .Select(offer => offer.Status)
+                .SingleAsync();
+            expiredNoticeStatus.TrySetResult((notice.OfferId, status));
+        });
         courierOfferHub.On<ExternalOfferChangedNotice>("ExternalOfferChanged", notice =>
         {
             if (notice.Status == "Cancelled") cancelledNoticeOne.TrySetResult(notice);
@@ -927,6 +939,9 @@ public sealed class BusinessApiTests
             using var dispatchJson = JsonDocument.Parse(await dispatch.Content.ReadAsStringAsync());
             Assert.Equal(2, dispatchJson.RootElement.GetProperty("offerCount").GetInt32());
         }
+        var observedExpiredNotice = await expiredNoticeStatus.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Contains(staleOfferIds, id => id == observedExpiredNotice.OfferId);
+        Assert.Equal(ExternalDeliveryOfferStatus.Expired, observedExpiredNotice.Status);
         await using (var expiredOffersScope = factory.Services.CreateAsyncScope())
         {
             var db = expiredOffersScope.ServiceProvider.GetRequiredService<AppDbContext>();
