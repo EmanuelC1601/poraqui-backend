@@ -23,6 +23,73 @@ namespace Poraqui.Domain.Tests;
 public sealed class BusinessApiTests
 {
     [Fact]
+    public async Task Revoked_admin_role_in_existing_token_cannot_use_admin_or_resource_wide_access()
+    {
+        await using var factory = new ApiTestHost();
+        using var client = factory.CreateClient();
+        await factory.InitializeDatabaseAsync();
+
+        var bootstrap = await client.PostAsJsonAsync("api/auth/bootstrap-admin", new
+        {
+            email = "role-revocation-admin@example.test", displayName = "Test Admin", password = "Test-Password-1!",
+            bootstrapKey = "integration-test-bootstrap-key-with-sufficient-length"
+        });
+        Assert.Equal(HttpStatusCode.Created, bootstrap.StatusCode);
+        var adminToken = await LoginAsync(client, "role-revocation-admin@example.test");
+        _ = await RegisterBusinessAsync(client, adminToken, "Negocio propio admin");
+        adminToken = await LoginAsync(client, "role-revocation-admin@example.test");
+
+        await RegisterAsync(client, "role-revocation-other-owner@example.test");
+        var otherOwnerToken = await LoginAsync(client, "role-revocation-other-owner@example.test");
+        var otherBusinessId = await RegisterBusinessAsync(client, otherOwnerToken, "Negocio de otro dueño");
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var admin = await users.FindByEmailAsync("role-revocation-admin@example.test");
+            Assert.NotNull(admin);
+            var revoked = await users.RemoveFromRoleAsync(admin!, ApplicationRoles.PlatformAdmin);
+            Assert.True(revoked.Succeeded);
+            Assert.True(await users.IsInRoleAsync(admin!, ApplicationRoles.BusinessOwner));
+        }
+
+        using var adminMetrics = await SendAsync(client, HttpMethod.Get,
+            "api/admin/metrics/pilot", adminToken);
+        Assert.Equal(HttpStatusCode.Forbidden, adminMetrics.StatusCode);
+
+        using var foreignBusiness = await SendAsync(client, HttpMethod.Get,
+            $"api/businesses/{otherBusinessId}", adminToken);
+        Assert.Equal(HttpStatusCode.Forbidden, foreignBusiness.StatusCode);
+
+        await RegisterAsync(client, "role-revocation-order-customer@example.test");
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var customer = await users.FindByEmailAsync("role-revocation-order-customer@example.test");
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var zone = new DeliveryZone("Role revocation realtime zone");
+            var order = new Order(customer!.Id, otherBusinessId, zone.Id, "Private customer destination", 0m,
+                [(Guid.NewGuid(), "Test item", 10m, 1)]);
+            db.DeliveryZones.Add(zone);
+            db.Orders.Add(order);
+            await db.SaveChangesAsync();
+
+            using var staleAdminIncidents = await SendAsync(client, HttpMethod.Get,
+                $"api/orders/{order.Id}/incidents", adminToken);
+            Assert.Equal(HttpStatusCode.Forbidden, staleAdminIncidents.StatusCode);
+            using var staleAdminReport = await SendAsync(client, HttpMethod.Post,
+                $"api/orders/{order.Id}/incidents", adminToken,
+                JsonContent.Create(new { commandId = Guid.NewGuid(), category = "Access", description = "Should be denied" }));
+            Assert.Equal(HttpStatusCode.Forbidden, staleAdminReport.StatusCode);
+
+            await using var staleAdminHub = CreateSignalRClient(factory, client, adminToken);
+            await staleAdminHub.StartAsync();
+            await Assert.ThrowsAsync<HubException>(() => staleAdminHub.InvokeAsync<OrderRealtimeSnapshot>(
+                "SubscribeOrder", order.Id));
+        }
+    }
+
+    [Fact]
     public async Task External_courier_role_and_availability_profile_are_provisioned_and_revoked_together()
     {
         await using var factory = new ApiTestHost();

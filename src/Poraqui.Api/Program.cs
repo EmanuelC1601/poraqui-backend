@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.OpenApi;
 using System.Text.Json.Schema;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 using Poraqui.Infrastructure.Identity;
 using Poraqui.Infrastructure.Persistence;
 using Poraqui.Api.Security;
@@ -183,6 +184,8 @@ if (!string.IsNullOrWhiteSpace(connectionString))
     builder.Services.AddSingleton<ITransferEvidenceStorage, FileTransferEvidenceStorage>();
 }
 builder.Services.AddPoraquiAuthorization();
+if (identityConfigured)
+    builder.Services.AddScoped<IAuthorizationHandler, CurrentRoleMembershipHandler>();
 
 var app = builder.Build();
 

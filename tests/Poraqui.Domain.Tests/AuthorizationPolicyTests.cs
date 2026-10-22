@@ -14,6 +14,7 @@ public sealed class AuthorizationPolicyTests
         using var provider = new ServiceCollection()
             .AddLogging()
             .AddPoraquiAuthorization()
+            .AddSingleton<IAuthorizationHandler, ClaimRoleMembershipTestHandler>()
             .BuildServiceProvider();
         var authorization = provider.GetRequiredService<IAuthorizationService>();
         var owner = UserWithRole(ApplicationRoles.BusinessOwner);
@@ -31,4 +32,14 @@ public sealed class AuthorizationPolicyTests
     private static ClaimsPrincipal UserWithRole(string role) => new(new ClaimsIdentity(
         [new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()), new Claim(ClaimTypes.Role, role)],
         authenticationType: "test"));
+
+    private sealed class ClaimRoleMembershipTestHandler : AuthorizationHandler<CurrentRoleMembershipRequirement>
+    {
+        protected override Task HandleRequirementAsync(AuthorizationHandlerContext context,
+            CurrentRoleMembershipRequirement requirement)
+        {
+            if (requirement.RoleNames.Any(context.User.IsInRole)) context.Succeed(requirement);
+            return Task.CompletedTask;
+        }
+    }
 }
