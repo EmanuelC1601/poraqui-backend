@@ -68,7 +68,6 @@ public sealed class ExternalCourierService(IExternalCourierRepository repository
         var couriers = await repository.GetAvailableCouriersAsync(order.ZoneId, ct);
         var now = DateTimeOffset.UtcNow;
         var expired = await repository.ExpireDueOffersForOrderAsync(order.Id, now, ct);
-        await PublishChangesAsync(expired, ct);
         var existing = await repository.GetCouriersWithActiveOffersAsync(order.Id, now, ct);
         var expiresAt = now.Add(offerDuration);
         var createdOffers = new List<ExternalDeliveryOffer>();
@@ -81,6 +80,7 @@ public sealed class ExternalCourierService(IExternalCourierRepository repository
                 createdOffers.Add(offer);
             }
         await repository.SaveChangesAsync(ct);
+        await PublishChangesAsync(expired, ct);
         foreach (var offer in createdOffers)
             await offerPublisher.PublishAvailableAsync(offer.CourierUserId,
                 new ExternalOfferNotice(offer.Id, offer.OrderId), ct);
