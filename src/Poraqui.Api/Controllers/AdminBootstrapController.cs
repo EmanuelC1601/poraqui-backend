@@ -5,6 +5,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Poraqui.Application.Security;
 using Poraqui.Infrastructure.Identity;
@@ -22,6 +23,8 @@ public sealed class AdminBootstrapController(
 {
     [AllowAnonymous]
     [HttpPost]
+    [EnableRateLimiting("AdminBootstrap")]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> CreateFirstAdministrator([FromBody] BootstrapAdminRequest request, CancellationToken cancellationToken)
     {
         var configuredKey = configuration["Bootstrap:AdminKey"];

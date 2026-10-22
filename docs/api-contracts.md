@@ -5,6 +5,7 @@ Estado: `main` es la base única de integración. Este documento describe los co
 ## Identidad, permisos y comercio
 
 - Identity API bajo `/api/auth` con bearer; bootstrap inicial `/api/auth/bootstrap-admin` requiere `Bootstrap:AdminKey` privada.
+- El bootstrap anónimo limita por IP a cinco intentos cada 10 minutos y devuelve `429` al excederlo. Quita `Bootstrap:AdminKey` y reinicia después de crear el primer administrador.
 - Roles: `PlatformAdmin`, `BusinessOwner`, `DeliveryPerson`, `ExternalCourier`; policies `PlatformAdministration`, `ManageBusiness`, `DeliveryOperations`. Además de los claims JWT, las políticas verifican la pertenencia actual del usuario al rol en Identity; un claim obsoleto tras revocar el rol no concede acceso. El hub también confirma el rol actual de administrador antes de autorizar suscripciones de alcance global.
 - Negocios en `/api/businesses`; catálogo en `/api/businesses/{id}/products`, opciones en `/api/products/{id}/option-groups` y disponibilidad en endpoints `/availability`.
 - Zonas `/api/delivery-zones/active`; administración por plataforma. Negocio configura tarifas por zona y horarios semanales.
