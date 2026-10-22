@@ -24,7 +24,7 @@ public sealed class OrdersHub(OrderWorkflowService workflow, ExternalCourierServ
         if (subscription.Audience == "courier" &&
             !await externalCourierRepository.HasDeliveryCourierRoleAsync(actorId, Context.ConnectionAborted))
             throw new HubException("Current courier role is required to subscribe to an order.");
-        var group = OrderChangeGroups.For(orderId, subscription.Audience);
+        var group = OrderChangeGroups.For(orderId, subscription.Audience, actorId);
         await Groups.AddToGroupAsync(Context.ConnectionId, group, Context.ConnectionAborted);
 
         try
@@ -39,7 +39,7 @@ public sealed class OrdersHub(OrderWorkflowService workflow, ExternalCourierServ
             if (current.Audience != subscription.Audience)
             {
                 await Groups.RemoveFromGroupAsync(Context.ConnectionId, group, Context.ConnectionAborted);
-                group = OrderChangeGroups.For(orderId, current.Audience);
+                group = OrderChangeGroups.For(orderId, current.Audience, actorId);
                 await Groups.AddToGroupAsync(Context.ConnectionId, group, Context.ConnectionAborted);
                 current = await workflow.GetRealtimeSnapshotAsync(orderId, actorId, isAdmin, Context.ConnectionAborted);
             }
@@ -54,8 +54,11 @@ public sealed class OrdersHub(OrderWorkflowService workflow, ExternalCourierServ
 
     public async Task UnsubscribeOrder(Guid orderId)
     {
-        foreach (var role in new[] { "customer", "business", "courier", "admin" })
+        foreach (var role in new[] { "customer", "business", "courier" })
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, OrderChangeGroups.For(orderId, role), Context.ConnectionAborted);
+        if (Guid.TryParse(Context.User?.FindFirstValue(ClaimTypes.NameIdentifier) ??
+                          Context.User?.FindFirstValue("sub"), out var actorId))
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, OrderChangeGroups.ForAdmin(orderId, actorId), Context.ConnectionAborted);
     }
 
     public async Task<IReadOnlyList<ExternalOfferView>> SubscribeCourierOffers()
@@ -97,6 +100,9 @@ public sealed class OrdersHub(OrderWorkflowService workflow, ExternalCourierServ
 public static class OrderChangeGroups
 {
     public static string For(Guid orderId, string role) => $"order:{orderId:N}:{role}";
+    public static string For(Guid orderId, string role, Guid userId) =>
+        role == "admin" ? ForAdmin(orderId, userId) : For(orderId, role);
+    public static string ForAdmin(Guid orderId, Guid adminUserId) => $"order:{orderId:N}:admin:{adminUserId:N}";
 }
 
 public static class ExternalOfferChangeGroups
@@ -105,7 +111,7 @@ public static class ExternalOfferChangeGroups
 }
 
 public sealed class SignalROrderChangePublisher(IHubContext<OrdersHub> hub, ILogger<SignalROrderChangePublisher> logger,
-    IExternalCourierRepository couriers)
+    IExternalCourierRepository couriers, IPlatformAdminDirectory platformAdmins)
     : IOrderChangePublisher
 {
     public async Task PublishAsync(OrderChangeNotice notice, CancellationToken cancellationToken)
@@ -116,12 +122,13 @@ public sealed class SignalROrderChangePublisher(IHubContext<OrdersHub> hub, ILog
             var groups = new List<string>
             {
                 OrderChangeGroups.For(notice.OrderId, "customer"),
-                OrderChangeGroups.For(notice.OrderId, "business"),
-                OrderChangeGroups.For(notice.OrderId, "admin")
+                OrderChangeGroups.For(notice.OrderId, "business")
             };
             if (notice.CourierUserId is { } courierId &&
                 await couriers.HasDeliveryCourierRoleAsync(courierId, cancellationToken))
                 groups.Add(OrderChangeGroups.For(notice.OrderId, "courier"));
+            groups.AddRange((await platformAdmins.GetCurrentPlatformAdminUserIdsAsync(cancellationToken))
+                .Select(adminId => OrderChangeGroups.ForAdmin(notice.OrderId, adminId)));
             await hub.Clients.Groups(groups).SendAsync("OrderChanged", payload, cancellationToken);
         }
         catch (Exception exception)

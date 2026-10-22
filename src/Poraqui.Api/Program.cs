@@ -177,6 +177,7 @@ if (!string.IsNullOrWhiteSpace(connectionString))
         (IExternalOfferSecretProtector)provider.GetRequiredService<IOrderCommandSecretProtector>());
     builder.Services.AddScoped<IOrderWorkflowRepository, OrderWorkflowRepository>();
     builder.Services.AddScoped<OrderWorkflowService>();
+    builder.Services.AddScoped<IPlatformAdminDirectory, PlatformAdminDirectory>();
     builder.Services.AddScoped<IExternalCourierRepository, ExternalCourierRepository>();
     builder.Services.AddScoped<ExternalCourierService>();
     if (!builder.Environment.IsEnvironment("Testing"))
