@@ -51,6 +51,7 @@ public sealed class ExternalCourierService(IExternalCourierRepository repository
     public async Task<int> ExpireDueOffersAsync(CancellationToken ct)
     {
         var expired = await repository.ExpireDueOffersAsync(DateTimeOffset.UtcNow, ct);
+        if (expired.Count > 0) await repository.SaveChangesAsync(ct);
         await PublishChangesAsync(expired, ct);
         return expired.Count;
     }

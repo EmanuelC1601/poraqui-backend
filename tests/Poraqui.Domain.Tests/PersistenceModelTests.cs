@@ -119,7 +119,7 @@ public sealed class PersistenceModelTests
     }
 
     [Fact]
-    public async Task Expiration_sweep_persists_due_external_offers_without_changing_unexpired_offers()
+    public async Task Expiration_sweep_marks_due_offers_and_caller_persists_without_changing_unexpired_offers()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
@@ -149,6 +149,10 @@ public sealed class PersistenceModelTests
         {
             var repository = new ExternalCourierRepository(db);
             Assert.Single(await repository.ExpireDueOffersAsync(now.AddMinutes(6), default));
+            await using (var beforeSave = new AppDbContext(options))
+                Assert.Equal(ExternalDeliveryOfferStatus.Offered,
+                    (await beforeSave.ExternalDeliveryOffers.SingleAsync(x => x.Id == due.Id)).Status);
+            await repository.SaveChangesAsync(default);
         }
 
         await using var verify = new AppDbContext(options);
