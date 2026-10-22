@@ -3,6 +3,8 @@
 
 El usuario indicó que por el momento no puede configurar la conexión de la base aislada `db74230`; queda pendiente y no se debe volver a solicitar en cada incremento. La última ejecución documentada con esa conexión pasó las pruebas SQL en fechas anteriores; esa evidencia histórica se conserva, pero no acredita conexión disponible ahora. En esta actualización, la suite Release aprobó 51 pruebas y omitió nueve SQL Server. Al reanudar: guardar `ConnectionStrings:SqlServerTest` en User Secrets del proyecto API sin compartir ni versionar la cadena y ejecutar las pruebas SQL dirigidas. Nunca usar la cadena compartida para pruebas mutables. No se ejecutaron migraciones en esta actualización. La revisión del sync offline confirmó que la hora del dispositivo es solo auditoría: el servidor vuelve a validar asignación, estado y código, y la idempotencia compara el payload. Ver [project-status.md](project-status.md).
 
+PR #123 se integró en `main` como `b22a545`; `build-and-test` pasó antes del merge. En `feature/transfer-evidence-storage-tests`, las pruebas enfocadas de almacenamiento de comprobantes pasan 9/9 y la suite Release pasa 60 pruebas con 9 pruebas SQL omitidas. La suite usa SQLite y filesystem temporal; no se ejecutaron migraciones ni se accedió a SQL Server.
+
 ## Flujo de trabajo
 
 El backend tiene un único responsable. `main` es la base de integración; cada incremento parte de `main` actualizado en una rama `feature/*`, se verifica y se integra mediante PR. Contratos, `AppDbContext` y migraciones tienen un solo propietario. La asignación anterior a OpenCode queda como antecedente en `docs/team-work.md`.
